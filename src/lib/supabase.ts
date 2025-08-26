@@ -1,12 +1,15 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL!
-const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY!
+// Correctly get the environment variables using import.meta.env
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
+// Throw an error if the variables are not defined
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables')
+  throw new Error('Supabase URL and/or Anon Key are missing from environment variables.')
 }
 
+// Create and export the Supabase client
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 // Helper function to get current user profile
