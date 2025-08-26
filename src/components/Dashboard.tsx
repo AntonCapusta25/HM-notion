@@ -272,7 +272,7 @@ export const Dashboard = () => {
                 onClick={() => setSelectedTask(task)}
                 onAssign={handleAssignTask}
               />
-    _        ))}
+           ))}
           </CardContent>
         </Card>
 
