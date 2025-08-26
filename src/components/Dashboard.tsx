@@ -63,7 +63,7 @@ export const Dashboard = () => {
     fetchDashboardStats();
   }, [userProfile]);
 
-  if (authLoading || tasksLoading || statsLoading) {
+  if (authLoading || statsLoading) { // Temporarily removed 'tasksLoading'
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
