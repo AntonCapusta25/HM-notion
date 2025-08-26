@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -11,8 +10,11 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { CalendarIcon, Plus, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { mockUsers } from '../data/mockData';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+// CHANGED: Import from useTaskStore instead of mockData
+import { useTaskStore } from '../hooks/useTaskStore';
+import { useAuth } from '../contexts/AuthContext';
 
 interface CreateTaskDialogProps {
   open: boolean;
@@ -21,6 +23,10 @@ interface CreateTaskDialogProps {
 }
 
 export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTaskDialogProps) => {
+  // ADDED: Get real users and createTask function from Supabase
+  const { users, createTask } = useTaskStore();
+  const { userProfile } = useAuth();
+  
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [assignedTo, setAssignedTo] = useState('');
@@ -28,35 +34,69 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
   const [dueDate, setDueDate] = useState<Date>();
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
+  
+  // ADDED: Loading and error states for better UX
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // UPDATED: Handle submission with Supabase
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const taskData = {
-      title,
-      description,
-      assignedTo,
-      priority,
-      dueDate: dueDate?.toISOString(),
-      tags,
-      status: 'todo' as const
-    };
     
-    if (onCreateTask) {
-      onCreateTask(taskData);
-    } else {
-      console.log('Creating task:', taskData);
+    if (!userProfile) {
+      setError('You must be logged in to create tasks');
+      return;
     }
-    
-    onOpenChange(false);
-    // Reset form
+
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      const taskData = {
+        title,
+        description,
+        assignedTo,
+        priority: priority as 'low' | 'medium' | 'high',
+        dueDate: dueDate?.toISOString().split('T')[0], // Format for Supabase date field
+        tags,
+        status: 'todo' as const,
+        subtasks: [] // Start with empty subtasks
+      };
+      
+      // Use the createTask function from useTaskStore (now connected to Supabase)
+      if (onCreateTask) {
+        // If parent component wants to handle creation
+        await onCreateTask(taskData);
+      } else {
+        // Use the Supabase-connected createTask directly
+        await createTask(taskData);
+      }
+      
+      // Success - close dialog and reset form
+      onOpenChange(false);
+      resetForm();
+      
+    } catch (err) {
+      console.error('Error creating task:', err);
+      setError('Failed to create task. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // ADDED: Form reset function
+  const resetForm = () => {
     setTitle('');
     setDescription('');
     setAssignedTo('');
     setPriority('');
     setDueDate(undefined);
     setTags([]);
+    setNewTag('');
+    setError(null);
   };
 
+  // UNCHANGED: Keep your existing tag management
   const addTag = () => {
     if (newTag.trim() && !tags.includes(newTag.trim())) {
       setTags([...tags, newTag.trim()]);
@@ -75,6 +115,13 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
           <DialogTitle>Create New Task</DialogTitle>
         </DialogHeader>
         
+        {/* ADDED: Error display */}
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
             <Label htmlFor="title">Task Title</Label>
@@ -84,6 +131,7 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Enter task title..."
               required
+              disabled={isSubmitting} // ADDED: Disable during submission
             />
           </div>
 
@@ -95,18 +143,20 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Describe the task..."
               rows={3}
+              disabled={isSubmitting} // ADDED: Disable during submission
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Assign To</Label>
-              <Select value={assignedTo} onValueChange={setAssignedTo}>
+              <Select value={assignedTo} onValueChange={setAssignedTo} disabled={isSubmitting}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select team member" />
                 </SelectTrigger>
                 <SelectContent>
-                  {mockUsers.map(user => (
+                  {/* CHANGED: Use real users from Supabase instead of mockUsers */}
+                  {users.map(user => (
                     <SelectItem key={user.id} value={user.id}>
                       {user.name} ({user.department})
                     </SelectItem>
@@ -117,7 +167,7 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
 
             <div className="space-y-2">
               <Label>Priority</Label>
-              <Select value={priority} onValueChange={setPriority}>
+              <Select value={priority} onValueChange={setPriority} disabled={isSubmitting}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select priority" />
                 </SelectTrigger>
@@ -140,6 +190,7 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
                     "w-full justify-start text-left font-normal",
                     !dueDate && "text-muted-foreground"
                   )}
+                  disabled={isSubmitting} // ADDED: Disable during submission
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {dueDate ? format(dueDate, "PPP") : <span>Pick a date</span>}
@@ -163,7 +214,10 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
               {tags.map(tag => (
                 <Badge key={tag} variant="secondary" className="gap-1">
                   {tag}
-                  <X className="h-3 w-3 cursor-pointer" onClick={() => removeTag(tag)} />
+                  <X 
+                    className="h-3 w-3 cursor-pointer" 
+                    onClick={() => removeTag(tag)}
+                  />
                 </Badge>
               ))}
             </div>
@@ -173,8 +227,15 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
                 onChange={(e) => setNewTag(e.target.value)}
                 placeholder="Add tag..."
                 onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
+                disabled={isSubmitting} // ADDED: Disable during submission
               />
-              <Button type="button" variant="outline" size="sm" onClick={addTag}>
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="sm" 
+                onClick={addTag}
+                disabled={isSubmitting} // ADDED: Disable during submission
+              >
                 <Plus className="h-4 w-4" />
               </Button>
             </div>
@@ -184,13 +245,16 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
             <Button 
               type="submit" 
               className="flex-1 bg-homemade-orange hover:bg-homemade-orange-dark"
+              disabled={isSubmitting || !title.trim()} // ADDED: Disable logic
             >
-              Create Task
+              {/* ADDED: Loading state */}
+              {isSubmitting ? 'Creating Task...' : 'Create Task'}
             </Button>
             <Button 
               type="button" 
               variant="outline" 
               onClick={() => onOpenChange(false)}
+              disabled={isSubmitting} // ADDED: Disable during submission
             >
               Cancel
             </Button>
