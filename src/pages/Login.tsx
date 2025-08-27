@@ -9,27 +9,24 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 
 const testSupabaseConnection = async () => {
   try {
+    // Test basic API
     const response = await fetch('https://nkvppuhwanflzowcqnjx.supabase.co/rest/v1/', {
       headers: {
         'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
       }
     });
     console.log('Supabase connection test:', response.status);
-  } catch (error) {
-    console.error('Supabase connection failed:', error);
-  }
-};
-
-const testAuthEndpoint = async () => {
-  try {
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/auth/v1/settings`, {
+    
+    // Test auth endpoint specifically
+    const authResponse = await fetch('https://nkvppuhwanflzowcqnjx.supabase.co/auth/v1/settings', {
       headers: {
         'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
       }
     });
-    console.log('Auth endpoint status:', response.status);
+    console.log('Auth endpoint test:', authResponse.status);
+    
   } catch (error) {
-    console.error('Auth endpoint failed:', error);
+    console.error('Connection failed:', error);
   }
 };
 
