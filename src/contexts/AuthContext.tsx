@@ -4,113 +4,87 @@ import { supabase } from '../lib/supabase'
 import { User } from '../types'
 
 interface AuthContextType {
-  user: SupabaseUser | null
-  userProfile: User | null
-  loading: boolean
-  signIn: (email: string, password: string) => Promise<{ data?: any; error?: any }>
-  signUp: (email: string, password: string, userData: Omit<User, 'id'>) => Promise<{ data?: any; error?: any }>
-  signOut: () => Promise<{ error?: any }>
-  isAdmin: boolean
+  user: SupabaseUser | null
+  userProfile: User | null
+  loading: boolean
+  signIn: (email: string, password: string) => Promise<{ data?: any; error?: any }>
+  signUp: (email: string, password: string, userData: Omit<User, 'id'>) => Promise<{ data?: any; error?: any }>
+  signOut: () => Promise<{ error?: any }>
+  isAdmin: boolean
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export const useAuth = () => {
-  const context = useContext(AuthContext)
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider')
-  }
-  return context
+  const context = useContext(AuthContext)
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider')
+  }
+  return context
 }
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<SupabaseUser | null>(null)
-  const [userProfile, setUserProfile] = useState<User | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [user, setUser] = useState<SupabaseUser | null>(null)
+  const [userProfile, setUserProfile] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
 
-  const fetchUserProfile = useCallback(async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', userId)
-        .single()
-      
-      if (data && !error) {
-        setUserProfile(data)
-      } else if (error) {
-        console.error('Error fetching user profile:', error)
-      }
-    } catch (err) {
-      console.error('Failed to fetch user profile:', err)
-    }
-  }, [])
+  const fetchUserProfile = useCallback(async (userId: string) => {
+    try {
+      const { data, error } = await supabase.from('users').select('*').eq('id', userId).single()
+      if (error) throw error
+      setUserProfile(data)
+    } catch (err) {
+      console.error('Error fetching user profile:', err)
+      setUserProfile(null)
+    }
+  }, [])
 
-  useEffect(() => {
-    const getInitialSession = async () => {
-      try {
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Auth timeout')), 10000)
-        );
-        
-        const sessionPromise = supabase.auth.getSession();
-        
-        const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]);
-        
-        if (session?.user) {
-          setUser(session.user)
-          await fetchUserProfile(session.user.id)
-        }
-      } catch (err) {
-        console.error('Error getting initial session:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
+  // FIX: A simpler, more robust useEffect that relies only on onAuthStateChange
+  useEffect(() => {
+    // onAuthStateChange fires immediately with the initial user session or null
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        if (session?.user) {
+          setUser(session.user)
+          await fetchUserProfile(session.user.id)
+        } else {
+          setUser(null)
+          setUserProfile(null)
+        }
+        setLoading(false)
+      }
+    )
 
-    getInitialSession()
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [fetchUserProfile])
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_, session) => {
-        if (session?.user) {
-          setUser(session.user)
-          await fetchUserProfile(session.user.id)
-        } else {
-          setUser(null)
-          setUserProfile(null)
-        }
-        setLoading(false)
-      }
-    )
+  const signIn = useCallback(async (email: string, password: string) => {
+    return await supabase.auth.signInWithPassword({ email, password })
+  }, [])
 
-    return () => subscription.unsubscribe()
-  }, [fetchUserProfile])
+  const signUp = useCallback(async (email: string, password: string, userData: Omit<User, 'id'>) => {
+    const { data, error } = await supabase.auth.signUp({ email, password })
+    if (data.user && !error) {
+      await supabase.from('users').insert([{ id: data.user.id, email, ...userData }])
+    }
+    return { data, error }
+  }, [])
 
-  const signIn = useCallback(async (email: string, password: string) => {
-    return await supabase.auth.signInWithPassword({ email, password })
-  }, [])
+  const signOut = useCallback(async () => {
+    return await supabase.auth.signOut()
+  }, [])
 
-  const signUp = useCallback(async (email: string, password: string, userData: Omit<User, 'id'>) => {
-    const { data, error } = await supabase.auth.signUp({ email, password })
-    if (data.user && !error) {
-      await supabase.from('users').insert([{ id: data.user.id, email, ...userData }])
-    }
-    return { data, error }
-  }, [])
+  const value = useMemo(() => ({
+    user,
+    userProfile,
+    loading,
+    signIn,
+    signUp,
+    signOut,
+    isAdmin: userProfile?.role === 'admin'
+  }), [user, userProfile, loading, signIn, signUp, signOut])
 
-  const signOut = useCallback(async () => {
-    return await supabase.auth.signOut()
-  }, [])
-
-  const value = useMemo(() => ({
-    user,
-    userProfile,
-    loading,
-    signIn,
-    signUp,
-    signOut,
-    isAdmin: userProfile?.role === 'admin'
-  }), [user, userProfile, loading, signIn, signUp, signOut])
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
