@@ -7,12 +7,20 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
-const Login = () => {
-  // TEMPORARY DEBUG - Remove this after testing
-  console.log('VITE_SUPABASE_URL:', import.meta.env.VITE_SUPABASE_URL);
-  console.log('VITE_SUPABASE_ANON_KEY exists:', !!import.meta.env.VITE_SUPABASE_ANON_KEY);
-  console.log('All env vars:', import.meta.env);
+const testSupabaseConnection = async () => {
+  try {
+    const response = await fetch('https://nkvppuhwanflzowcqnjx.supabase.co/rest/v1/', {
+      headers: {
+        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
+      }
+    });
+    console.log('Supabase connection test:', response.status);
+  } catch (error) {
+    console.error('Supabase connection failed:', error);
+  }
+};
 
+const Login = () => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
