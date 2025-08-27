@@ -6,7 +6,48 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+// Add this inside your Login component, after the other state variables
+const [connectionTest, setConnectionTest] = useState('');
 
+const testConnection = async () => {
+  setConnectionTest('Testing...');
+  
+  try {
+    // Test 1: Basic API endpoint
+    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/`, {
+      headers: {
+        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+      }
+    });
+    
+    if (response.ok) {
+      setConnectionTest('API connection works');
+      
+      // Test 2: Auth endpoint
+      const authResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/auth/v1/settings`, {
+        headers: {
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
+        }
+      });
+      
+      if (authResponse.ok) {
+        setConnectionTest('Both API and Auth work');
+      } else {
+        setConnectionTest(`Auth failed: ${authResponse.status}`);
+      }
+    } else {
+      setConnectionTest(`API failed: ${response.status} - ${response.statusText}`);
+    }
+  } catch (error) {
+    setConnectionTest(`Connection failed: ${error.message}`);
+  }
+};
+
+// Add this button in your JSX, after the login form:
+<Button onClick={testConnection} variant="outline" className="w-full mt-4">
+  Test Connection: {connectionTest || 'Click to test'}
+</Button>
 const testSupabaseConnection = async () => {
   try {
     const response = await fetch('https://nkvppuhwanflzowcqnjx.supabase.co/rest/v1/', {
