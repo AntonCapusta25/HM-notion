@@ -1,42 +1,29 @@
-useEffect(() => {
-  const getInitialSession = async () => {
-    try {
-      // Add timeout to prevent hanging forever
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Auth timeout')), 10000)
-      );
-      
-      const sessionPromise = supabase.auth.getSession();
-      
-      const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]);
-      
-      if (session?.user) {
-        setUser(session.user)
-        await fetchUserProfile(session.user.id)
-      }
-    } catch (err) {
-      console.error('Error getting initial session:', err)
-      // Force loading to false even on error
-    } finally {
-      setLoading(false)
-    }
+import { useAuth } from '../contexts/AuthContext'
+import { Navigate } from 'react-router-dom'
+
+interface ProtectedRouteProps {
+  children: React.ReactNode
+}
+
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
+  const { user, userProfile, loading } = useAuth()
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    )
   }
 
-  getInitialSession()
+  if (!user || !userProfile) {
+    return <Navigate to="/login" replace />
+  }
 
-  // Listen for auth changes
-  const { data: { subscription } } = supabase.auth.onAuthStateChange(
-    async (event, session) => {
-      if (session?.user) {
-        setUser(session.user)
-        await fetchUserProfile(session.user.id)
-      } else {
-        setUser(null)
-        setUserProfile(null)
-      }
-      setLoading(false)
-    }
-  )
+  return <>{children}</>
+}
 
-  return () => subscription.unsubscribe()
-}, [fetchUserProfile])
+export default ProtectedRoute
