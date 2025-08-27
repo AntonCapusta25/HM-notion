@@ -7,6 +7,29 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
+const testDirectLogin = async () => {
+  try {
+    console.log("Testing direct login...");
+    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: {
+        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        email: 'ali@homemade.com',    // Use your test admin email
+        password: 'password123'       // Use your test password
+      })
+    });
+
+    console.log('Direct login test status:', response.status);
+    const data = await response.json();
+    console.log('Direct login test response:', data);
+
+  } catch (error) {
+    console.error('Direct login test failed:', error);
+  }
+};
 const testSupabaseConnection = async () => {
   try {
     // Test basic API
@@ -114,6 +137,10 @@ const Login = () => {
             className="w-full mt-4"
           >
             Test Supabase Connection
+          </Button>
+
+          <Button onClick={testDirectLogin} variant="destructive" className="w-full mt-2">
+          Test Direct Login API
           </Button>
 
           {/* Development helper */}
