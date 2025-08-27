@@ -20,6 +20,19 @@ const testSupabaseConnection = async () => {
   }
 };
 
+const testAuthEndpoint = async () => {
+  try {
+    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/auth/v1/settings`, {
+      headers: {
+        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
+      }
+    });
+    console.log('Auth endpoint status:', response.status);
+  } catch (error) {
+    console.error('Auth endpoint failed:', error);
+  }
+};
+
 const Login = () => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
