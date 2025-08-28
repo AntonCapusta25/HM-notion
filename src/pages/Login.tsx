@@ -6,69 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-
-const testQuery = async () => {
-  console.log('Testing direct profile query...');
-  try {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', '5dc1149d-f75c-43e0-95b5-798473f89989')
-      .single();
-    
-    console.log('Direct query result:', { data, error });
-  } catch (err) {
-    console.log('Direct query failed:', err);
-  }
-};
-
-// Add this button to your login page
-<button onClick={testQuery}>Test Profile Query</button>
-const testDirectLogin = async () => {
-  try {
-    console.log("Testing direct login...");
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/auth/v1/token?grant_type=password`, {
-      method: 'POST',
-      headers: {
-        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        email: 'ali@homemade.com',    // Use your test admin email
-        password: 'password123'       // Use your test password
-      })
-    });
-
-    console.log('Direct login test status:', response.status);
-    const data = await response.json();
-    console.log('Direct login test response:', data);
-
-  } catch (error) {
-    console.error('Direct login test failed:', error);
-  }
-};
-const testSupabaseConnection = async () => {
-  try {
-    // Test basic API
-    const response = await fetch('https://nkvppuhwanflzowcqnjx.supabase.co/rest/v1/', {
-      headers: {
-        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
-      }
-    });
-    console.log('Supabase connection test:', response.status);
-    
-    // Test auth endpoint specifically
-    const authResponse = await fetch('https://nkvppuhwanflzowcqnjx.supabase.co/auth/v1/settings', {
-      headers: {
-        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
-      }
-    });
-    console.log('Auth endpoint test:', authResponse.status);
-    
-  } catch (error) {
-    console.error('Connection failed:', error);
-  }
-};
+import { supabase } from '../lib/supabase'
 
 const Login = () => {
   const [email, setEmail] = useState('')
@@ -81,6 +19,66 @@ const Login = () => {
   if (user) {
     return <Navigate to="/" replace />
   }
+
+  const testQuery = async () => {
+    console.log('Testing direct profile query...');
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', '5dc1149d-f75c-43e0-95b5-798473f89989')
+        .single();
+      
+      console.log('Direct query result:', { data, error });
+    } catch (err) {
+      console.log('Direct query failed:', err);
+    }
+  };
+
+  const testDirectLogin = async () => {
+    try {
+      console.log("Testing direct login...");
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+        method: 'POST',
+        headers: {
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email: 'ali@homemade.com',
+          password: 'password123'
+        })
+      });
+
+      console.log('Direct login test status:', response.status);
+      const data = await response.json();
+      console.log('Direct login test response:', data);
+
+    } catch (error) {
+      console.error('Direct login test failed:', error);
+    }
+  };
+
+  const testSupabaseConnection = async () => {
+    try {
+      const response = await fetch('https://nkvppuhwanflzowcqnjx.supabase.co/rest/v1/', {
+        headers: {
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
+        }
+      });
+      console.log('Supabase connection test:', response.status);
+      
+      const authResponse = await fetch('https://nkvppuhwanflzowcqnjx.supabase.co/auth/v1/settings', {
+        headers: {
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
+        }
+      });
+      console.log('Auth endpoint test:', authResponse.status);
+      
+    } catch (error) {
+      console.error('Connection failed:', error);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -147,7 +145,7 @@ const Login = () => {
             </Button>
           </form>
 
-          {/* Test connection button */}
+          {/* Test buttons */}
           <Button 
             onClick={testSupabaseConnection}
             variant="outline" 
@@ -156,11 +154,21 @@ const Login = () => {
             Test Supabase Connection
           </Button>
 
-          <Button onClick={testDirectLogin} variant="destructive" className="w-full mt-2">
-          Test Direct Login API
+          <Button 
+            onClick={testDirectLogin} 
+            variant="destructive" 
+            className="w-full mt-2"
+          >
+            Test Direct Login API
           </Button>
 
-          <button onClick={testQuery}>Test Profile Query</button>
+          <Button 
+            onClick={testQuery}
+            variant="secondary"
+            className="w-full mt-2"
+          >
+            Test Profile Query
+          </Button>
 
           {/* Development helper */}
           <div className="mt-6 p-4 bg-muted rounded-lg">
