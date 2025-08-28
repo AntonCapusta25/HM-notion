@@ -7,6 +7,23 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
+const testQuery = async () => {
+  console.log('Testing direct profile query...');
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', '5dc1149d-f75c-43e0-95b5-798473f89989')
+      .single();
+    
+    console.log('Direct query result:', { data, error });
+  } catch (err) {
+    console.log('Direct query failed:', err);
+  }
+};
+
+// Add this button to your login page
+<button onClick={testQuery}>Test Profile Query</button>
 const testDirectLogin = async () => {
   try {
     console.log("Testing direct login...");
@@ -142,6 +159,8 @@ const Login = () => {
           <Button onClick={testDirectLogin} variant="destructive" className="w-full mt-2">
           Test Direct Login API
           </Button>
+
+          <button onClick={testQuery}>Test Profile Query</button>
 
           {/* Development helper */}
           <div className="mt-6 p-4 bg-muted rounded-lg">
