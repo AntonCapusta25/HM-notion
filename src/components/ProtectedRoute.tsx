@@ -1,29 +1,45 @@
-import { useAuth } from '../contexts/AuthContext'
-import { Navigate } from 'react-router-dom'
+import React from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { Navigate, useLocation } from 'react-router-dom';
+
+// A simple, self-contained loading screen component
+const LoadingScreen = () => (
+  <div className="min-h-screen flex items-center justify-center">
+    <div className="text-center">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+      <p className="mt-4 text-muted-foreground">Loading...</p>
+    </div>
+  </div>
+);
 
 interface ProtectedRouteProps {
-  children: React.ReactNode
+  children: React.ReactNode;
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { user, userProfile, loading } = useAuth()
+  const { user, userProfile, loading } = useAuth();
+  const location = useLocation();
 
+  // 1. While the AuthProvider is determining the initial auth state, show a loading screen.
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    )
+    return <LoadingScreen />;
   }
 
-  if (!user || !userProfile) {
-    return <Navigate to="/login" replace />
+  // 2. If the initial load is finished and there is no authenticated user, redirect to the login page.
+  // We pass the original location so we can redirect them back after they log in.
+  if (!user) {
+    return <Navigate to="/signin" state={{ from: location }} replace />;
   }
 
-  return <>{children}</>
-}
+  // 3. (THE FIX) If there IS a user but we're still waiting for their profile from the database,
+  // continue to show the loading screen. This prevents the redirect loop.
+  if (!userProfile) {
+    return <LoadingScreen />;
+  }
 
-export default ProtectedRoute
+  // 4. If all checks pass (loading is done, user is authenticated, and profile is loaded),
+  // show the protected page content.
+  return <>{children}</>;
+};
+
+export default ProtectedRoute;
