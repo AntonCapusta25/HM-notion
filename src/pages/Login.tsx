@@ -26,7 +26,7 @@ const Login = () => {
       const { data, error } = await supabase
         .from('users')
         .select('*')
-        .eq('id', '5dc1149d-f75c-43e0-95b5-798473f89989')
+        .eq('id', 'fa49a622-3867-4106-b612-92745b01e298')
         .single();
       
       console.log('Direct query result:', { data, error });
