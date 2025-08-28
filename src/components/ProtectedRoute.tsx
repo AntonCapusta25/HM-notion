@@ -20,13 +20,12 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const { user, userProfile, loading } = useAuth();
   const location = useLocation();
 
-  // 1. While the AuthProvider is determining the initial auth state, show a loading screen.
+  // 1. While the AuthProvider is checking the initial auth state, show a loading screen.
   if (loading) {
     return <LoadingScreen />;
   }
 
   // 2. If the initial load is finished and there is no authenticated user, redirect to the login page.
-  // We pass the original location so we can redirect them back after they log in.
   if (!user) {
     return <Navigate to="/signin" state={{ from: location }} replace />;
   }
