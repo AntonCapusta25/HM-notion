@@ -7,6 +7,7 @@ import { WorkspaceSelector } from '../components/WorkspaceSelector';
 import { ListView } from '../components/ListView';
 import { useTaskStore } from '../hooks/useTaskStore';
 import { useAuth } from '../contexts/AuthContext';
+import { useProfile } from '../hooks/useProfile'; // Add this import
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -15,10 +16,11 @@ import { Plus, Calendar, AlertCircle, LayoutGrid, List } from 'lucide-react';
 import { Task } from '../types';
 
 const MyTasks = () => {
-  // CHANGED: Get authentication and use personal_only filter for Supabase
-  const { userProfile, loading: authLoading } = useAuth();
+  // FIXED: Separate useAuth and useProfile
+  const { user } = useAuth();
+  const { profile: userProfile, loading: profileLoading, error: profileError } = useProfile();
   
-  // CHANGED: Use personal_only filter to get only user's tasks from Supabase
+  // Use personal_only filter to get only user's tasks from Supabase
   const { 
     tasks: personalTasks, 
     users, 
@@ -31,7 +33,7 @@ const MyTasks = () => {
     loading: tasksLoading,
     error
   } = useTaskStore({ 
-    filters: { personal_only: true } // This replaces the client-side filtering
+    filters: { personal_only: true }
   });
   
   const [showCreateTask, setShowCreateTask] = useState(false);
@@ -40,8 +42,8 @@ const MyTasks = () => {
   const [filter, setFilter] = useState<'all' | 'today' | 'week' | 'overdue'>('all');
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
 
-  // ADDED: Loading state
-  if (authLoading || tasksLoading) {
+  // FIXED: Updated loading state to include profileLoading
+  if (profileLoading || tasksLoading) {
     return (
       <Layout>
         <div className="min-h-screen flex items-center justify-center">
@@ -54,7 +56,20 @@ const MyTasks = () => {
     );
   }
 
-  // ADDED: Error state
+  // FIXED: Added profile error handling
+  if (profileError) {
+    return (
+      <Layout>
+        <Alert variant="destructive" className="m-6">
+          <AlertDescription>
+            Error loading profile: {profileError}
+          </AlertDescription>
+        </Alert>
+      </Layout>
+    );
+  }
+
+  // Error state for tasks
   if (error) {
     return (
       <Layout>
@@ -67,25 +82,24 @@ const MyTasks = () => {
     );
   }
 
-  // ADDED: No user profile state
-  if (!userProfile) {
+  // FIXED: Fallback to user email if no profile, but still allow access
+  if (!userProfile && !user) {
     return (
       <Layout>
         <Alert className="m-6">
           <AlertDescription>
-            Unable to load user profile. Please try refreshing the page.
+            Unable to load user information. Please try refreshing the page.
           </AlertDescription>
         </Alert>
       </Layout>
     );
   }
 
-  // CHANGED: Use personalTasks instead of manual filtering
-  // Keep your existing filtering logic, but apply it to the already-filtered personal tasks
+  // Use personalTasks instead of manual filtering
   const myTasks = useMemo(() => {
     let filtered = personalTasks; // Already filtered to user's tasks by Supabase
     
-    // Keep your existing workspace filtering
+    // Keep existing workspace filtering
     if (selectedWorkspace) {
       const workspace = workspaces.find(w => w.id === selectedWorkspace);
       if (workspace) {
@@ -93,7 +107,7 @@ const MyTasks = () => {
       }
     }
 
-    // Keep your existing date filtering logic
+    // Keep existing date filtering logic
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const weekFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -120,16 +134,16 @@ const MyTasks = () => {
       default:
         return filtered;
     }
-  }, [personalTasks, selectedWorkspace, workspaces, filter]); // CHANGED: Use personalTasks instead of tasks + manual filtering
+  }, [personalTasks, selectedWorkspace, workspaces, filter]);
 
-  // UNCHANGED: Keep your existing task grouping logic
+  // Keep existing task grouping logic
   const tasksByStatus = {
     todo: myTasks.filter(t => t.status === 'todo'),
     in_progress: myTasks.filter(t => t.status === 'in_progress'),
     done: myTasks.filter(t => t.status === 'done')
   };
 
-  // UNCHANGED: Keep your existing stats calculation
+  // Keep existing stats calculation
   const stats = {
     total: myTasks.length,
     overdue: myTasks.filter(t => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'done').length,
@@ -141,34 +155,30 @@ const MyTasks = () => {
     }).length
   };
 
-  // CHANGED: Auto-assign to current authenticated user
+  // FIXED: Use fallback user ID for task assignment
   const handleCreateTask = async (taskData: any) => {
     try {
       await createTask({
         ...taskData,
-        assignedTo: userProfile.id, // Auto-assign to current authenticated user
+        assignedTo: userProfile?.id || user?.id, // FIXED: Use fallback
         subtasks: []
       });
     } catch (err) {
       console.error('Failed to create task:', err);
-      // Could add toast notification here
     }
   };
 
-  // UNCHANGED: Keep your existing assignment logic
   const handleAssignTask = async (taskId: string, userId: string) => {
     try {
       await updateTask(taskId, { assignedTo: userId });
     } catch (err) {
       console.error('Failed to assign task:', err);
-      // Could add toast notification here
     }
   };
 
   return (
     <Layout>
       <div className="space-y-6">
-        {/* CHANGED: Use real user name */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">My Tasks</h1>
@@ -178,7 +188,6 @@ const MyTasks = () => {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {/* UNCHANGED: Keep your view toggle */}
             <div className="flex border rounded-lg p-1 bg-gray-50">
               <Button
                 variant={viewMode === 'kanban' ? 'default' : 'ghost'}
@@ -207,7 +216,6 @@ const MyTasks = () => {
           </div>
         </div>
 
-        {/* UNCHANGED: Keep your stats cards exactly as they are */}
         {viewMode === 'kanban' && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card>
@@ -254,7 +262,6 @@ const MyTasks = () => {
           </div>
         )}
 
-        {/* UNCHANGED: Keep your filters exactly as they are */}
         {viewMode === 'kanban' && (
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
@@ -301,7 +308,6 @@ const MyTasks = () => {
           </div>
         )}
 
-        {/* UNCHANGED: Keep your main content exactly as is */}
         {viewMode === 'list' ? (
           <ListView
             tasks={myTasks}
@@ -312,7 +318,6 @@ const MyTasks = () => {
             onAssignTask={handleAssignTask}
           />
         ) : (
-          /* UNCHANGED: Keep your beautiful Kanban layout */
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <Card>
               <CardHeader className="pb-3">
@@ -382,7 +387,6 @@ const MyTasks = () => {
           </div>
         )}
 
-        {/* UNCHANGED: Keep your existing dialogs */}
         <CreateTaskDialog 
           open={showCreateTask} 
           onOpenChange={setShowCreateTask}
