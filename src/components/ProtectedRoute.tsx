@@ -51,7 +51,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
   // If loading is done and there is no user or no profile, redirect to login.
   if (!user || !profile) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    return <Navigate to="/signin" state={{ from: location }} replace />;
   }
 
   // If all checks pass, render the protected page.
