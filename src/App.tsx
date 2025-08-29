@@ -12,10 +12,11 @@ import Calendar from "./pages/Calendar";
 import Search from "./pages/Search";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
-import Login from "./pages/Login"; // You'll need to create this
-import LoadingScreen from "./components/LoadingScreen"; // Optional loading component
+import Login from "./pages/Login";
+import LoadingScreen from "./components/LoadingScreen";
 import TestPage from './pages/TestPage';
 
+// CRITICAL FIX: Move QueryClient creation outside component
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
