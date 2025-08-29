@@ -31,7 +31,8 @@ export const useTaskStore = (props: UseTaskStoreProps = {}) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const filtersJSON = JSON.stringify(filters);
+  // FIXED: Use useMemo to prevent infinite re-renders
+  const filtersJSON = useMemo(() => JSON.stringify(filters), [filters]);
 
   const fetchTasks = useCallback(async () => {
     if (!user) {
@@ -82,11 +83,14 @@ export const useTaskStore = (props: UseTaskStoreProps = {}) => {
     } finally {
       setLoading(false);
     }
-  }, [user, userProfile, filtersJSON]);
+  }, [user?.id, userProfile?.id, filtersJSON]); // FIXED: Use stable IDs instead of full objects
 
-  // FIX: Separated initial data fetches into one effect.
+  // FIXED: Separated initial data fetches with stable dependencies
   useEffect(() => {
     fetchTasks();
+  }, [fetchTasks]);
+
+  useEffect(() => {
     const fetchUsersAndWorkspaces = async () => {
       if (!user) return;
       try {
@@ -101,9 +105,9 @@ export const useTaskStore = (props: UseTaskStoreProps = {}) => {
       }
     };
     fetchUsersAndWorkspaces();
-  }, [fetchTasks, user]);
+  }, [user?.id]); // FIXED: Use stable user ID
 
-  // FIX: Separated the real-time subscription into its own effect to prevent loops.
+  // FIXED: Separated real-time subscription with stable dependencies
   useEffect(() => {
     if (!user) return;
     const channel = supabase
@@ -116,9 +120,9 @@ export const useTaskStore = (props: UseTaskStoreProps = {}) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, fetchTasks]);
+  }, [user?.id, fetchTasks]); // FIXED: Use stable dependencies
 
-  // FIXED: Updated createTask to use user as fallback
+  // FIXED: Updated createTask to use stable dependencies
   const createTask = useCallback(async (taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'comments' | 'createdBy'>) => {
     // FIXED: Check for user instead of userProfile, use fallback for user ID
     if (!user) throw new Error('Cannot create task: user not authenticated.');
@@ -155,9 +159,9 @@ export const useTaskStore = (props: UseTaskStoreProps = {}) => {
       setError('Failed to create task');
       throw err; // Re-throw so the UI can handle it
     }
-  }, [user, userProfile, fetchTasks]);
+  }, [user?.id, userProfile?.id]); // FIXED: Use stable IDs
 
-  // FIXED: Updated updateTask to use user as fallback
+  // FIXED: Updated updateTask to use stable dependencies
   const updateTask = useCallback(async (taskId: string, updates: Partial<Task>) => {
     // FIXED: Check for user instead of userProfile
     if (!user) throw new Error('Cannot update task: user not authenticated.');
@@ -200,11 +204,20 @@ export const useTaskStore = (props: UseTaskStoreProps = {}) => {
       setError('Failed to update task');
       throw err; // Re-throw so the UI can handle it
     }
-  }, [tasks, user, userProfile, fetchTasks]);
+  }, [tasks, user?.id, userProfile?.id]); // FIXED: Use stable IDs
 
   const deleteTask = useCallback(async (taskId: string) => {
-    // ... (Your original logic is preserved)
-  }, [fetchTasks]);
+    if (!user) throw new Error('Cannot delete task: user not authenticated.');
+    
+    try {
+      const { error } = await supabase.from('tasks').delete().eq('id', taskId);
+      if (error) throw error;
+    } catch (err) {
+      console.error('Error deleting task:', err);
+      setError('Failed to delete task');
+      throw err;
+    }
+  }, [user?.id]);
 
   const addComment = useCallback(async (taskId: string, content: string) => {
     // FIXED: Use user check and fallback ID
@@ -223,7 +236,7 @@ export const useTaskStore = (props: UseTaskStoreProps = {}) => {
       setError('Failed to add comment');
       throw err;
     }
-  }, [user, userProfile, tasks, fetchTasks]);
+  }, [user?.id, userProfile?.id]); // FIXED: Use stable IDs
 
   const toggleSubtask = useCallback(async (taskId: string, subtaskId: string) => {
     // FIXED: Use user check instead of userProfile
@@ -244,7 +257,7 @@ export const useTaskStore = (props: UseTaskStoreProps = {}) => {
       setError('Failed to toggle subtask');
       throw err;
     }
-  }, [tasks, user, userProfile, fetchTasks]);
+  }, [tasks, user?.id]); // FIXED: Use stable IDs
 
   return {
     tasks,
