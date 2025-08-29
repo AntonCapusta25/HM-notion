@@ -12,9 +12,9 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-// CHANGED: Import from useTaskStore instead of mockData
 import { useTaskStore } from '../hooks/useTaskStore';
 import { useAuth } from '../contexts/AuthContext';
+import { useProfile } from '../hooks/useProfile'; // Add this import
 
 interface CreateTaskDialogProps {
   open: boolean;
@@ -23,9 +23,10 @@ interface CreateTaskDialogProps {
 }
 
 export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTaskDialogProps) => {
-  // ADDED: Get real users and createTask function from Supabase
   const { users, createTask } = useTaskStore();
-  const { userProfile } = useAuth();
+  // FIXED: Use both useAuth for user and useProfile for profile data
+  const { user } = useAuth();
+  const { profile: userProfile } = useProfile();
   
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -35,15 +36,14 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
   
-  // ADDED: Loading and error states for better UX
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // UPDATED: Handle submission with Supabase
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!userProfile) {
+    // FIXED: Check both user and userProfile, but user is the minimum requirement
+    if (!user) {
       setError('You must be logged in to create tasks');
       return;
     }
@@ -57,22 +57,20 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
         description,
         assignedTo,
         priority: priority as 'low' | 'medium' | 'high',
-        dueDate: dueDate?.toISOString().split('T')[0], // Format for Supabase date field
+        dueDate: dueDate?.toISOString().split('T')[0],
         tags,
         status: 'todo' as const,
-        subtasks: [] // Start with empty subtasks
+        subtasks: [],
+        // FIXED: Use userProfile.id if available, otherwise fall back to user.id
+        createdBy: userProfile?.id || user.id
       };
       
-      // Use the createTask function from useTaskStore (now connected to Supabase)
       if (onCreateTask) {
-        // If parent component wants to handle creation
         await onCreateTask(taskData);
       } else {
-        // Use the Supabase-connected createTask directly
         await createTask(taskData);
       }
       
-      // Success - close dialog and reset form
       onOpenChange(false);
       resetForm();
       
@@ -84,7 +82,6 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
     }
   };
 
-  // ADDED: Form reset function
   const resetForm = () => {
     setTitle('');
     setDescription('');
@@ -96,7 +93,6 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
     setError(null);
   };
 
-  // UNCHANGED: Keep your existing tag management
   const addTag = () => {
     if (newTag.trim() && !tags.includes(newTag.trim())) {
       setTags([...tags, newTag.trim()]);
@@ -115,7 +111,6 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
           <DialogTitle>Create New Task</DialogTitle>
         </DialogHeader>
         
-        {/* ADDED: Error display */}
         {error && (
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
@@ -131,7 +126,7 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Enter task title..."
               required
-              disabled={isSubmitting} // ADDED: Disable during submission
+              disabled={isSubmitting}
             />
           </div>
 
@@ -143,7 +138,7 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Describe the task..."
               rows={3}
-              disabled={isSubmitting} // ADDED: Disable during submission
+              disabled={isSubmitting}
             />
           </div>
 
@@ -155,7 +150,6 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
                   <SelectValue placeholder="Select team member" />
                 </SelectTrigger>
                 <SelectContent>
-                  {/* CHANGED: Use real users from Supabase instead of mockUsers */}
                   {users.map(user => (
                     <SelectItem key={user.id} value={user.id}>
                       {user.name} ({user.department})
@@ -190,7 +184,7 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
                     "w-full justify-start text-left font-normal",
                     !dueDate && "text-muted-foreground"
                   )}
-                  disabled={isSubmitting} // ADDED: Disable during submission
+                  disabled={isSubmitting}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {dueDate ? format(dueDate, "PPP") : <span>Pick a date</span>}
@@ -227,14 +221,14 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
                 onChange={(e) => setNewTag(e.target.value)}
                 placeholder="Add tag..."
                 onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
-                disabled={isSubmitting} // ADDED: Disable during submission
+                disabled={isSubmitting}
               />
               <Button 
                 type="button" 
                 variant="outline" 
                 size="sm" 
                 onClick={addTag}
-                disabled={isSubmitting} // ADDED: Disable during submission
+                disabled={isSubmitting}
               >
                 <Plus className="h-4 w-4" />
               </Button>
@@ -245,16 +239,15 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
             <Button 
               type="submit" 
               className="flex-1 bg-homemade-orange hover:bg-homemade-orange-dark"
-              disabled={isSubmitting || !title.trim()} // ADDED: Disable logic
+              disabled={isSubmitting || !title.trim()}
             >
-              {/* ADDED: Loading state */}
               {isSubmitting ? 'Creating Task...' : 'Create Task'}
             </Button>
             <Button 
               type="button" 
               variant="outline" 
               onClick={() => onOpenChange(false)}
-              disabled={isSubmitting} // ADDED: Disable during submission
+              disabled={isSubmitting}
             >
               Cancel
             </Button>
