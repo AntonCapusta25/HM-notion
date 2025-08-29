@@ -40,7 +40,7 @@ const App = () => (
             {/* Protected routes - require authentication */}
             <Route path="/" element={
               <ProtectedRoute>
-                <TestPage />
+                <Index />
               </ProtectedRoute>
             } />
             <Route path="/my-tasks" element={
