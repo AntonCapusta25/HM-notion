@@ -14,6 +14,7 @@ import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login"; // You'll need to create this
 import LoadingScreen from "./components/LoadingScreen"; // Optional loading component
+import TestPage from './pages/TestPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
