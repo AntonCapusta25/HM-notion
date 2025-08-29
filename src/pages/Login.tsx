@@ -1,103 +1,66 @@
-import React, { useState } from 'react'
-import { useAuth } from '../contexts/AuthContext'
-import { Navigate } from 'react-router-dom'
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { supabase } from '../lib/supabase'
+import React, { useState } from 'react';
+import { Navigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+
+// A simple loading screen to show while the auth state is being checked.
+const LoadingScreen = () => (
+  <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="text-center">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+      <p className="mt-4 text-muted-foreground">Loading...</p>
+    </div>
+  </div>
+);
 
 const Login = () => {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
   
-  const { user, signIn } = useAuth()
+  // Get the user and the loading state from the AuthProvider
+  const { user, signIn, loading: authLoading } = useAuth();
 
-  if (user) {
-    return <Navigate to="/" replace />
+  // --- THE FIX ---
+  // 1. First, check if the AuthProvider is still doing its initial load.
+  //    If it is, we show a loading screen and wait.
+  if (authLoading) {
+    return <LoadingScreen />;
   }
 
-  const testQuery = async () => {
-    console.log('Testing direct profile query...');
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', 'fa49a622-3867-4106-b612-92745b01e298')
-        .single();
-      
-      console.log('Direct query result:', { data, error });
-    } catch (err) {
-      console.log('Direct query failed:', err);
-    }
-  };
-
-  const testDirectLogin = async () => {
-    try {
-      console.log("Testing direct login...");
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/auth/v1/token?grant_type=password`, {
-        method: 'POST',
-        headers: {
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          email: 'ali@homemade.com',
-          password: 'password123'
-        })
-      });
-
-      console.log('Direct login test status:', response.status);
-      const data = await response.json();
-      console.log('Direct login test response:', data);
-
-    } catch (error) {
-      console.error('Direct login test failed:', error);
-    }
-  };
-
-  const testSupabaseConnection = async () => {
-    try {
-      const response = await fetch('https://nkvppuhwanflzowcqnjx.supabase.co/rest/v1/', {
-        headers: {
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
-        }
-      });
-      console.log('Supabase connection test:', response.status);
-      
-      const authResponse = await fetch('https://nkvppuhwanflzowcqnjx.supabase.co/auth/v1/settings', {
-        headers: {
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
-        }
-      });
-      console.log('Auth endpoint test:', authResponse.status);
-      
-    } catch (error) {
-      console.error('Connection failed:', error);
-    }
-  };
+  // 2. Only after the initial load is complete, we check if a user exists.
+  //    If they do, we can now safely redirect them.
+  if (user) {
+    return <Navigate to="/" replace />;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
-    const { error: signInError } = await signIn(email, password)
+    e.preventDefault();
+    setIsSubmitting(true);
+    setError('');
+
+    const { error: signInError } = await signIn(email, password);
     
     if (signInError) {
-      setError(signInError.message)
+      setError(signInError.message);
     }
+    // If the login is successful, the `user` object in `useAuth` will update,
+    // and this component will re-render, triggering the redirect above.
     
-    setLoading(false)
-  }
+    setIsSubmitting(false);
+  };
 
+  // 3. If the initial load is done and there's no user, we show the login form.
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">Welcome to Homebase</CardTitle>
+          <CardTitle className="text-2xl font-bold">Welcome to Homemade</CardTitle>
           <CardDescription>
             Sign in to access your task management platform
           </CardDescription>
@@ -115,11 +78,12 @@ const Login = () => {
               <Input
                 id="email"
                 type="email"
+                autoComplete="email"
                 placeholder="Enter your email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                disabled={loading}
+                disabled={isSubmitting}
               />
             </div>
             
@@ -128,47 +92,23 @@ const Login = () => {
               <Input
                 id="password"
                 type="password"
+                autoComplete="current-password"
                 placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                disabled={loading}
+                disabled={isSubmitting}
               />
             </div>
             
             <Button 
               type="submit" 
               className="w-full" 
-              disabled={loading}
+              disabled={isSubmitting}
             >
-              {loading ? 'Signing in...' : 'Sign In'}
+              {isSubmitting ? 'Signing in...' : 'Sign In'}
             </Button>
           </form>
-
-          {/* Test buttons */}
-          <Button 
-            onClick={testSupabaseConnection}
-            variant="outline" 
-            className="w-full mt-4"
-          >
-            Test Supabase Connection
-          </Button>
-
-          <Button 
-            onClick={testDirectLogin} 
-            variant="destructive" 
-            className="w-full mt-2"
-          >
-            Test Direct Login API
-          </Button>
-
-          <Button 
-            onClick={testQuery}
-            variant="secondary"
-            className="w-full mt-2"
-          >
-            Test Profile Query
-          </Button>
 
           {/* Development helper */}
           <div className="mt-6 p-4 bg-muted rounded-lg">
@@ -181,7 +121,7 @@ const Login = () => {
         </CardContent>
       </Card>
     </div>
-  )
-}
+  );
+};
 
-export default Login
+export default Login;
