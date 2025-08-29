@@ -1,5 +1,5 @@
 import React from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useProfile } from '../hooks/useProfile';
 
@@ -16,21 +16,21 @@ interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
-export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
+// Ensure the component is exported as a default
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const { user, loading: authLoading } = useAuth();
   const { profile, loading: profileLoading } = useProfile();
-  const location = useLocation();
 
-  // Show loading while checking auth or fetching profile
   if (authLoading || profileLoading) {
     return <LoadingScreen />;
   }
 
-  // Redirect if not authenticated or profile is missing
   if (!user || !profile) {
-    return <Navigate to="/signin" state={{ from: location }} replace />;
+    return <Navigate to="/signin" replace />;
   }
 
-  // All checks passed, show the page
   return <>{children}</>;
 };
+
+// Make sure this line exists at the end of the file
+export default ProtectedRoute;
