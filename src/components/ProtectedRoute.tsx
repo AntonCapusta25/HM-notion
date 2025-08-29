@@ -1,8 +1,8 @@
 import React from 'react';
-import { useAuth } from '../contexts/AuthContext';
 import { Navigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { useProfile } from '../hooks/useProfile';
 
-// A simple, self-contained loading screen component
 const LoadingScreen = () => (
   <div className="min-h-screen flex items-center justify-center">
     <div className="text-center">
@@ -16,29 +16,21 @@ interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { user, userProfile, loading } = useAuth();
+export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
+  const { user, loading: authLoading } = useAuth();
+  const { profile, loading: profileLoading } = useProfile();
   const location = useLocation();
 
-  // 1. While the AuthProvider is checking the initial auth state, show a loading screen.
-  if (loading) {
+  // Show loading while checking auth or fetching profile
+  if (authLoading || profileLoading) {
     return <LoadingScreen />;
   }
 
-  // 2. If the initial load is finished and there is no authenticated user, redirect to the login page.
-  if (!user) {
+  // Redirect if not authenticated or profile is missing
+  if (!user || !profile) {
     return <Navigate to="/signin" state={{ from: location }} replace />;
   }
 
-  // 3. (THE FIX) If there IS a user but we're still waiting for their profile from the database,
-  // continue to show the loading screen. This prevents the redirect loop.
-  if (!userProfile) {
-    return <LoadingScreen />;
-  }
-
-  // 4. If all checks pass (loading is done, user is authenticated, and profile is loaded),
-  // show the protected page content.
+  // All checks passed, show the page
   return <>{children}</>;
 };
-
-export default ProtectedRoute;
