@@ -33,7 +33,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   // If no user, redirect to login
   if (!user) {
     console.log('ProtectedRoute - no user found, redirecting to signin');
-    return <Navigate to="/signin" state={{ from: location }} replace />;
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   // If user exists, render the protected content
