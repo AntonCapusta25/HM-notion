@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { Layout } from '../components/Layout';
 import { TaskCard } from '../components/TaskCard';
 import { CreateTaskDialog } from '../components/CreateTaskDialog';
@@ -7,7 +7,6 @@ import { WorkspaceSelector } from '../components/WorkspaceSelector';
 import { ListView } from '../components/ListView';
 import { useTaskStore } from '../hooks/useTaskStore';
 import { useAuth } from '../contexts/AuthContext';
-import { useProfile } from '../hooks/useProfile'; // Add this import
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -15,12 +14,13 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Plus, Calendar, AlertCircle, LayoutGrid, List } from 'lucide-react';
 import { Task } from '../types';
 
+// CRITICAL FIX: Move filters object outside component to prevent re-creation
+const PERSONAL_FILTERS = { filters: { personal_only: true } };
+
 const MyTasks = () => {
-  // FIXED: Separate useAuth and useProfile
+  // CRITICAL: ALL hooks must be called first, no conditional hook calls
   const { user } = useAuth();
-  const { profile: userProfile, loading: profileLoading, error: profileError } = useProfile();
   
-  // Use personal_only filter to get only user's tasks from Supabase
   const { 
     tasks: personalTasks, 
     users, 
@@ -32,9 +32,7 @@ const MyTasks = () => {
     toggleSubtask,
     loading: tasksLoading,
     error
-  } = useTaskStore({ 
-    filters: { personal_only: true }
-  });
+  } = useTaskStore(PERSONAL_FILTERS); // FIXED: Use constant instead of creating new object
   
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -42,8 +40,8 @@ const MyTasks = () => {
   const [filter, setFilter] = useState<'all' | 'today' | 'week' | 'overdue'>('all');
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
 
-  // FIXED: Updated loading state to include profileLoading
-  if (profileLoading || tasksLoading) {
+  // NOW we can do conditional rendering after all hooks are called
+  if (tasksLoading) {
     return (
       <Layout>
         <div className="min-h-screen flex items-center justify-center">
@@ -56,20 +54,6 @@ const MyTasks = () => {
     );
   }
 
-  // FIXED: Added profile error handling
-  if (profileError) {
-    return (
-      <Layout>
-        <Alert variant="destructive" className="m-6">
-          <AlertDescription>
-            Error loading profile: {profileError}
-          </AlertDescription>
-        </Alert>
-      </Layout>
-    );
-  }
-
-  // Error state for tasks
   if (error) {
     return (
       <Layout>
@@ -82,68 +66,61 @@ const MyTasks = () => {
     );
   }
 
-  // FIXED: Fallback to user email if no profile, but still allow access
-  if (!userProfile && !user) {
+  if (!user) {
     return (
       <Layout>
         <Alert className="m-6">
           <AlertDescription>
-            Unable to load user information. Please try refreshing the page.
+            Please log in to view your tasks.
           </AlertDescription>
         </Alert>
       </Layout>
     );
   }
 
-  // Use personalTasks instead of manual filtering
-  const myTasks = useMemo(() => {
-    let filtered = personalTasks; // Already filtered to user's tasks by Supabase
-    
-    // Keep existing workspace filtering
-    if (selectedWorkspace) {
-      const workspace = workspaces.find(w => w.id === selectedWorkspace);
-      if (workspace) {
-        filtered = filtered.filter(task => task.tags.includes(workspace.department));
-      }
+  // Simple filtering without useMemo to avoid dependency issues
+  let myTasks = personalTasks || [];
+  
+  // Workspace filtering
+  if (selectedWorkspace) {
+    const workspace = workspaces.find(w => w.id === selectedWorkspace);
+    if (workspace) {
+      myTasks = myTasks.filter(task => task.tags && task.tags.includes(workspace.department));
     }
+  }
 
-    // Keep existing date filtering logic
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const weekFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+  // Date filtering
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const weekFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-    switch (filter) {
-      case 'today':
-        return filtered.filter(task => {
-          if (!task.dueDate) return false;
-          const dueDate = new Date(task.dueDate);
-          return dueDate <= today && task.status !== 'done';
-        });
-      case 'week':
-        return filtered.filter(task => {
-          if (!task.dueDate) return false;
-          const dueDate = new Date(task.dueDate);
-          return dueDate <= weekFromNow && task.status !== 'done';
-        });
-      case 'overdue':
-        return filtered.filter(task => {
-          if (!task.dueDate) return false;
-          const dueDate = new Date(task.dueDate);
-          return dueDate < today && task.status !== 'done';
-        });
-      default:
-        return filtered;
-    }
-  }, [personalTasks, selectedWorkspace, workspaces, filter]);
+  if (filter === 'today') {
+    myTasks = myTasks.filter(task => {
+      if (!task.dueDate) return false;
+      const dueDate = new Date(task.dueDate);
+      return dueDate <= today && task.status !== 'done';
+    });
+  } else if (filter === 'week') {
+    myTasks = myTasks.filter(task => {
+      if (!task.dueDate) return false;
+      const dueDate = new Date(task.dueDate);
+      return dueDate <= weekFromNow && task.status !== 'done';
+    });
+  } else if (filter === 'overdue') {
+    myTasks = myTasks.filter(task => {
+      if (!task.dueDate) return false;
+      const dueDate = new Date(task.dueDate);
+      return dueDate < today && task.status !== 'done';
+    });
+  }
 
-  // Keep existing task grouping logic
+  // Simple object creation without useMemo
   const tasksByStatus = {
     todo: myTasks.filter(t => t.status === 'todo'),
     in_progress: myTasks.filter(t => t.status === 'in_progress'),
     done: myTasks.filter(t => t.status === 'done')
   };
 
-  // Keep existing stats calculation
   const stats = {
     total: myTasks.length,
     overdue: myTasks.filter(t => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'done').length,
@@ -155,12 +132,11 @@ const MyTasks = () => {
     }).length
   };
 
-  // FIXED: Use fallback user ID for task assignment
   const handleCreateTask = async (taskData: any) => {
     try {
       await createTask({
         ...taskData,
-        assignedTo: userProfile?.id || user?.id, // FIXED: Use fallback
+        assignedTo: user.id, // Use user.id directly
         subtasks: []
       });
     } catch (err) {
