@@ -5,6 +5,7 @@ import { TaskDetailDialog } from '../components/TaskDetailDialog';
 import { WorkspaceSelector } from '../components/WorkspaceSelector';
 import { useTaskStore } from '../hooks/useTaskStore';
 import { useAuth } from '../contexts/AuthContext';
+import { useProfile } from '../hooks/useProfile'; // Add this import
 import { supabase } from '../lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,10 +26,11 @@ interface TeamDashboardStats {
 }
 
 const Team = () => {
-  // CHANGED: Get authentication and team-wide data from Supabase
-  const { userProfile, loading: authLoading } = useAuth();
+  // FIXED: Separate useAuth and useProfile
+  const { user } = useAuth();
+  const { profile: userProfile, loading: profileLoading, error: profileError } = useProfile();
   
-  // CHANGED: Get ALL team tasks (no personal_only filter)
+  // Get ALL team tasks (no personal_only filter) and pass userProfile
   const { 
     tasks, 
     users, 
@@ -38,25 +40,32 @@ const Team = () => {
     toggleSubtask, 
     loading: tasksLoading, 
     error 
-  } = useTaskStore(); // No filters - shows ALL team tasks
+  } = useTaskStore({ 
+    userProfile // Pass userProfile to avoid hook ordering issues
+  }); // No filters - shows ALL team tasks
   
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
 
-  // ADDED: Real team dashboard stats from Supabase
+  // Real team dashboard stats from Supabase
   const [dashboardStats, setDashboardStats] = useState<TeamDashboardStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
 
-  // ADDED: Fetch team-wide dashboard stats
+  // FIXED: Updated useEffect to work with the fixed userProfile
   useEffect(() => {
     const fetchTeamStats = async () => {
-      if (!userProfile) return;
+      // FIXED: Use fallback if userProfile not loaded yet
+      const userId = userProfile?.id || user?.id;
+      if (!userId) {
+        setStatsLoading(false);
+        return;
+      }
 
       try {
         setStatsLoading(true);
         const { data, error } = await supabase
-          .rpc('get_dashboard_stats', { user_uuid: userProfile.id });
+          .rpc('get_dashboard_stats', { user_uuid: userId });
         
         if (data && !error) {
           setDashboardStats(data);
@@ -71,10 +80,10 @@ const Team = () => {
     };
 
     fetchTeamStats();
-  }, [userProfile]);
+  }, [userProfile?.id, user?.id]); // FIXED: Depend on both userProfile and user
 
-  // ADDED: Loading state
-  if (authLoading || tasksLoading || statsLoading) {
+  // FIXED: Updated loading state
+  if (profileLoading || tasksLoading || statsLoading) {
     return (
       <Layout>
         <div className="min-h-screen flex items-center justify-center">
@@ -87,7 +96,19 @@ const Team = () => {
     );
   }
 
-  // ADDED: Error state
+  // FIXED: Added profile error handling
+  if (profileError) {
+    return (
+      <Layout>
+        <Alert variant="destructive" className="m-6">
+          <AlertDescription>
+            Error loading profile: {profileError}
+          </AlertDescription>
+        </Alert>
+      </Layout>
+    );
+  }
+
   if (error) {
     return (
       <Layout>
@@ -100,27 +121,27 @@ const Team = () => {
     );
   }
 
-  // ADDED: No user profile state
-  if (!userProfile) {
+  // FIXED: Check for user authentication, allow fallback
+  if (!userProfile && !user) {
     return (
       <Layout>
         <Alert className="m-6">
           <AlertDescription>
-            Unable to load user profile. Please try refreshing the page.
+            Please log in to view team data.
           </AlertDescription>
         </Alert>
       </Layout>
     );
   }
 
-  // UNCHANGED: Keep your existing filtering logic (works with ALL team tasks now)
+  // Keep existing filtering logic (works with ALL team tasks now)
   const filteredTasks = useMemo(() => {
     let filtered = tasks; // Now contains ALL team tasks from Supabase
     
     if (selectedWorkspace) {
       const workspace = workspaces.find(w => w.id === selectedWorkspace);
       if (workspace) {
-        filtered = filtered.filter(task => task.tags.includes(workspace.department));
+        filtered = filtered.filter(task => task.tags && task.tags.includes(workspace.department));
       }
     }
 
@@ -131,7 +152,7 @@ const Team = () => {
     return filtered;
   }, [tasks, selectedWorkspace, selectedUser, workspaces]);
 
-  // CHANGED: Use real stats from Supabase when available, fallback to calculated stats
+  // Use real stats from Supabase when available, fallback to calculated stats
   const teamStats = useMemo(() => {
     if (dashboardStats) {
       return {
@@ -154,7 +175,7 @@ const Team = () => {
     };
   }, [filteredTasks, dashboardStats]);
 
-  // UNCHANGED: Keep your existing user stats calculation (now works with real users and tasks)
+  // Keep existing user stats calculation (now works with real users and tasks)
   const userStats = useMemo(() => {
     return users.map(user => {
       const userTasks = filteredTasks.filter(t => t.assignedTo === user.id);
@@ -178,27 +199,25 @@ const Team = () => {
     });
   }, [users, filteredTasks]);
 
-  // UNCHANGED: Keep your existing task grouping
+  // Keep existing task grouping
   const tasksByStatus = {
     todo: filteredTasks.filter(t => t.status === 'todo'),
     in_progress: filteredTasks.filter(t => t.status === 'in_progress'),
     done: filteredTasks.filter(t => t.status === 'done')
   };
 
-  // CHANGED: Add async handling for task assignment
+  // Add async handling for task assignment
   const handleAssignTask = async (taskId: string, userId: string) => {
     try {
       await updateTask(taskId, { assignedTo: userId });
     } catch (err) {
       console.error('Failed to assign task:', err);
-      // Could add toast notification here
     }
   };
 
   return (
     <Layout>
       <div className="space-y-6">
-        {/* UNCHANGED: Keep your exact header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Team Overview</h1>
@@ -206,7 +225,6 @@ const Team = () => {
           </div>
         </div>
 
-        {/* CHANGED: Now uses real team stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <Card>
             <CardContent className="p-6">
@@ -265,7 +283,6 @@ const Team = () => {
           </Card>
         </div>
 
-        {/* UNCHANGED: Keep your exact filters (now works with real data) */}
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex-1">
             <WorkspaceSelector 
@@ -290,7 +307,6 @@ const Team = () => {
           </div>
         </div>
 
-        {/* UNCHANGED: Keep your team performance section (now with real user data) */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -349,7 +365,6 @@ const Team = () => {
           </CardContent>
         </Card>
 
-        {/* UNCHANGED: Keep your exact Kanban layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card>
             <CardHeader className="pb-3">
@@ -397,13 +412,13 @@ const Team = () => {
 
           <Card>
             <CardHeader className="pb-3">
-            <CardTitle className="flex items-center justify-between text-base">
-              <span className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-green-400 rounded-full" />
-                Done
-              </span>
-              <Badge variant="secondary">{tasksByStatus.done.length}</Badge>
-            </CardTitle>
+              <CardTitle className="flex items-center justify-between text-base">
+                <span className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-green-400 rounded-full" />
+                  Done
+                </span>
+                <Badge variant="secondary">{tasksByStatus.done.length}</Badge>
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {tasksByStatus.done.map(task => (
@@ -418,7 +433,6 @@ const Team = () => {
           </Card>
         </div>
 
-        {/* UNCHANGED: Keep your existing task detail dialog */}
         <TaskDetailDialog
           task={selectedTask}
           users={users}
