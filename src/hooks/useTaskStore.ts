@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { useProfile } from '../hooks/useProfile'; // Add this import
 import { Task, User, Workspace, formatTaskFromSupabase } from '../types';
 
 // Your mock data fallback
@@ -17,13 +16,15 @@ interface UseTaskStoreProps {
     tag?: string;
     personal_only?: boolean;
   };
+  // FIXED: Accept user profile data as parameters instead of calling useProfile internally
+  userProfile?: { id: string } | null;
 }
 
 export const useTaskStore = (props: UseTaskStoreProps = {}) => {
-  const { filters = {} } = props;
-  // FIXED: Separate useAuth and useProfile
+  const { filters = {}, userProfile } = props;
+  
+  // FIXED: Only call useAuth, not useProfile (to avoid hook ordering issues)
   const { user } = useAuth();
-  const { profile: userProfile } = useProfile();
   
   const [tasks, setTasks] = useState<Task[]>([]);
   const [users, setUsers] = useState<User[]>(mockUsers);
@@ -58,7 +59,7 @@ export const useTaskStore = (props: UseTaskStoreProps = {}) => {
               }
               break;
             case 'personal_only':
-              // FIXED: Use fallback for user ID
+              // FIXED: Use passed userProfile or fallback to user.id
               const userId = userProfile?.id || user.id;
               if (userId) {
                 query = query.or(`assigned_to.eq.${userId},created_by.eq.${userId}`);
@@ -83,7 +84,7 @@ export const useTaskStore = (props: UseTaskStoreProps = {}) => {
     } finally {
       setLoading(false);
     }
-  }, [user?.id, userProfile?.id, filtersJSON]); // FIXED: Use stable IDs instead of full objects
+  }, [user?.id, userProfile?.id, filtersJSON]); // FIXED: Use stable IDs
 
   // FIXED: Separated initial data fetches with stable dependencies
   useEffect(() => {
@@ -122,9 +123,8 @@ export const useTaskStore = (props: UseTaskStoreProps = {}) => {
     };
   }, [user?.id, fetchTasks]); // FIXED: Use stable dependencies
 
-  // FIXED: Updated createTask to use stable dependencies
+  // FIXED: Updated createTask to use passed userProfile or fallback
   const createTask = useCallback(async (taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'comments' | 'createdBy'>) => {
-    // FIXED: Check for user instead of userProfile, use fallback for user ID
     if (!user) throw new Error('Cannot create task: user not authenticated.');
     
     const userId = userProfile?.id || user.id;
@@ -137,7 +137,7 @@ export const useTaskStore = (props: UseTaskStoreProps = {}) => {
         assigned_to: taskData.assignedTo || null,
         priority: taskData.priority,
         status: taskData.status,
-        created_by: userId, // FIXED: Use fallback user ID
+        created_by: userId,
         workspace_id: null
       }]).select().single();
       if (error) throw error;
@@ -149,21 +149,18 @@ export const useTaskStore = (props: UseTaskStoreProps = {}) => {
         const subtaskInserts = taskData.subtasks.map(subtask => ({ task_id: data.id, title: subtask.title, completed: subtask.completed }));
         await supabase.from('subtasks').insert(subtaskInserts);
       }
-      // FIXED: Use fallback user ID for notification check
       if (taskData.assignedTo && taskData.assignedTo !== userId) {
         await supabase.from('notifications').insert([{ user_id: taskData.assignedTo, task_id: data.id, type: 'task_assigned', message: `You have been assigned to: ${taskData.title}` }]);
       }
-      // NOTE: Manual fetchTasks() is no longer needed here. The real-time subscription will handle it.
     } catch (err) {
       console.error('Error creating task:', err);
       setError('Failed to create task');
-      throw err; // Re-throw so the UI can handle it
+      throw err;
     }
-  }, [user?.id, userProfile?.id]); // FIXED: Use stable IDs
+  }, [user?.id, userProfile?.id]);
 
-  // FIXED: Updated updateTask to use stable dependencies
+  // FIXED: Updated updateTask to use passed userProfile or fallback
   const updateTask = useCallback(async (taskId: string, updates: Partial<Task>) => {
-    // FIXED: Check for user instead of userProfile
     if (!user) throw new Error('Cannot update task: user not authenticated.');
     
     const userId = userProfile?.id || user.id;
@@ -198,13 +195,12 @@ export const useTaskStore = (props: UseTaskStoreProps = {}) => {
           await supabase.from('notifications').insert([{ user_id: updates.assignedTo, task_id: taskId, type: 'task_assigned', message: `You have been assigned to: ${originalTask.title}` }]);
         }
       }
-      // NOTE: Manual fetchTasks() is no longer needed here.
     } catch (err) {
       console.error('Error updating task:', err);
       setError('Failed to update task');
-      throw err; // Re-throw so the UI can handle it
+      throw err;
     }
-  }, [tasks, user?.id, userProfile?.id]); // FIXED: Use stable IDs
+  }, [tasks, user?.id, userProfile?.id]);
 
   const deleteTask = useCallback(async (taskId: string) => {
     if (!user) throw new Error('Cannot delete task: user not authenticated.');
@@ -220,7 +216,6 @@ export const useTaskStore = (props: UseTaskStoreProps = {}) => {
   }, [user?.id]);
 
   const addComment = useCallback(async (taskId: string, content: string) => {
-    // FIXED: Use user check and fallback ID
     if (!user) throw new Error('Cannot add comment: user not authenticated.');
     const userId = userProfile?.id || user.id;
     
@@ -236,10 +231,9 @@ export const useTaskStore = (props: UseTaskStoreProps = {}) => {
       setError('Failed to add comment');
       throw err;
     }
-  }, [user?.id, userProfile?.id]); // FIXED: Use stable IDs
+  }, [user?.id, userProfile?.id]);
 
   const toggleSubtask = useCallback(async (taskId: string, subtaskId: string) => {
-    // FIXED: Use user check instead of userProfile
     if (!user) throw new Error('Cannot toggle subtask: user not authenticated.');
     
     try {
@@ -257,7 +251,7 @@ export const useTaskStore = (props: UseTaskStoreProps = {}) => {
       setError('Failed to toggle subtask');
       throw err;
     }
-  }, [tasks, user?.id]); // FIXED: Use stable IDs
+  }, [tasks, user?.id]);
 
   return {
     tasks,
