@@ -5,7 +5,6 @@ import { TaskDetailDialog } from '../components/TaskDetailDialog';
 import { WorkspaceSelector } from '../components/WorkspaceSelector';
 import { useTaskStore } from '../hooks/useTaskStore';
 import { useAuth } from '../contexts/AuthContext';
-import { useProfile } from '../hooks/useProfile'; // Add this import
 import { supabase } from '../lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,12 +24,13 @@ interface TeamDashboardStats {
   high_priority: number;
 }
 
+// CRITICAL FIX: Move empty filters outside component to prevent re-creation
+const NO_FILTERS = {};
+
 const Team = () => {
-  // FIXED: Separate useAuth and useProfile
+  // CRITICAL: ALL hooks must be called first, no conditional hook calls
   const { user } = useAuth();
-  const { profile: userProfile, loading: profileLoading, error: profileError } = useProfile();
   
-  // Get ALL team tasks (no personal_only filter) and pass userProfile
   const { 
     tasks, 
     users, 
@@ -40,24 +40,18 @@ const Team = () => {
     toggleSubtask, 
     loading: tasksLoading, 
     error 
-  } = useTaskStore({ 
-    userProfile // Pass userProfile to avoid hook ordering issues
-  }); // No filters - shows ALL team tasks
+  } = useTaskStore(NO_FILTERS); // FIXED: Use constant instead of creating new object
   
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
-
-  // Real team dashboard stats from Supabase
   const [dashboardStats, setDashboardStats] = useState<TeamDashboardStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
 
-  // FIXED: Updated useEffect to work with the fixed userProfile
+  // NOW we can do conditional logic after all hooks are called
   useEffect(() => {
     const fetchTeamStats = async () => {
-      // FIXED: Use fallback if userProfile not loaded yet
-      const userId = userProfile?.id || user?.id;
-      if (!userId) {
+      if (!user?.id) {
         setStatsLoading(false);
         return;
       }
@@ -65,7 +59,7 @@ const Team = () => {
       try {
         setStatsLoading(true);
         const { data, error } = await supabase
-          .rpc('get_dashboard_stats', { user_uuid: userId });
+          .rpc('get_dashboard_stats', { user_uuid: user.id });
         
         if (data && !error) {
           setDashboardStats(data);
@@ -80,10 +74,9 @@ const Team = () => {
     };
 
     fetchTeamStats();
-  }, [userProfile?.id, user?.id]); // FIXED: Depend on both userProfile and user
+  }, [user?.id]);
 
-  // FIXED: Updated loading state
-  if (profileLoading || tasksLoading || statsLoading) {
+  if (tasksLoading || statsLoading) {
     return (
       <Layout>
         <div className="min-h-screen flex items-center justify-center">
@@ -92,19 +85,6 @@ const Team = () => {
             <p className="mt-4 text-muted-foreground">Loading team overview...</p>
           </div>
         </div>
-      </Layout>
-    );
-  }
-
-  // FIXED: Added profile error handling
-  if (profileError) {
-    return (
-      <Layout>
-        <Alert variant="destructive" className="m-6">
-          <AlertDescription>
-            Error loading profile: {profileError}
-          </AlertDescription>
-        </Alert>
       </Layout>
     );
   }
@@ -121,8 +101,7 @@ const Team = () => {
     );
   }
 
-  // FIXED: Check for user authentication, allow fallback
-  if (!userProfile && !user) {
+  if (!user) {
     return (
       <Layout>
         <Alert className="m-6">
@@ -134,79 +113,67 @@ const Team = () => {
     );
   }
 
-  // Keep existing filtering logic (works with ALL team tasks now)
-  const filteredTasks = useMemo(() => {
-    let filtered = tasks; // Now contains ALL team tasks from Supabase
-    
-    if (selectedWorkspace) {
-      const workspace = workspaces.find(w => w.id === selectedWorkspace);
-      if (workspace) {
-        filtered = filtered.filter(task => task.tags && task.tags.includes(workspace.department));
-      }
+  // Simple filtering without useMemo to avoid dependency issues
+  let filteredTasks = tasks || [];
+  
+  if (selectedWorkspace) {
+    const workspace = workspaces.find(w => w.id === selectedWorkspace);
+    if (workspace) {
+      filteredTasks = filteredTasks.filter(task => task.tags && task.tags.includes(workspace.department));
     }
+  }
 
-    if (selectedUser) {
-      filtered = filtered.filter(task => task.assignedTo === selectedUser);
-    }
+  if (selectedUser) {
+    filteredTasks = filteredTasks.filter(task => task.assignedTo === selectedUser);
+  }
 
-    return filtered;
-  }, [tasks, selectedWorkspace, selectedUser, workspaces]);
+  // Simple object creation without useMemo
+  const teamStats = dashboardStats ? {
+    totalTasks: dashboardStats.total_tasks,
+    inProgress: dashboardStats.in_progress_tasks,
+    completed: dashboardStats.done_tasks,
+    overdue: dashboardStats.overdue_tasks
+  } : {
+    totalTasks: filteredTasks.length,
+    inProgress: filteredTasks.filter(t => t.status === 'in_progress').length,
+    completed: filteredTasks.filter(t => t.status === 'done').length,
+    overdue: filteredTasks.filter(t => {
+      if (!t.dueDate) return false;
+      const today = new Date();
+      const dueDate = new Date(t.dueDate);
+      return dueDate < today && t.status !== 'done';
+    }).length
+  };
 
-  // Use real stats from Supabase when available, fallback to calculated stats
-  const teamStats = useMemo(() => {
-    if (dashboardStats) {
-      return {
-        totalTasks: dashboardStats.total_tasks,
-        inProgress: dashboardStats.in_progress_tasks,
-        completed: dashboardStats.done_tasks,
-        overdue: dashboardStats.overdue_tasks
-      };
-    }
-    
-    // Fallback to calculated stats from filtered tasks
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    
+  // Simple user stats calculation
+  const userStats = users.map(user => {
+    const userTasks = filteredTasks.filter(t => t.assignedTo === user.id);
+    const completed = userTasks.filter(t => t.status === 'done').length;
+    const inProgress = userTasks.filter(t => t.status === 'in_progress').length;
+    const overdue = userTasks.filter(t => {
+      if (!t.dueDate) return false;
+      const today = new Date();
+      const dueDate = new Date(t.dueDate);
+      return dueDate < today && t.status !== 'done';
+    }).length;
+
     return {
-      totalTasks: filteredTasks.length,
-      inProgress: filteredTasks.filter(t => t.status === 'in_progress').length,
-      completed: filteredTasks.filter(t => t.status === 'done').length,
-      overdue: filteredTasks.filter(t => t.dueDate && new Date(t.dueDate) < today && t.status !== 'done').length
+      ...user,
+      totalTasks: userTasks.length,
+      completed,
+      inProgress,
+      overdue,
+      completionRate: userTasks.length > 0 ? Math.round((completed / userTasks.length) * 100) : 0
     };
-  }, [filteredTasks, dashboardStats]);
+  });
 
-  // Keep existing user stats calculation (now works with real users and tasks)
-  const userStats = useMemo(() => {
-    return users.map(user => {
-      const userTasks = filteredTasks.filter(t => t.assignedTo === user.id);
-      const completed = userTasks.filter(t => t.status === 'done').length;
-      const inProgress = userTasks.filter(t => t.status === 'in_progress').length;
-      const overdue = userTasks.filter(t => {
-        if (!t.dueDate) return false;
-        const today = new Date();
-        const dueDate = new Date(t.dueDate);
-        return dueDate < today && t.status !== 'done';
-      }).length;
-
-      return {
-        ...user,
-        totalTasks: userTasks.length,
-        completed,
-        inProgress,
-        overdue,
-        completionRate: userTasks.length > 0 ? Math.round((completed / userTasks.length) * 100) : 0
-      };
-    });
-  }, [users, filteredTasks]);
-
-  // Keep existing task grouping
+  // Simple task grouping
   const tasksByStatus = {
     todo: filteredTasks.filter(t => t.status === 'todo'),
     in_progress: filteredTasks.filter(t => t.status === 'in_progress'),
     done: filteredTasks.filter(t => t.status === 'done')
   };
 
-  // Add async handling for task assignment
   const handleAssignTask = async (taskId: string, userId: string) => {
     try {
       await updateTask(taskId, { assignedTo: userId });
