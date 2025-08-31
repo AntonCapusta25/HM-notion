@@ -23,6 +23,7 @@ import { useTaskStore } from '../hooks/useTaskStore';
 import { useAuth } from '../contexts/AuthContext';
 import { CreateWorkspaceDialog } from '../components/CreateWorkspaceDialog';
 import { EditWorkspaceDialog } from '../components/EditWorkspaceDialog';
+import { CreateTaskDialog } from '../components/CreateTaskDialog';
 import { Workspace } from '../types';
 
 interface SidebarProps {
@@ -45,10 +46,11 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const { user } = useAuth();
   const [showCreateWorkspace, setShowCreateWorkspace] = useState(false);
+  const [showCreateTask, setShowCreateTask] = useState(false);
   const [editingWorkspace, setEditingWorkspace] = useState<Workspace | null>(null);
   
   // Get real workspace and task data
-  const { tasks, workspaces, loading } = useTaskStore(NO_FILTERS);
+  const { tasks, workspaces, loading, createTask } = useTaskStore(NO_FILTERS);
 
   // Calculate task counts for each workspace
   const workspacesWithCounts = workspaces.map(workspace => {
@@ -76,6 +78,11 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
     } catch (error) {
       console.error('Failed to delete workspace:', error);
     }
+  };
+
+  const handleCreateTask = (taskData: any) => {
+    createTask(taskData);
+    setShowCreateTask(false);
   };
 
   return (
@@ -120,9 +127,25 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
           {/* Quick Actions */}
           {!collapsed && (
             <div className="px-4 pb-4">
-              <Button className="w-full bg-homemade-orange hover:bg-homemade-orange-dark">
+              <Button 
+                className="w-full bg-homemade-orange hover:bg-homemade-orange-dark"
+                onClick={() => setShowCreateTask(true)}
+              >
                 <Plus className="h-4 w-4 mr-2" />
                 New Task
+              </Button>
+            </div>
+          )}
+
+          {/* Collapsed New Task Button */}
+          {collapsed && (
+            <div className="px-2 pb-4">
+              <Button 
+                className="w-full bg-homemade-orange hover:bg-homemade-orange-dark p-2"
+                onClick={() => setShowCreateTask(true)}
+                title="New Task"
+              >
+                <Plus className="h-4 w-4" />
               </Button>
             </div>
           )}
@@ -275,6 +298,13 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
           </div>
         </div>
       </div>
+
+      {/* Create Task Dialog */}
+      <CreateTaskDialog
+        isOpen={showCreateTask}
+        onClose={() => setShowCreateTask(false)}
+        onCreateTask={handleCreateTask}
+      />
 
       {/* Create Workspace Dialog */}
       <CreateWorkspaceDialog 
