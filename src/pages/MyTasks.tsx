@@ -83,10 +83,8 @@ const MyTasks = () => {
   
   // Workspace filtering
   if (selectedWorkspace) {
-    const workspace = workspaces.find(w => w.id === selectedWorkspace);
-    if (workspace) {
-      myTasks = myTasks.filter(task => task.tags && task.tags.includes(workspace.department));
-    }
+    // FIXED: Filter by workspace_id instead of tags
+    myTasks = myTasks.filter(task => task.workspace_id === selectedWorkspace);
   }
 
   // Date filtering
