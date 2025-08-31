@@ -80,10 +80,7 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
     }
   };
 
-  const handleCreateTask = (taskData: any) => {
-    createTask(taskData);
-    setShowCreateTask(false);
-  };
+  // Remove this function since CreateTaskDialog handles it internally
 
   return (
     <>
@@ -301,9 +298,8 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
 
       {/* Create Task Dialog */}
       <CreateTaskDialog
-        isOpen={showCreateTask}
-        onClose={() => setShowCreateTask(false)}
-        onCreateTask={handleCreateTask}
+        open={showCreateTask}
+        onOpenChange={setShowCreateTask}
       />
 
       {/* Create Workspace Dialog */}
