@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Plus, Filter, Calendar, BarChart3, Grid3X3, List } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Plus, Calendar, BarChart3, Grid3X3, List } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -8,6 +8,7 @@ import { TaskCard } from './TaskCard';
 import { CreateTaskDialog } from './CreateTaskDialog';
 import { TaskDetailDialog } from './TaskDetailDialog';
 import { ListView } from './ListView';
+import { TaskFilters, TaskFiltersState } from './TaskFilters';
 import { useTaskStore } from '../hooks/useTaskStore';
 import { useAuth } from '../contexts/AuthContext';
 import { useProfile } from '../hooks/useProfile';
@@ -37,6 +38,14 @@ export const Dashboard = () => {
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
+  const [taskFilters, setTaskFilters] = useState<TaskFiltersState>({
+    status: [],
+    priority: [],
+    assignee: [],
+    tags: [],
+    sortBy: 'createdAt',
+    sortOrder: 'desc'
+  });
 
   useEffect(() => {
     const fetchDashboardStats = async () => {
@@ -156,9 +165,81 @@ export const Dashboard = () => {
     myTasks: userProfile ? tasks.filter(t => t.assignedTo === userProfile.id || t.createdBy === userProfile.id).length : 0
   };
 
-  const filteredTasks = filter === 'my' && userProfile
-    ? tasks.filter(t => t.assignedTo === userProfile.id || t.createdBy === userProfile.id)
-    : tasks; 
+  // Apply filtering and sorting with useMemo for performance
+  const filteredTasks = useMemo(() => {
+    let filtered = tasks;
+
+    // Apply basic filter (my/all/team)
+    if (filter === 'my' && userProfile) {
+      filtered = filtered.filter(t => t.assignedTo === userProfile.id || t.createdBy === userProfile.id);
+    }
+
+    // Apply advanced filters
+    if (taskFilters.status.length > 0) {
+      filtered = filtered.filter(t => taskFilters.status.includes(t.status));
+    }
+
+    if (taskFilters.priority.length > 0) {
+      filtered = filtered.filter(t => taskFilters.priority.includes(t.priority));
+    }
+
+    if (taskFilters.assignee.length > 0) {
+      filtered = filtered.filter(t => t.assignedTo && taskFilters.assignee.includes(t.assignedTo));
+    }
+
+    if (taskFilters.tags.length > 0) {
+      filtered = filtered.filter(t => 
+        t.tags && t.tags.some(tag => taskFilters.tags.includes(tag))
+      );
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      let aValue, bValue;
+      
+      switch (taskFilters.sortBy) {
+        case 'dueDate':
+          aValue = a.dueDate ? new Date(a.dueDate).getTime() : 0;
+          bValue = b.dueDate ? new Date(b.dueDate).getTime() : 0;
+          break;
+        case 'priority':
+          const priorityOrder = { high: 3, medium: 2, low: 1 };
+          aValue = priorityOrder[a.priority] || 0;
+          bValue = priorityOrder[b.priority] || 0;
+          break;
+        case 'createdAt':
+          aValue = new Date(a.createdAt).getTime();
+          bValue = new Date(b.createdAt).getTime();
+          break;
+        case 'title':
+          aValue = a.title.toLowerCase();
+          bValue = b.title.toLowerCase();
+          break;
+        default:
+          aValue = new Date(a.createdAt).getTime();
+          bValue = new Date(b.createdAt).getTime();
+      }
+
+      if (taskFilters.sortOrder === 'desc') {
+        return bValue > aValue ? 1 : -1;
+      } else {
+        return aValue > bValue ? 1 : -1;
+      }
+    });
+
+    return filtered;
+  }, [tasks, filter, userProfile, taskFilters]);
+
+  // Get available tags for filter dropdown
+  const availableTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    tasks.forEach(task => {
+      if (task.tags) {
+        task.tags.forEach(tag => tagSet.add(tag));
+      }
+    });
+    return Array.from(tagSet).sort();
+  }, [tasks]); 
 
   const tasksByStatus = {
     todo: filteredTasks.filter(t => t.status === 'todo'),
@@ -305,10 +386,12 @@ export const Dashboard = () => {
               Team View ({stats.total})
             </Button>
           </div>
-          <Button variant="outline" size="sm">
-            <Filter className="h-4 w-4 mr-2" />
-            Filter
-          </Button>
+          <TaskFilters
+            filters={taskFilters}
+            onFiltersChange={setTaskFilters}
+            users={users}
+            availableTags={availableTags}
+          />
         </div>
 
         {/* View Toggle */}
