@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Filter, Calendar, BarChart3 } from 'lucide-react';
+import { Plus, Filter, Calendar, BarChart3, Grid3X3, List } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -7,9 +7,10 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { TaskCard } from './TaskCard';
 import { CreateTaskDialog } from './CreateTaskDialog';
 import { TaskDetailDialog } from './TaskDetailDialog';
+import { ListView } from './ListView';
 import { useTaskStore } from '../hooks/useTaskStore';
 import { useAuth } from '../contexts/AuthContext';
-import { useProfile } from '../hooks/useProfile'; // Add this import
+import { useProfile } from '../hooks/useProfile';
 import { supabase } from '../lib/supabase';
 import { Task } from '../types';
 
@@ -29,10 +30,11 @@ export const Dashboard = () => {
   // Use both useAuth for the authenticated user and useProfile for profile data
   const { user } = useAuth();
   const { profile: userProfile, loading: profileLoading, error: profileError } = useProfile();
-  const { tasks, users, createTask, updateTask, addComment, toggleSubtask, loading: tasksLoading, error } = useTaskStore();
+  const { tasks, users, createTask, updateTask, deleteTask, addComment, toggleSubtask, loading: tasksLoading, error } = useTaskStore();
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [filter, setFilter] = useState<'all' | 'my' | 'team'>('all');
+  const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
 
@@ -183,6 +185,17 @@ export const Dashboard = () => {
     }
   };
 
+  const handleDeleteTask = async (taskId: string) => {
+    const confirmed = window.confirm('Are you sure you want to delete this task?');
+    if (!confirmed) return;
+    
+    try {
+      await deleteTask(taskId);
+    } catch (err) {
+      console.error('Failed to delete task:', err);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -264,106 +277,142 @@ export const Dashboard = () => {
         </Card>
       </div>
 
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2">
-          <Button 
-            variant={filter === 'all' ? 'default' : 'outline'} 
-            size="sm"
-            onClick={() => setFilter('all')}
-            className={filter === 'all' ? 'bg-homemade-orange hover:bg-homemade-orange-dark' : ''}
-          >
-            All Tasks ({stats.total})
-          </Button>
-          <Button 
-            variant={filter === 'my' ? 'default' : 'outline'} 
-            size="sm"
-            onClick={() => setFilter('my')}
-            className={filter === 'my' ? 'bg-homemade-orange hover:bg-homemade-orange-dark' : ''}
-          >
-            My Tasks ({stats.myTasks})
-          </Button>
-          <Button 
-            variant={filter === 'team' ? 'default' : 'outline'} 
-            size="sm"
-            onClick={() => setFilter('team')}
-            className={filter === 'team' ? 'bg-homemade-orange hover:bg-homemade-orange-dark' : ''}
-          >
-            Team View ({stats.total})
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Button 
+              variant={filter === 'all' ? 'default' : 'outline'} 
+              size="sm"
+              onClick={() => setFilter('all')}
+              className={filter === 'all' ? 'bg-homemade-orange hover:bg-homemade-orange-dark' : ''}
+            >
+              All Tasks ({stats.total})
+            </Button>
+            <Button 
+              variant={filter === 'my' ? 'default' : 'outline'} 
+              size="sm"
+              onClick={() => setFilter('my')}
+              className={filter === 'my' ? 'bg-homemade-orange hover:bg-homemade-orange-dark' : ''}
+            >
+              My Tasks ({stats.myTasks})
+            </Button>
+            <Button 
+              variant={filter === 'team' ? 'default' : 'outline'} 
+              size="sm"
+              onClick={() => setFilter('team')}
+              className={filter === 'team' ? 'bg-homemade-orange hover:bg-homemade-orange-dark' : ''}
+            >
+              Team View ({stats.total})
+            </Button>
+          </div>
+          <Button variant="outline" size="sm">
+            <Filter className="h-4 w-4 mr-2" />
+            Filter
           </Button>
         </div>
-        <Button variant="outline" size="sm">
-          <Filter className="h-4 w-4 mr-2" />
-          Filter
-        </Button>
+
+        {/* View Toggle */}
+        <div className="flex items-center gap-2">
+          <Button 
+            variant={viewMode === 'cards' ? 'default' : 'outline'} 
+            size="sm"
+            onClick={() => setViewMode('cards')}
+            className={viewMode === 'cards' ? 'bg-homemade-orange hover:bg-homemade-orange-dark' : ''}
+          >
+            <Grid3X3 className="h-4 w-4 mr-2" />
+            Cards
+          </Button>
+          <Button 
+            variant={viewMode === 'list' ? 'default' : 'outline'} 
+            size="sm"
+            onClick={() => setViewMode('list')}
+            className={viewMode === 'list' ? 'bg-homemade-orange hover:bg-homemade-orange-dark' : ''}
+          >
+            <List className="h-4 w-4 mr-2" />
+            List
+          </Button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center justify-between text-base">
-              <span className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-gray-400 rounded-full" />
-                To Do
-              </span>
-              <Badge variant="secondary">{tasksByStatus.todo.length}</Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {tasksByStatus.todo.map(task => (
-              <TaskCard 
-                key={task.id} 
-                task={task} 
-                onClick={() => setSelectedTask(task)}
-                onAssign={handleAssignTask}
-              />
-           ))}
-          </CardContent>
-        </Card>
+      {/* Conditional Rendering Based on View Mode */}
+      {viewMode === 'cards' ? (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center justify-between text-base">
+                <span className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-gray-400 rounded-full" />
+                  To Do
+                </span>
+                <Badge variant="secondary">{tasksByStatus.todo.length}</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {tasksByStatus.todo.map(task => (
+                <TaskCard 
+                  key={task.id} 
+                  task={task} 
+                  onClick={() => setSelectedTask(task)}
+                  onAssign={handleAssignTask}
+                />
+             ))}
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center justify-between text-base">
-              <span className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-yellow-400 rounded-full" />
-                In Progress
-              </span>
-              <Badge variant="secondary">{tasksByStatus.in_progress.length}</Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {tasksByStatus.in_progress.map(task => (
-              <TaskCard 
-                key={task.id} 
-                task={task} 
-                onClick={() => setSelectedTask(task)}
-                onAssign={handleAssignTask}
-              />
-            ))}
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center justify-between text-base">
+                <span className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-yellow-400 rounded-full" />
+                  In Progress
+                </span>
+                <Badge variant="secondary">{tasksByStatus.in_progress.length}</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {tasksByStatus.in_progress.map(task => (
+                <TaskCard 
+                  key={task.id} 
+                  task={task} 
+                  onClick={() => setSelectedTask(task)}
+                  onAssign={handleAssignTask}
+                />
+              ))}
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center justify-between text-base">
-              <span className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-green-400 rounded-full" />
-                Done
-              </span>
-              <Badge variant="secondary">{tasksByStatus.done.length}</Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {tasksByStatus.done.map(task => (
-              <TaskCard 
-                key={task.id} 
-                task={task} 
-                onClick={() => setSelectedTask(task)}
-                onAssign={handleAssignTask}
-              />
-            ))}
-          </CardContent>
-        </Card>
-      </div>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center justify-between text-base">
+                <span className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-green-400 rounded-full" />
+                  Done
+                </span>
+                <Badge variant="secondary">{tasksByStatus.done.length}</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {tasksByStatus.done.map(task => (
+                <TaskCard 
+                  key={task.id} 
+                  task={task} 
+                  onClick={() => setSelectedTask(task)}
+                  onAssign={handleAssignTask}
+                />
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      ) : (
+        <ListView
+          tasks={filteredTasks}
+          users={users}
+          onCreateTask={handleCreateTask}
+          onUpdateTask={updateTask}
+          onDeleteTask={handleDeleteTask}
+          onAssignTask={handleAssignTask}
+        />
+      )}
 
       <CreateTaskDialog 
         open={showCreateTask} 
