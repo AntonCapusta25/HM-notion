@@ -69,6 +69,11 @@ const App = () => (
                 <Settings />
               </ProtectedRoute>
             } />
+            <Route path="/workspace/:id" element={
+             <ProtectedRoute>
+               <WorkspaceDetail />
+             </ProtectedRoute>
+            } />
             
             {/* Catch-all route */}
             <Route path="*" element={<NotFound />} />
