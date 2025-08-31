@@ -15,6 +15,7 @@ import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import LoadingScreen from "./components/LoadingScreen";
 import TestPage from './pages/TestPage';
+import WorkspaceDetail from "./pages/WorkspaceDetail";
 
 // CRITICAL FIX: Move QueryClient creation outside component
 const queryClient = new QueryClient({
