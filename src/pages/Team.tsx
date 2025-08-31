@@ -117,10 +117,8 @@ const Team = () => {
   let filteredTasks = tasks || [];
   
   if (selectedWorkspace) {
-    const workspace = workspaces.find(w => w.id === selectedWorkspace);
-    if (workspace) {
-      filteredTasks = filteredTasks.filter(task => task.tags && task.tags.includes(workspace.department));
-    }
+    // FIXED: Filter by workspace_id instead of tags
+    filteredTasks = filteredTasks.filter(task => task.workspace_id === selectedWorkspace);
   }
 
   if (selectedUser) {
