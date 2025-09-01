@@ -28,16 +28,9 @@ interface DashboardStats {
 }
 
 export const Dashboard = () => {
-  // Use both useAuth for the authenticated user and useProfile for profile data
   const { user } = useAuth();
   const { profile: userProfile, loading: profileLoading, error: profileError } = useProfile();
   const { tasks, users, createTask, updateTask, deleteTask, addComment, toggleSubtask, loading: tasksLoading, error } = useTaskContext();
-
-  // Add debugging logs for Dashboard
-  console.log('📊 Dashboard render - tasks count:', tasks.length);
-  console.log('📊 Dashboard render - task titles:', tasks.map(t => t.title));
-  console.log('📊 Dashboard render - userProfile:', userProfile?.id);
-  console.log('📊 Dashboard render - loading:', tasksLoading);
 
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -56,13 +49,10 @@ export const Dashboard = () => {
 
   useEffect(() => {
     const fetchDashboardStats = async () => {
-      // If there is no user profile yet, we are not loading stats.
-      // Set loading to false and exit.
       if (!userProfile) {
         setStatsLoading(false);
         return;
       }
-
       try {
         setStatsLoading(true);
         const { data, error } = await supabase
@@ -83,13 +73,6 @@ export const Dashboard = () => {
     fetchDashboardStats();
   }, [userProfile]);
 
-  // Track when Dashboard detects task changes
-  useEffect(() => {
-    console.log('📊 Dashboard detected tasks change:', tasks.length, 'tasks');
-    console.log('📊 Task titles in Dashboard:', tasks.map(t => t.title));
-  }, [tasks]);
-
-  // Show loading while profile is loading
   if (profileLoading || statsLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -101,7 +84,6 @@ export const Dashboard = () => {
     );
   }
 
-  // Show error if profile failed to load
   if (profileError) {
     return (
       <Alert variant="destructive" className="m-6">
@@ -112,7 +94,6 @@ export const Dashboard = () => {
     );
   }
 
-  // Show error if tasks failed to load
   if (error) {
     return (
       <Alert variant="destructive" className="m-6">
@@ -123,7 +104,6 @@ export const Dashboard = () => {
     );
   }
 
-  // If no profile data, show fallback using user email
   if (!userProfile && user) {
     return (
       <div className="space-y-6">
@@ -151,7 +131,6 @@ export const Dashboard = () => {
     );
   }
 
-  // If still no profile and no user, something is wrong
   if (!userProfile && !user) {
     return (
       <Alert className="m-6">
@@ -178,81 +157,75 @@ export const Dashboard = () => {
     myTasks: userProfile ? tasks.filter(t => t.assignedTo === userProfile.id || t.createdBy === userProfile.id).length : 0
   };
 
-  // Apply filtering and sorting - removed useMemo to prevent infinite re-renders
-  let filteredTasks = tasks;
+  // === OPTIMIZATION 1: Memoize filtered and sorted tasks ===
+  const filteredTasks = useMemo(() => {
+    let result = tasks;
 
-  // Apply basic filter (my/all/team)
-  if (filter === 'my' && userProfile) {
-    filteredTasks = filteredTasks.filter(t => t.assignedTo === userProfile.id || t.createdBy === userProfile.id);
-  }
-
-  // Apply advanced filters
-  if (taskFilters.status.length > 0) {
-    filteredTasks = filteredTasks.filter(t => taskFilters.status.includes(t.status));
-  }
-
-  if (taskFilters.priority.length > 0) {
-    filteredTasks = filteredTasks.filter(t => taskFilters.priority.includes(t.priority));
-  }
-
-  if (taskFilters.assignee.length > 0) {
-    filteredTasks = filteredTasks.filter(t => t.assignedTo && taskFilters.assignee.includes(t.assignedTo));
-  }
-
-  if (taskFilters.tags.length > 0) {
-    filteredTasks = filteredTasks.filter(t => 
-      t.tags && t.tags.some(tag => taskFilters.tags.includes(tag))
-    );
-  }
-
-  // Apply sorting
-  filteredTasks = [...filteredTasks].sort((a, b) => {
-    let aValue, bValue;
-    
-    switch (taskFilters.sortBy) {
-      case 'dueDate':
-        aValue = a.dueDate ? new Date(a.dueDate).getTime() : 0;
-        bValue = b.dueDate ? new Date(b.dueDate).getTime() : 0;
-        break;
-      case 'priority':
-        const priorityOrder = { high: 3, medium: 2, low: 1 };
-        aValue = priorityOrder[a.priority] || 0;
-        bValue = priorityOrder[b.priority] || 0;
-        break;
-      case 'createdAt':
-        aValue = new Date(a.createdAt).getTime();
-        bValue = new Date(b.createdAt).getTime();
-        break;
-      case 'title':
-        aValue = a.title.toLowerCase();
-        bValue = b.title.toLowerCase();
-        break;
-      default:
-        aValue = new Date(a.createdAt).getTime();
-        bValue = new Date(b.createdAt).getTime();
+    if (filter === 'my' && userProfile) {
+      result = result.filter(t => t.assignedTo === userProfile.id || t.createdBy === userProfile.id);
     }
 
-    if (taskFilters.sortOrder === 'desc') {
-      return bValue > aValue ? 1 : -1;
-    } else {
-      return aValue > bValue ? 1 : -1;
+    if (taskFilters.status.length > 0) {
+      result = result.filter(t => taskFilters.status.includes(t.status));
     }
-  });
-
-  // Get available tags for filter dropdown - also removed useMemo
-  const tagSet = new Set<string>();
-  tasks.forEach(task => {
-    if (task.tags) {
-      task.tags.forEach(tag => tagSet.add(tag));
+    if (taskFilters.priority.length > 0) {
+      result = result.filter(t => taskFilters.priority.includes(t.priority));
     }
-  });
-  const availableTags = Array.from(tagSet).sort(); 
+    if (taskFilters.assignee.length > 0) {
+      result = result.filter(t => t.assignedTo && taskFilters.assignee.includes(t.assignedTo));
+    }
+    if (taskFilters.tags.length > 0) {
+      result = result.filter(t => 
+        t.tags && t.tags.some(tag => taskFilters.tags.includes(tag))
+      );
+    }
 
-  const tasksByStatus = {
+    return [...result].sort((a, b) => {
+      let aValue, bValue;
+      switch (taskFilters.sortBy) {
+        case 'dueDate':
+          aValue = a.dueDate ? new Date(a.dueDate).getTime() : 0;
+          bValue = b.dueDate ? new Date(b.dueDate).getTime() : 0;
+          break;
+        case 'priority':
+          const priorityOrder = { high: 3, medium: 2, low: 1 };
+          aValue = priorityOrder[a.priority as keyof typeof priorityOrder] || 0;
+          bValue = priorityOrder[b.priority as keyof typeof priorityOrder] || 0;
+          break;
+        case 'title':
+            aValue = a.title.toLowerCase();
+            bValue = b.title.toLowerCase();
+            break;
+        default: // createdAt
+            aValue = new Date(a.createdAt).getTime();
+            bValue = new Date(b.createdAt).getTime();
+      }
+      if (taskFilters.sortOrder === 'desc') {
+        return bValue > aValue ? 1 : -1;
+      } else {
+        return aValue > bValue ? 1 : -1;
+      }
+    });
+  }, [tasks, filter, taskFilters, userProfile]);
+
+  // === OPTIMIZATION 2: Memoize the available tags list ===
+  const availableTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    tasks.forEach(task => {
+      if (task.tags) {
+        task.tags.forEach(tag => tagSet.add(tag));
+      }
+    });
+    return Array.from(tagSet).sort();
+  }, [tasks]);
+
+  // === OPTIMIZATION 3: Memoize the tasks grouped by status ===
+  const tasksByStatus = useMemo(() => ({
     todo: filteredTasks.filter(t => t.status === 'todo'),
     in_progress: filteredTasks.filter(t => t.status === 'in_progress'),
     done: filteredTasks.filter(t => t.status === 'done')
-  };
+  }), [filteredTasks]);
+
 
   const handleCreateTask = async (taskData: any) => {
     try {
@@ -401,7 +374,6 @@ export const Dashboard = () => {
           />
         </div>
 
-        {/* View Toggle */}
         <div className="flex items-center gap-2">
           <Button 
             variant={viewMode === 'cards' ? 'default' : 'outline'} 
@@ -424,7 +396,6 @@ export const Dashboard = () => {
         </div>
       </div>
 
-      {/* Conditional Rendering Based on View Mode */}
       {viewMode === 'cards' ? (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card>
@@ -445,7 +416,7 @@ export const Dashboard = () => {
                   onClick={() => setSelectedTask(task)}
                   onAssign={handleAssignTask}
                 />
-             ))}
+              ))}
             </CardContent>
           </Card>
 
