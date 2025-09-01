@@ -1,13 +1,13 @@
-
-import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useState, useMemo } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
-import { Calendar, Clock, User, MessageCircle, CheckSquare, Square, Plus, MoreHorizontal } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar, UserPlus, X, MessageCircle, CheckSquare, Square, Plus } from 'lucide-react';
 import { Task, User as UserType } from '../types';
 import { format } from 'date-fns';
 
@@ -35,7 +35,16 @@ export const TaskDetailDialog = ({
 
   if (!task) return null;
 
-  const assignedUser = users.find(u => u.id === task.assignedTo);
+  // Find all assigned users for the task
+  const assignedUsers = useMemo(() => {
+    return users.filter(u => task.assignees?.includes(u.id));
+  }, [users, task.assignees]);
+  
+  // Find all users who are NOT assigned to the task
+  const unassignedUsers = useMemo(() => {
+    return users.filter(u => !task.assignees?.includes(u.id));
+  }, [users, task.assignees]);
+
   const createdByUser = users.find(u => u.id === task.createdBy);
 
   const handleAddComment = () => {
@@ -53,10 +62,21 @@ export const TaskDetailDialog = ({
         completed: false
       };
       onUpdateTask(task.id, {
-        subtasks: [...task.subtasks, newSubtaskObj]
+        subtasks: [...(task.subtasks || []), newSubtaskObj]
       });
       setNewSubtask('');
     }
+  };
+
+  // Functions to add/remove assignees by updating the task
+  const handleAddAssignee = (userId: string) => {
+    const newAssignees = [...(task.assignees || []), userId];
+    onUpdateTask(task.id, { assignees: newAssignees });
+  };
+  
+  const handleRemoveAssignee = (userId: string) => {
+    const newAssignees = (task.assignees || []).filter(id => id !== userId);
+    onUpdateTask(task.id, { assignees: newAssignees });
   };
 
   const priorityColors = {
@@ -70,12 +90,18 @@ export const TaskDetailDialog = ({
     in_progress: 'bg-blue-100 text-blue-800',
     done: 'bg-green-100 text-green-800'
   };
+  
+  const subtasks = task.subtasks || [];
+  const comments = task.comments || [];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold pr-8">{task.title}</DialogTitle>
+          <DialogDescription>
+            Manage task details, subtasks, and comments.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -88,9 +114,9 @@ export const TaskDetailDialog = ({
 
             {/* Subtasks */}
             <div>
-              <h3 className="font-medium mb-3">Subtasks ({task.subtasks.filter(st => st.completed).length}/{task.subtasks.length})</h3>
+              <h3 className="font-medium mb-3">Subtasks ({subtasks.filter(st => st.completed).length}/{subtasks.length})</h3>
               <div className="space-y-2">
-                {task.subtasks.map(subtask => (
+                {subtasks.map(subtask => (
                   <div key={subtask.id} className="flex items-center gap-2">
                     <button
                       onClick={() => onToggleSubtask(task.id, subtask.id)}
@@ -117,20 +143,20 @@ export const TaskDetailDialog = ({
 
             {/* Comments */}
             <div>
-              <h3 className="font-medium mb-3">Comments ({task.comments.length})</h3>
+              <h3 className="font-medium mb-3">Comments ({comments.length})</h3>
               <div className="space-y-4">
-                {task.comments.map(comment => {
+                {comments.map(comment => {
                   const author = users.find(u => u.id === comment.author);
                   return (
                     <div key={comment.id} className="flex gap-3">
                       <Avatar className="h-8 w-8">
-                        <AvatarFallback className="bg-homemade-orange text-white text-xs">
-                          {author?.avatar}
+                        <AvatarFallback className="bg-gray-200 text-xs">
+                          {author ? author.name.charAt(0) : '?'}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium text-sm">{author?.name}</span>
+                          <span className="font-medium text-sm">{author?.name || 'Unknown User'}</span>
                           <span className="text-xs text-gray-500">
                             {format(new Date(comment.createdAt), 'MMM d, yyyy at h:mm a')}
                           </span>
@@ -171,18 +197,53 @@ export const TaskDetailDialog = ({
               </Badge>
             </div>
 
+            {/* ==================================================================== */}
+            {/* === NEW: Multi-assignee display and management UI ================== */}
+            {/* ==================================================================== */}
             <div>
-              <h3 className="font-medium mb-2">Assigned to</h3>
-              {assignedUser && (
-                <div className="flex items-center gap-2">
-                  <Avatar className="h-6 w-6">
-                    <AvatarFallback className="bg-homemade-orange text-white text-xs">
-                      {assignedUser.avatar}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="text-sm">{assignedUser.name}</span>
-                </div>
-              )}
+              <h3 className="font-medium mb-2">Assignees</h3>
+              <div className="space-y-2">
+                {assignedUsers.map(user => (
+                   <div key={user.id} className="flex items-center justify-between group">
+                      <div className="flex items-center gap-2">
+                         <Avatar className="h-6 w-6">
+                           <AvatarFallback className="text-xs">{user.name.charAt(0)}</AvatarFallback>
+                         </Avatar>
+                         <span className="text-sm">{user.name}</span>
+                      </div>
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100" onClick={() => handleRemoveAssignee(user.id)}>
+                         <X className="h-3 w-3"/>
+                      </Button>
+                   </div>
+                ))}
+                 <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="w-full justify-start text-left font-normal text-gray-500">
+                        <UserPlus className="mr-2 h-4 w-4" />
+                        Add assignee...
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-56 p-0">
+                      <div className="p-1">
+                        {unassignedUsers.map(user => (
+                          <div 
+                            key={user.id}
+                            className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-md cursor-pointer"
+                            onClick={() => handleAddAssignee(user.id)}
+                          >
+                            <Avatar className="h-6 w-6">
+                              <AvatarFallback className="text-xs">{user.name.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                            <span className="text-sm">{user.name}</span>
+                          </div>
+                        ))}
+                         {unassignedUsers.length === 0 && (
+                           <p className="p-4 text-center text-sm text-gray-500">All users assigned.</p>
+                         )}
+                      </div>
+                    </PopoverContent>
+                 </Popover>
+              </div>
             </div>
 
             {task.dueDate && (
@@ -198,7 +259,7 @@ export const TaskDetailDialog = ({
             <div>
               <h3 className="font-medium mb-2">Tags</h3>
               <div className="flex flex-wrap gap-1">
-                {task.tags.map((tag, index) => (
+                {(task.tags || []).map((tag, index) => (
                   <Badge key={index} variant="outline" className="text-xs">
                     {tag}
                   </Badge>
@@ -209,7 +270,7 @@ export const TaskDetailDialog = ({
             <Separator />
 
             <div className="text-xs text-gray-500 space-y-1">
-              <div>Created by {createdByUser?.name}</div>
+              <div>Created by {createdByUser?.name || 'Unknown'}</div>
               <div>{format(new Date(task.createdAt), 'MMM d, yyyy at h:mm a')}</div>
               <div>Updated {format(new Date(task.updatedAt), 'MMM d, yyyy at h:mm a')}</div>
             </div>
