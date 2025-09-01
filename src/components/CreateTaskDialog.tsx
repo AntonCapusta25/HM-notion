@@ -33,7 +33,7 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
   // CHANGED: State now holds an array of assignee IDs
   const [assignees, setAssignees] = useState<string[]>([]);
   const [priority, setPriority] = useState('');
-  const [dueDate, setDueDate] = useState<Date>();
+  const [due_date, setdue_date] = useState<Date>();
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
   
@@ -58,7 +58,7 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
         description,
         assignees, // This is now an array of user IDs
         priority: priority as 'low' | 'medium' | 'high',
-        dueDate: dueDate?.toISOString().split('T')[0],
+        due_date: due_date?.toISOString().split('T')[0],
         tags,
         status: 'todo' as const,
         subtasks: [],
@@ -87,7 +87,7 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
     setDescription('');
     setAssignees([]); // Reset assignees array
     setPriority('');
-    setDueDate(undefined);
+    setDue_date(undefined);
     setTags([]);
     setNewTag('');
     setError(null);
@@ -224,19 +224,19 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
                     variant="outline"
                     className={cn(
                       "w-full justify-start text-left font-normal",
-                      !dueDate && "text-muted-foreground"
+                      !due_date && "text-muted-foreground"
                     )}
                     disabled={isSubmitting}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dueDate ? format(dueDate, "PPP") : <span>Pick a date</span>}
+                    {due_date ? format(due_date, "PPP") : <span>Pick a date</span>}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar
                     mode="single"
-                    selected={dueDate}
-                    onSelect={setDueDate}
+                    selected={due_date}
+                    onSelect={setdue_date}
                     initialFocus
                   />
                 </PopoverContent>
