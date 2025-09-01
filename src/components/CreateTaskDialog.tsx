@@ -12,9 +12,9 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useTaskStore } from '../hooks/useTaskStore';
+import { useTaskContext } from '../contexts/TaskContext';
 import { useAuth } from '../contexts/AuthContext';
-import { useProfile } from '../hooks/useProfile'; // Add this import
+import { useProfile } from '../hooks/useProfile';
 
 interface CreateTaskDialogProps {
   open: boolean;
@@ -23,8 +23,7 @@ interface CreateTaskDialogProps {
 }
 
 export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTaskDialogProps) => {
-  const { users, createTask } = useTaskStore();
-  // FIXED: Use both useAuth for user and useProfile for profile data
+  const { users, createTask } = useTaskContext();
   const { user } = useAuth();
   const { profile: userProfile } = useProfile();
   
@@ -42,7 +41,6 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // FIXED: Check both user and userProfile, but user is the minimum requirement
     if (!user) {
       setError('You must be logged in to create tasks');
       return;
@@ -61,7 +59,6 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
         tags,
         status: 'todo' as const,
         subtasks: [],
-        // FIXED: Use userProfile.id if available, otherwise fall back to user.id
         createdBy: userProfile?.id || user.id
       };
       
