@@ -28,6 +28,7 @@ interface DashboardStats {
 }
 
 export const Dashboard = () => {
+  // All hooks are at the top level, before any returns
   const { user } = useAuth();
   const { profile: userProfile, loading: profileLoading, error: profileError } = useProfile();
   const { tasks, users, createTask, updateTask, deleteTask, addComment, toggleSubtask, loading: tasksLoading, error } = useTaskContext();
@@ -69,10 +70,73 @@ export const Dashboard = () => {
         setStatsLoading(false);
       }
     };
-
     fetchDashboardStats();
   }, [userProfile]);
 
+  const filteredTasks = useMemo(() => {
+    let result = tasks;
+    if (filter === 'my' && userProfile) {
+      result = result.filter(t => t.assignedTo === userProfile.id || t.createdBy === userProfile.id);
+    }
+    if (taskFilters.status.length > 0) {
+      result = result.filter(t => taskFilters.status.includes(t.status));
+    }
+    if (taskFilters.priority.length > 0) {
+      result = result.filter(t => taskFilters.priority.includes(t.priority));
+    }
+    if (taskFilters.assignee.length > 0) {
+      result = result.filter(t => t.assignedTo && taskFilters.assignee.includes(t.assignedTo));
+    }
+    if (taskFilters.tags.length > 0) {
+      result = result.filter(t => 
+        t.tags && t.tags.some(tag => taskFilters.tags.includes(tag))
+      );
+    }
+    return [...result].sort((a, b) => {
+      let aValue, bValue;
+      switch (taskFilters.sortBy) {
+        case 'dueDate':
+          aValue = a.dueDate ? new Date(a.dueDate).getTime() : 0;
+          bValue = b.dueDate ? new Date(b.dueDate).getTime() : 0;
+          break;
+        case 'priority':
+          const priorityOrder = { high: 3, medium: 2, low: 1 };
+          aValue = priorityOrder[a.priority as keyof typeof priorityOrder] || 0;
+          bValue = priorityOrder[b.priority as keyof typeof priorityOrder] || 0;
+          break;
+        case 'title':
+            aValue = a.title.toLowerCase();
+            bValue = b.title.toLowerCase();
+            break;
+        default: // createdAt
+            aValue = new Date(a.createdAt).getTime();
+            bValue = new Date(b.createdAt).getTime();
+      }
+      if (taskFilters.sortOrder === 'desc') {
+        return bValue > aValue ? 1 : -1;
+      } else {
+        return aValue > bValue ? 1 : -1;
+      }
+    });
+  }, [tasks, filter, taskFilters, userProfile]);
+
+  const availableTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    tasks.forEach(task => {
+      if (task.tags) {
+        task.tags.forEach(tag => tagSet.add(tag));
+      }
+    });
+    return Array.from(tagSet).sort();
+  }, [tasks]);
+
+  const tasksByStatus = useMemo(() => ({
+    todo: filteredTasks.filter(t => t.status === 'todo'),
+    in_progress: filteredTasks.filter(t => t.status === 'in_progress'),
+    done: filteredTasks.filter(t => t.status === 'done')
+  }), [filteredTasks]);
+
+  // Conditional returns now happen AFTER all hooks have been called
   if (profileLoading || statsLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -156,76 +220,6 @@ export const Dashboard = () => {
     dueToday: tasks.filter(t => t.dueDate === new Date().toISOString().split('T')[0] && t.status !== 'done').length,
     myTasks: userProfile ? tasks.filter(t => t.assignedTo === userProfile.id || t.createdBy === userProfile.id).length : 0
   };
-
-  // === OPTIMIZATION 1: Memoize filtered and sorted tasks ===
-  const filteredTasks = useMemo(() => {
-    let result = tasks;
-
-    if (filter === 'my' && userProfile) {
-      result = result.filter(t => t.assignedTo === userProfile.id || t.createdBy === userProfile.id);
-    }
-
-    if (taskFilters.status.length > 0) {
-      result = result.filter(t => taskFilters.status.includes(t.status));
-    }
-    if (taskFilters.priority.length > 0) {
-      result = result.filter(t => taskFilters.priority.includes(t.priority));
-    }
-    if (taskFilters.assignee.length > 0) {
-      result = result.filter(t => t.assignedTo && taskFilters.assignee.includes(t.assignedTo));
-    }
-    if (taskFilters.tags.length > 0) {
-      result = result.filter(t => 
-        t.tags && t.tags.some(tag => taskFilters.tags.includes(tag))
-      );
-    }
-
-    return [...result].sort((a, b) => {
-      let aValue, bValue;
-      switch (taskFilters.sortBy) {
-        case 'dueDate':
-          aValue = a.dueDate ? new Date(a.dueDate).getTime() : 0;
-          bValue = b.dueDate ? new Date(b.dueDate).getTime() : 0;
-          break;
-        case 'priority':
-          const priorityOrder = { high: 3, medium: 2, low: 1 };
-          aValue = priorityOrder[a.priority as keyof typeof priorityOrder] || 0;
-          bValue = priorityOrder[b.priority as keyof typeof priorityOrder] || 0;
-          break;
-        case 'title':
-            aValue = a.title.toLowerCase();
-            bValue = b.title.toLowerCase();
-            break;
-        default: // createdAt
-            aValue = new Date(a.createdAt).getTime();
-            bValue = new Date(b.createdAt).getTime();
-      }
-      if (taskFilters.sortOrder === 'desc') {
-        return bValue > aValue ? 1 : -1;
-      } else {
-        return aValue > bValue ? 1 : -1;
-      }
-    });
-  }, [tasks, filter, taskFilters, userProfile]);
-
-  // === OPTIMIZATION 2: Memoize the available tags list ===
-  const availableTags = useMemo(() => {
-    const tagSet = new Set<string>();
-    tasks.forEach(task => {
-      if (task.tags) {
-        task.tags.forEach(tag => tagSet.add(tag));
-      }
-    });
-    return Array.from(tagSet).sort();
-  }, [tasks]);
-
-  // === OPTIMIZATION 3: Memoize the tasks grouped by status ===
-  const tasksByStatus = useMemo(() => ({
-    todo: filteredTasks.filter(t => t.status === 'todo'),
-    in_progress: filteredTasks.filter(t => t.status === 'in_progress'),
-    done: filteredTasks.filter(t => t.status === 'done')
-  }), [filteredTasks]);
-
 
   const handleCreateTask = async (taskData: any) => {
     try {
