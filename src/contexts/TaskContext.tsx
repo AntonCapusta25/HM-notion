@@ -47,12 +47,13 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
       if (usersRes.error) throw usersRes.error;
       if (workspacesRes.error) throw workspacesRes.error;
 
-      // Make data formatting robust against null relationships
+      // Make data formatting robust against null or missing relationships
       const formattedTasks = (tasksRes.data || []).map(task => ({
         ...task,
         assignees: (task.task_assignees || []).map((a: { user_id: string }) => a.user_id),
         subtasks: task.subtasks || [],
-        comments: task.comments || []
+        comments: task.comments || [],
+        tags: task.tags || [] // This line prevents the '.length' error
       }));
 
       setTasks(formattedTasks);
