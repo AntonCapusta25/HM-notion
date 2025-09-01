@@ -19,6 +19,17 @@ interface TaskContextValue {
 
 const TaskContext = createContext<TaskContextValue | null>(null);
 
+// Helper function to safely parse dates
+const safeParseDate = (dateValue: any): string | null => {
+  if (!dateValue) return null;
+  if (typeof dateValue === 'string') {
+    const date = new Date(dateValue);
+    if (isNaN(date.getTime())) return null;
+    return dateValue;
+  }
+  return null;
+};
+
 export const TaskProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -43,8 +54,13 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
       const formattedTasks = (tasksRes.data || []).map(task => ({
         ...task,
         assignees: (task.task_assignees || []).map((a: { user_id: string }) => a.user_id),
-        subtasks: task.subtasks || [], comments: task.comments || [], tags: task.tags || [],
-        createdAt: task.createdAt || null, updatedAt: task.updatedAt || null, dueDate: task.dueDate || null
+        subtasks: task.subtasks || [], 
+        comments: task.comments || [], 
+        tags: task.tags || [],
+        // FIXED: Use safe date parsing to prevent Invalid time value errors
+        createdAt: safeParseDate(task.createdAt) || new Date().toISOString(),
+        updatedAt: safeParseDate(task.updatedAt) || new Date().toISOString(),
+        dueDate: safeParseDate(task.dueDate)
       }));
 
       setTasks(formattedTasks);
@@ -78,7 +94,13 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
     
     const { data: newTask, error } = await supabase
       .from('tasks')
-      .insert({ ...restOfTaskData, subtasks: subtasks || [], createdBy: user.id }) // Only include valid columns
+      .insert({ 
+        ...restOfTaskData, 
+        subtasks: subtasks || [], 
+        createdBy: user.id,
+        // FIXED: Ensure dates are properly formatted
+        dueDate: taskData.dueDate ? safeParseDate(taskData.dueDate) : null
+      })
       .select()
       .single();
 
@@ -92,8 +114,15 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const updateTask = async (taskId: string, updates: Partial<Task>) => {
-    const { assignees, ...restOfUpdates } = updates; // Ensure assignees array is not sent to `tasks` table
-    const { error } = await supabase.from('tasks').update(restOfUpdates).eq('id', taskId);
+    const { assignees, ...restOfUpdates } = updates;
+    
+    // FIXED: Safe date parsing for updates
+    const safeUpdates = {
+      ...restOfUpdates,
+      ...(updates.dueDate !== undefined && { dueDate: safeParseDate(updates.dueDate) })
+    };
+    
+    const { error } = await supabase.from('tasks').update(safeUpdates).eq('id', taskId);
     if (error) throw error;
 
     // If assignees are part of the update, handle them separately
