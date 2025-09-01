@@ -118,8 +118,8 @@ export const Dashboard = () => {
             bValue = b.title.toLowerCase();
             break;
         default: // createdAt
-            aValue = new Date(a.createdAt).getTime();
-            bValue = new Date(b.createdAt).getTime();
+            aValue = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            bValue = b.createdAt ? new Date(b.createdAt).getTime() : 0;
       }
       if (taskFilters.sortOrder === 'desc') {
         return bValue > aValue ? 1 : -1;
@@ -224,8 +224,22 @@ export const Dashboard = () => {
     total: tasks.length,
     inProgress: tasks.filter(t => t.status === 'in_progress').length,
     completed: tasks.filter(t => t.status === 'done').length,
-    overdue: tasks.filter(t => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'done').length,
-    dueToday: tasks.filter(t => t.dueDate === new Date().toISOString().split('T')[0] && t.status !== 'done').length,
+    overdue: tasks.filter(t => {
+      if (!t.dueDate || t.status === 'done') return false;
+      try {
+        return new Date(t.dueDate) < new Date();
+      } catch {
+        return false;
+      }
+    }).length,
+    dueToday: tasks.filter(t => {
+      if (!t.dueDate || t.status === 'done') return false;
+      try {
+        return t.dueDate === new Date().toISOString().split('T')[0];
+      } catch {
+        return false;
+      }
+    }).length,
     myTasks: userProfile ? tasks.filter(t => (t.assignees && t.assignees.includes(userProfile.id)) || t.createdBy === userProfile.id).length : 0
   };
 
