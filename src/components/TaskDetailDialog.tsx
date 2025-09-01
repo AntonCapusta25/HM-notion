@@ -155,7 +155,6 @@ export const TaskDetailDialog = ({
                         <div className="flex items-center gap-2 mb-1">
                           <span className="font-medium text-sm">{author?.name || 'Unknown User'}</span>
                           <span className="text-xs text-gray-500">
-                            {/* FIX: Safely format the comment's creation date */}
                             {comment.createdAt && format(new Date(comment.createdAt), 'MMM d, yyyy at h:mm a')}
                           </span>
                         </div>
@@ -266,7 +265,6 @@ export const TaskDetailDialog = ({
 
             <div className="text-xs text-gray-500 space-y-1">
               <div>Created by {createdByUser?.name || 'Unknown'}</div>
-              {/* FIX: Safely format the task's creation and update dates */}
               <div>
                 {task.createdAt && `Created ${format(new Date(task.createdAt), 'MMM d, yyyy')}`}
               </div>
