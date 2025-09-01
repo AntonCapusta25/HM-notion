@@ -14,7 +14,6 @@ export const useTaskStore = () => {
   const fetchAllData = useCallback(async () => {
     try {
       const [tasksRes, usersRes, workspacesRes] = await Promise.all([
-        // FIX: Changed `task_assignees!inner(user_id)` to `task_assignees(user_id)`
         supabase.from('tasks').select(`*, comments(*), task_assignees(user_id)`),
         supabase.from('users').select('*'),
         supabase.from('workspaces').select('*')
@@ -70,7 +69,10 @@ export const useTaskStore = () => {
   const createTask = async (taskData: Partial<Task>) => {
     if (!user) throw new Error("User not authenticated");
     const { assignees, subtasks, ...restOfTaskData } = taskData;
-    const { data: newTask, error } = await supabase.from('tasks').insert({ ...restOfTaskData, subtasks: subtasks || [], createdBy: user.id }).select().single();
+    
+    // FIX: Changed `createdBy` to `created_by` to match your database schema
+    const { data: newTask, error } = await supabase.from('tasks').insert({ ...restOfTaskData, subtasks: subtasks || [], created_by: user.id }).select().single();
+    
     if (error) throw error;
 
     if (assignees && assignees.length > 0) {
