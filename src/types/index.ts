@@ -1,129 +1,62 @@
+// src/types.ts
+
+// From your `users` table
 export interface User {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'member';
-  avatar?: string;
+  role: string;
   department: string;
+  avatar: string | null;
+  created_at: string;
 }
 
-export interface Task {
-  id: string;
-  title: string;
-  description: string;
-  dueDate?: string;
-  assignedTo: string; // Keep for backwards compatibility
-  assignees: string[]; // Add this for many-to-many
-  priority: 'low' | 'medium' | 'high';
-  status: 'todo' | 'in_progress' | 'done';
-  tags: string[];
-  subtasks: Subtask[];
-  createdAt: string;
-  updatedAt: string;
-  createdBy: string;
-  comments: Comment[];
-  workspaceId?: string;
-}
-
-export interface Subtask {
-  id: string;
-  title: string;
-  completed: boolean;
-}
-
-export interface Comment {
-  id: string;
-  content: string;
-  author: string;
-  createdAt: string;
-}
-
+// From your `workspaces` table
 export interface Workspace {
   id: string;
   name: string;
   department: string;
+  created_at: string;
+  description: string | null;
+  created_by: string;
   color: string;
 }
 
-export interface DashboardStats {
-  total_tasks: number
-  todo_tasks: number
-  in_progress_tasks: number
-  done_tasks: number
-  overdue_tasks: number
-  due_today: number
-  high_priority: number
-  my_tasks: number
-  my_created_tasks: number
+// From your `comments` table
+export interface Comment {
+  id: string;
+  task_id: string;
+  author: string;
+  content: string;
+  created_at: string;
 }
 
-export interface SupabaseTask {
-  id: string
-  title: string
-  description: string
-  due_date: string | null
-  assigned_to: string | null
-  priority: 'low' | 'medium' | 'high'
-  status: 'todo' | 'in_progress' | 'done'
-  created_by: string
-  workspace_id: string | null
-  created_at: string
-  updated_at: string
-  assigned_user?: User | null
-  created_user?: User | null
-  subtasks?: Subtask[]
-  comments?: Comment[]
-  task_tags?: { tag: string }[]
-  workspace?: Workspace | null
+// From your `subtasks` table
+export interface Subtask {
+  id: string;
+  task_id: string;
+  title: string;
+  completed: boolean;
+  created_at: string;
 }
 
-// FIXED: Safe date parsing function
-const safeParseDate = (dateValue: any): string => {
-  if (!dateValue) return new Date().toISOString();
-  if (typeof dateValue === 'string') {
-    const date = new Date(dateValue);
-    if (isNaN(date.getTime())) {
-      console.warn(`Invalid date value encountered: ${dateValue}, using current time`);
-      return new Date().toISOString();
-    }
-    return dateValue;
-  }
-  return new Date().toISOString();
-};
-
-// FIXED: Safe due date parsing (can be null)
-const safeParseDueDate = (dateValue: any): string | undefined => {
-  if (!dateValue) return undefined;
-  if (typeof dateValue === 'string') {
-    const date = new Date(dateValue);
-    if (isNaN(date.getTime())) {
-      console.warn(`Invalid due date value encountered: ${dateValue}, returning undefined`);
-      return undefined;
-    }
-    return dateValue;
-  }
-  return undefined;
-};
-
-// FIXED: Helper function with safe date parsing and many-to-many support
-export const formatTaskFromSupabase = (supabaseTask: SupabaseTask): Task => {
-  const assignees = supabaseTask.assigned_to ? [supabaseTask.assigned_to] : [];
+// Represents a fully assembled Task object in the application
+export interface Task {
+  // Columns from the `tasks` table
+  id: string;
+  title: string;
+  description: string | null;
+  due_date: string | null;
+  priority: string;
+  status: string;
+  created_by: string;
+  workspace_id: string | null;
+  created_at: string;
+  updated_at: string;
   
-  return {
-    id: supabaseTask.id,
-    title: supabaseTask.title || '',
-    description: supabaseTask.description || '',
-    dueDate: safeParseDueDate(supabaseTask.due_date),
-    assignedTo: supabaseTask.assigned_to || '', // Keep for backwards compatibility
-    assignees: assignees, // Convert single assignee to array for many-to-many
-    priority: supabaseTask.priority,
-    status: supabaseTask.status,
-    tags: supabaseTask.task_tags?.map(tt => tt.tag) || [],
-    subtasks: supabaseTask.subtasks || [],
-    createdAt: safeParseDate(supabaseTask.created_at),
-    updatedAt: safeParseDate(supabaseTask.updated_at),
-    createdBy: supabaseTask.created_by,
-    comments: supabaseTask.comments || [],
-    workspaceId: supabaseTask.workspace_id || undefined
-  };
-};
+  // Data loaded from related tables
+  assignees: string[]; // From `task_assignees`
+  tags: string[];      // From `task_tags`
+  subtasks: Subtask[]; // From `subtasks`
+  comments: Comment[]; // From `comments`
+}
