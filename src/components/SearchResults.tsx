@@ -1,17 +1,25 @@
-
 import { useState, useMemo } from 'react';
 import { Search, User, Calendar, Tag } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { useTaskStore } from '../hooks/useTaskStore';
+import { useTaskContext } from '../contexts/TaskContext'; // CHANGED: from useTaskStore
 import { TaskCard } from './TaskCard';
-import { Task, User as UserType } from '../types';
+import { TaskDetailDialog } from './TaskDetailDialog'; // ADDED: for viewing task details
+import { Task } from '../types';
 
 export const SearchResults = () => {
-  const { tasks, users, workspaces } = useTaskStore();
+  // CHANGED: Switched to the real-time context
+  const { 
+    tasks, 
+    users, 
+    workspaces,
+    updateTask,
+    addComment,
+    toggleSubtask
+  } = useTaskContext();
+
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
@@ -22,19 +30,19 @@ export const SearchResults = () => {
     
     const filteredTasks = tasks.filter(task =>
       task.title.toLowerCase().includes(query) ||
-      task.description.toLowerCase().includes(query) ||
-      task.tags.some(tag => tag.toLowerCase().includes(query))
+      (task.description && task.description.toLowerCase().includes(query)) ||
+      (task.tags && task.tags.some(tag => tag.toLowerCase().includes(query))) // FIXED: Added check for tags
     );
 
     const filteredUsers = users.filter(user =>
       user.name.toLowerCase().includes(query) ||
       user.email.toLowerCase().includes(query) ||
-      user.department.toLowerCase().includes(query)
+      (user.department && user.department.toLowerCase().includes(query))
     );
 
     const filteredWorkspaces = workspaces.filter(workspace =>
       workspace.name.toLowerCase().includes(query) ||
-      workspace.department.toLowerCase().includes(query)
+      (workspace.department && workspace.department.toLowerCase().includes(query))
     );
 
     return {
@@ -46,12 +54,20 @@ export const SearchResults = () => {
 
   const hasResults = searchResults.tasks.length > 0 || searchResults.users.length > 0 || searchResults.workspaces.length > 0;
 
+  const handleAssignTask = async (taskId: string, userId: string) => {
+    try {
+      await updateTask(taskId, { assignedTo: userId });
+    } catch (err) {
+      console.error('Failed to assign task:', err);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Search Header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Search</h1>
-        <p className="text-gray-600 mt-1">Find tasks, users, and workspaces</p>
+        <p className="text-gray-600 mt-1">Find tasks, users, and workspaces across your entire Homemade platform.</p>
       </div>
 
       {/* Search Input */}
@@ -73,7 +89,7 @@ export const SearchResults = () => {
               <CardContent className="p-8 text-center">
                 <Search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">No results found</h3>
-                <p className="text-gray-600">Try adjusting your search terms</p>
+                <p className="text-gray-600">Try adjusting your search terms.</p>
               </CardContent>
             </Card>
           ) : (
@@ -93,6 +109,7 @@ export const SearchResults = () => {
                         key={task.id} 
                         task={task}
                         onClick={() => setSelectedTask(task)}
+                        onAssign={handleAssignTask}
                       />
                     ))}
                   </CardContent>
@@ -113,15 +130,17 @@ export const SearchResults = () => {
                       <div key={user.id} className="flex items-center gap-3 p-3 border rounded-lg">
                         <Avatar className="h-10 w-10">
                           <AvatarFallback className="bg-homemade-orange text-white">
-                            {user.avatar}
+                            {user.avatar || user.name.charAt(0)}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1">
                           <h4 className="font-medium">{user.name}</h4>
                           <p className="text-sm text-gray-600">{user.email}</p>
-                          <Badge variant="outline" className="mt-1">
-                            {user.department}
-                          </Badge>
+                          {user.department && (
+                            <Badge variant="outline" className="mt-1">
+                              {user.department}
+                            </Badge>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -158,6 +177,17 @@ export const SearchResults = () => {
           )}
         </div>
       )}
+
+      {/* ADDED: Task Detail Dialog to view selected tasks */}
+      <TaskDetailDialog
+        task={selectedTask}
+        users={users}
+        open={!!selectedTask}
+        onOpenChange={(open) => !open && setSelectedTask(null)}
+        onUpdateTask={updateTask}
+        onAddComment={addComment}
+        onToggleSubtask={toggleSubtask}
+      />
     </div>
   );
 };
