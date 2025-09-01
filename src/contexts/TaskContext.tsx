@@ -1,7 +1,7 @@
 import { useState, useEffect, createContext, useContext, ReactNode, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
-import { Task, User, Workspace, Comment } from '../types'; // Make sure your types are correctly imported
+import { Task, User, Workspace } from '../types';
 
 // Define the shape of the context's value
 interface TaskContextValue {
@@ -34,13 +34,11 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
   const fetchAllData = useCallback(async () => {
     try {
       setError(null);
-      setLoading(true);
 
-      // Fetch all data in parallel for better performance
       const [tasksRes, usersRes, workspacesRes] = await Promise.all([
         supabase
           .from('tasks')
-          .select(`*, comments(*), task_assignees(user_id)`), // Fetch assignees and comments
+          .select(`*, comments(*), task_assignees(user_id)`),
         supabase.from('users').select('*'),
         supabase.from('workspaces').select('*')
       ]);
@@ -49,15 +47,17 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
       if (usersRes.error) throw usersRes.error;
       if (workspacesRes.error) throw workspacesRes.error;
 
-      // Transform tasks to have a simple `assignees` array of user IDs
-      const formattedTasks = tasksRes.data.map(task => ({
+      // Make data formatting robust against null relationships
+      const formattedTasks = (tasksRes.data || []).map(task => ({
         ...task,
-        assignees: task.task_assignees.map((a: { user_id: string }) => a.user_id)
+        assignees: (task.task_assignees || []).map((a: { user_id: string }) => a.user_id),
+        subtasks: task.subtasks || [],
+        comments: task.comments || []
       }));
 
       setTasks(formattedTasks);
-      setUsers(usersRes.data);
-      setWorkspaces(workspacesRes.data);
+      setUsers(usersRes.data || []);
+      setWorkspaces(workspacesRes.data || []);
 
     } catch (err: any) {
       console.error("Error fetching data:", err);
@@ -74,27 +74,24 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
 
   // Effect for setting up the real-time subscriptions
   useEffect(() => {
-    // A change in any of these tables will trigger a full data refetch
-    // This is the simplest and most robust way to ensure data consistency
-    const subscriptions = [
-      supabase.channel('tasks-channel').on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => fetchAllData()).subscribe(),
-      supabase.channel('comments-channel').on('postgres_changes', { event: '*', schema: 'public', table: 'comments' }, () => fetchAllData()).subscribe(),
-      supabase.channel('assignees-channel').on('postgres_changes', { event: '*', schema: 'public', table: 'task_assignees' }, () => fetchAllData()).subscribe(),
-    ];
+    const channel = supabase.channel('realtime-all');
+    
+    channel
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => fetchAllData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'comments' }, () => fetchAllData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'task_assignees' }, () => fetchAllData())
+      .subscribe();
 
-    // Cleanup function to remove subscriptions when the component unmounts
     return () => {
-      subscriptions.forEach(sub => sub.unsubscribe());
+      supabase.removeChannel(channel);
     };
   }, [fetchAllData]);
 
-  // Action: Create a new task
   const createTask = async (taskData: Partial<Task>) => {
     if (!user) throw new Error("User not logged in");
     
     const { assignees, ...restOfTaskData } = taskData;
     
-    // 1. Insert the main task data
     const { data: newTask, error } = await supabase
       .from('tasks')
       .insert({ ...restOfTaskData, createdBy: user.id })
@@ -104,7 +101,6 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
     if (error) throw error;
     if (!newTask) throw new Error("Task creation failed");
 
-    // 2. If there are assignees, insert them into the join table
     if (assignees && assignees.length > 0) {
       const assigneeLinks = assignees.map((userId: string) => ({
         task_id: newTask.id,
@@ -115,28 +111,24 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
     }
   };
   
-  // Action: Update a task
   const updateTask = async (taskId: string, updates: Partial<Task>) => {
     const { error } = await supabase.from('tasks').update(updates).eq('id', taskId);
     if (error) throw error;
   };
   
-  // Action: Delete a task
   const deleteTask = async (taskId: string) => {
     const { error } = await supabase.from('tasks').delete().eq('id', taskId);
     if (error) throw error;
   };
 
-  // Action: Add a comment
   const addComment = async (taskId: string, content: string) => {
     if (!user) throw new Error("User not logged in");
     const { error } = await supabase
       .from('comments')
-      .insert({ task_id: taskId, content, author: user.id }); // Using `author` column
+      .insert({ task_id: taskId, content, author: user.id });
     if (error) throw error;
   };
 
-  // Action: Toggle a subtask's completion status
   const toggleSubtask = async (taskId: string, subtaskId: string) => {
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
@@ -148,21 +140,17 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
     await updateTask(taskId, { subtasks: updatedSubtasks });
   };
   
-  // Action: Update all assignees for a task
   const updateAssignees = async (taskId: string, assigneeIds: string[]) => {
-    // 1. Delete all existing assignments for this task
     const { error: deleteError } = await supabase.from('task_assignees').delete().eq('task_id', taskId);
     if (deleteError) throw deleteError;
 
-    // 2. Insert the new set of assignments
     if (assigneeIds.length > 0) {
       const newAssignments = assigneeIds.map(userId => ({ task_id: taskId, user_id: userId }));
       const { error: insertError } = await supabase.from('task_assignees').insert(newAssignments);
       if (insertError) throw insertError;
     }
   };
-
-  // The value that will be provided to all consumer components
+  
   const value = {
     tasks,
     users,
@@ -184,7 +172,6 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-// The consumer hook that components will use to access the context
 export const useTaskContext = () => {
   const context = useContext(TaskContext);
   if (!context) {
