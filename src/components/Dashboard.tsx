@@ -47,11 +47,11 @@ export const Dashboard = () => {
     sortOrder: 'desc'
   });
 
-  // Debug logging
-  console.log('📊 Dashboard render - tasks count:', tasks.length);
-  console.log('📊 Dashboard render - task titles:', tasks.map(t => t.title));
-  console.log('📊 Dashboard render - userProfile:', userProfile?.id);
-  console.log('📊 Dashboard render - loading:', tasksLoading);
+  // REMOVED: Excessive debug logging that was causing re-renders
+  // Only log on task count changes
+  useEffect(() => {
+    console.log('📊 Dashboard task count changed:', tasks.length);
+  }, [tasks.length]);
 
   useEffect(() => {
     const fetchDashboardStats = async () => {
@@ -78,9 +78,17 @@ export const Dashboard = () => {
     fetchDashboardStats();
   }, [userProfile]);
 
-  // FIXED: Safe filtering and sorting logic
+  // Track task changes for real-time updates
+  useEffect(() => {
+    console.log('🔄 Dashboard detected task update - count:', tasks.length);
+    if (tasks.length > 0) {
+      console.log('📋 Current tasks:', tasks.map(t => ({ id: t.id, title: t.title })));
+    }
+  }, [tasks]);
+
+  // FIXED: Memoize filtered tasks properly to prevent unnecessary re-calculations
   const filteredTasks = useMemo(() => {
-    let result = tasks;
+    let result = [...tasks]; // Create new array to avoid mutations
     
     if (filter === 'my' && userProfile) {
       result = result.filter(t => 
@@ -106,15 +114,14 @@ export const Dashboard = () => {
     }
 
     // FIXED: Safe sorting with proper error handling
-    return [...result].sort((a, b) => {
+    return result.sort((a, b) => {
       let aValue: any, bValue: any;
       
       try {
         switch (taskFilters.sortBy) {
           case 'dueDate':
-            // Safe date parsing for sorting
             const parseDate = (dateStr?: string) => {
-              if (!dateStr) return new Date('9999-12-31').getTime(); // Far future for null dates
+              if (!dateStr) return new Date('9999-12-31').getTime();
               try {
                 const date = new Date(dateStr);
                 return isNaN(date.getTime()) ? new Date('9999-12-31').getTime() : date.getTime();
@@ -152,7 +159,6 @@ export const Dashboard = () => {
             bValue = parseCreatedDate(b.createdAt);
         }
         
-        // Handle comparison based on sort order
         if (taskFilters.sortOrder === 'desc') {
           return bValue > aValue ? 1 : bValue < aValue ? -1 : 0;
         } else {
@@ -161,7 +167,7 @@ export const Dashboard = () => {
         
       } catch (error) {
         console.warn('Error in task sorting:', error);
-        return 0; // Keep original order if sorting fails
+        return 0;
       }
     });
   }, [tasks, filter, taskFilters, userProfile]);
@@ -182,7 +188,7 @@ export const Dashboard = () => {
     done: filteredTasks.filter(t => t.status === 'done')
   }), [filteredTasks]);
 
-  if (profileLoading || statsLoading) {
+  if (profileLoading || tasksLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -287,9 +293,11 @@ export const Dashboard = () => {
 
   const handleCreateTask = async (taskData: any) => {
     try {
+      console.log('🚀 Creating task from Dashboard...');
       await createTask(taskData);
+      console.log('✅ Task creation completed from Dashboard');
     } catch (err) {
-      console.error('Failed to create task:', err);
+      console.error('❌ Failed to create task:', err);
     }
   };
 
@@ -298,9 +306,11 @@ export const Dashboard = () => {
     if (!confirmed) return;
     
     try {
+      console.log('🗑️ Deleting task from Dashboard:', taskId);
       await deleteTask(taskId);
+      console.log('✅ Task deletion completed from Dashboard');
     } catch (err) {
-      console.error('Failed to delete task:', err);
+      console.error('❌ Failed to delete task:', err);
     }
   };
 
