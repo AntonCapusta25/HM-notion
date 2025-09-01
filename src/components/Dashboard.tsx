@@ -88,6 +88,7 @@ export const Dashboard = () => {
       result = result.filter(t => taskFilters.priority.includes(t.priority));
     }
 
+    // THIS IS THE CORRECTED LOGIC
     if (taskFilters.assignee.length > 0) {
       result = result.filter(t => 
         t.assignees && t.assignees.some(assigneeId => taskFilters.assignee.includes(assigneeId))
@@ -230,10 +231,7 @@ export const Dashboard = () => {
 
   const handleCreateTask = async (taskData: any) => {
     try {
-      await createTask({
-        ...taskData,
-        subtasks: []
-      });
+      await createTask(taskData);
     } catch (err) {
       console.error('Failed to create task:', err);
     }
