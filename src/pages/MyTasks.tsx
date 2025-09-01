@@ -153,6 +153,17 @@ const MyTasks = () => {
       console.error('Failed to assign task:', err);
     }
   };
+  
+  const handleDeleteTask = async (taskId: string) => {
+    const confirmed = window.confirm('Are you sure you want to delete this task?');
+    if (!confirmed) return;
+    
+    try {
+      await deleteTask(taskId);
+    } catch (err) {
+      console.error('Failed to delete task:', err);
+    }
+  };
 
   return (
     <Layout>
@@ -292,7 +303,7 @@ const MyTasks = () => {
             users={users}
             onCreateTask={handleCreateTask}
             onUpdateTask={updateTask}
-            onDeleteTask={deleteTask}
+            onDeleteTask={handleDeleteTask}
             onAssignTask={handleAssignTask}
           />
         ) : (
