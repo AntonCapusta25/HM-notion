@@ -18,10 +18,8 @@ interface TaskContextValue {
   updateAssignees: (taskId: string, assigneeIds: string[]) => Promise<void>;
 }
 
-// Create the context
 const TaskContext = createContext<TaskContextValue | null>(null);
 
-// This is the provider component that will wrap your app
 export const TaskProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -30,7 +28,6 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Memoized fetch function to avoid re-creating it on every render
   const fetchAllData = useCallback(async () => {
     try {
       setError(null);
@@ -47,13 +44,19 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
       if (usersRes.error) throw usersRes.error;
       if (workspacesRes.error) throw workspacesRes.error;
 
-      // Make data formatting robust against null or missing relationships
+      // Robustly clean all array AND date fields at the source
       const formattedTasks = (tasksRes.data || []).map(task => ({
         ...task,
         assignees: (task.task_assignees || []).map((a: { user_id: string }) => a.user_id),
         subtasks: task.subtasks || [],
-        comments: task.comments || [],
-        tags: task.tags || [] // This line prevents the '.length' error
+        comments: (task.comments || []).map(comment => ({
+          ...comment,
+          createdAt: comment.createdAt || null
+        })),
+        tags: task.tags || [],
+        createdAt: task.createdAt || null,
+        updatedAt: task.updatedAt || null,
+        dueDate: task.dueDate || null
       }));
 
       setTasks(formattedTasks);
@@ -68,12 +71,10 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  // Effect for the initial data load
   useEffect(() => {
     fetchAllData();
   }, [fetchAllData]);
 
-  // Effect for setting up the real-time subscriptions
   useEffect(() => {
     const channel = supabase.channel('realtime-all');
     
