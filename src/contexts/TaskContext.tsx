@@ -3,7 +3,6 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 import { Task, User, Workspace } from '../types';
 
-// Define the shape of the context's value
 interface TaskContextValue {
   tasks: Task[];
   users: User[];
@@ -31,11 +30,8 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
   const fetchAllData = useCallback(async () => {
     try {
       setError(null);
-
       const [tasksRes, usersRes, workspacesRes] = await Promise.all([
-        supabase
-          .from('tasks')
-          .select(`*, comments(*), task_assignees(user_id)`),
+        supabase.from('tasks').select(`*, comments(*), task_assignees(user_id)`),
         supabase.from('users').select('*'),
         supabase.from('workspaces').select('*')
       ]);
@@ -44,25 +40,16 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
       if (usersRes.error) throw usersRes.error;
       if (workspacesRes.error) throw workspacesRes.error;
 
-      // Robustly clean all array AND date fields at the source
       const formattedTasks = (tasksRes.data || []).map(task => ({
         ...task,
         assignees: (task.task_assignees || []).map((a: { user_id: string }) => a.user_id),
-        subtasks: task.subtasks || [],
-        comments: (task.comments || []).map(comment => ({
-          ...comment,
-          createdAt: comment.createdAt || null
-        })),
-        tags: task.tags || [],
-        createdAt: task.createdAt || null,
-        updatedAt: task.updatedAt || null,
-        dueDate: task.dueDate || null
+        subtasks: task.subtasks || [], comments: task.comments || [], tags: task.tags || [],
+        createdAt: task.createdAt || null, updatedAt: task.updatedAt || null, dueDate: task.dueDate || null
       }));
 
       setTasks(formattedTasks);
       setUsers(usersRes.data || []);
       setWorkspaces(workspacesRes.data || []);
-
     } catch (err: any) {
       console.error("Error fetching data:", err);
       setError(err.message);
@@ -71,51 +58,48 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  useEffect(() => {
-    fetchAllData();
-  }, [fetchAllData]);
+  useEffect(() => { fetchAllData(); }, [fetchAllData]);
 
   useEffect(() => {
     const channel = supabase.channel('realtime-all');
-    
     channel
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => fetchAllData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'comments' }, () => fetchAllData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'task_assignees' }, () => fetchAllData())
       .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [fetchAllData]);
 
   const createTask = async (taskData: Partial<Task>) => {
     if (!user) throw new Error("User not logged in");
     
-    const { assignees, ...restOfTaskData } = taskData;
+    // FIX: Destructure out properties that are not columns in the 'tasks' table.
+    const { assignees, subtasks, ...restOfTaskData } = taskData;
     
     const { data: newTask, error } = await supabase
       .from('tasks')
-      .insert({ ...restOfTaskData, createdBy: user.id })
+      .insert({ ...restOfTaskData, subtasks: subtasks || [], createdBy: user.id }) // Only include valid columns
       .select()
       .single();
 
     if (error) throw error;
-    if (!newTask) throw new Error("Task creation failed");
 
     if (assignees && assignees.length > 0) {
-      const assigneeLinks = assignees.map((userId: string) => ({
-        task_id: newTask.id,
-        user_id: userId
-      }));
+      const assigneeLinks = assignees.map((userId: string) => ({ task_id: newTask.id, user_id: userId }));
       const { error: assigneeError } = await supabase.from('task_assignees').insert(assigneeLinks);
       if (assigneeError) throw assigneeError;
     }
   };
   
   const updateTask = async (taskId: string, updates: Partial<Task>) => {
-    const { error } = await supabase.from('tasks').update(updates).eq('id', taskId);
+    const { assignees, ...restOfUpdates } = updates; // Ensure assignees array is not sent to `tasks` table
+    const { error } = await supabase.from('tasks').update(restOfUpdates).eq('id', taskId);
     if (error) throw error;
+
+    // If assignees are part of the update, handle them separately
+    if (assignees) {
+      await updateAssignees(taskId, assignees);
+    }
   };
   
   const deleteTask = async (taskId: string) => {
@@ -125,20 +109,16 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
 
   const addComment = async (taskId: string, content: string) => {
     if (!user) throw new Error("User not logged in");
-    const { error } = await supabase
-      .from('comments')
-      .insert({ task_id: taskId, content, author: user.id });
+    const { error } = await supabase.from('comments').insert({ task_id: taskId, content, author: user.id });
     if (error) throw error;
   };
 
   const toggleSubtask = async (taskId: string, subtaskId: string) => {
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
-    
     const updatedSubtasks = (task.subtasks || []).map(st => 
       st.id === subtaskId ? { ...st, completed: !st.completed } : st
     );
-
     await updateTask(taskId, { subtasks: updatedSubtasks });
   };
   
@@ -153,25 +133,9 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
     }
   };
   
-  const value = {
-    tasks,
-    users,
-    workspaces,
-    loading,
-    error,
-    createTask,
-    updateTask,
-    deleteTask,
-    addComment,
-    toggleSubtask,
-    updateAssignees,
-  };
+  const value = { tasks, users, workspaces, loading, error, createTask, updateTask, deleteTask, addComment, toggleSubtask, updateAssignees };
 
-  return (
-    <TaskContext.Provider value={value}>
-      {children}
-    </TaskContext.Provider>
-  );
+  return (<TaskContext.Provider value={value}>{children}</TaskContext.Provider>);
 };
 
 export const useTaskContext = () => {
