@@ -170,7 +170,7 @@ export const useTaskStore = (props: UseTaskStoreProps = {}) => {
         workspacesSubscription.unsubscribe();
       }
     };
-  }, [user?.id, fetchTasks, fetchWorkspaces]);
+  }, [user?.id]); // Only keep user?.id
 
   // FIXED: Updated createTask to use passed userProfile or fallback
   const createTask = useCallback(async (taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'comments' | 'createdBy'>) => {
