@@ -30,10 +30,10 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
   
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  // CHANGED: State now holds an array of assignee IDs
   const [assignees, setAssignees] = useState<string[]>([]);
   const [priority, setPriority] = useState('');
-  const [due_date, setdue_date] = useState<Date>();
+  // FIXED: Consistent naming for due date
+  const [dueDate, setDueDate] = useState<Date>();
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
   
@@ -52,13 +52,12 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
     setError(null);
 
     try {
-      // CHANGED: The payload now sends an array of assignees
       const taskData = {
         title,
         description,
-        assignees, // This is now an array of user IDs
+        assignees,
         priority: priority as 'low' | 'medium' | 'high',
-        due_date: due_date?.toISOString().split('T')[0],
+        due_date: dueDate?.toISOString().split('T')[0], // Convert to database field name
         tags,
         status: 'todo' as const,
         subtasks: [],
@@ -82,12 +81,13 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
     }
   };
 
+  // FIXED: Consistent state variable names
   const resetForm = () => {
     setTitle('');
     setDescription('');
-    setAssignees([]); // Reset assignees array
+    setAssignees([]);
     setPriority('');
-    setDue_date(undefined);
+    setDueDate(undefined); // Fixed: was setDue_date
     setTags([]);
     setNewTag('');
     setError(null);
@@ -114,7 +114,6 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
     setTags(tags.filter(tag => tag !== tagToRemove));
   };
 
-  // Memoize lists for performance
   const assignedUsers = useMemo(() => users.filter(u => assignees.includes(u.id)), [users, assignees]);
   const unassignedUsers = useMemo(() => users.filter(u => !assignees.includes(u.id)), [users, assignees]);
 
@@ -156,9 +155,6 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
             />
           </div>
           
-          {/* ==================================================================== */}
-          {/* === NEW: Multi-select UI for Assignees ============================= */}
-          {/* ==================================================================== */}
           <div className="space-y-2">
             <Label>Assignees</Label>
             <div className="flex flex-wrap items-center gap-2 p-2 border rounded-md min-h-[40px]">
@@ -199,7 +195,6 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
               </Popover>
             </div>
           </div>
-          {/* ==================================================================== */}
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -224,19 +219,19 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
                     variant="outline"
                     className={cn(
                       "w-full justify-start text-left font-normal",
-                      !due_date && "text-muted-foreground"
+                      !dueDate && "text-muted-foreground"
                     )}
                     disabled={isSubmitting}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {due_date ? format(due_date, "PPP") : <span>Pick a date</span>}
+                    {dueDate ? format(dueDate, "PPP") : <span>Pick a date</span>}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar
                     mode="single"
-                    selected={due_date}
-                    onSelect={setdue_date}
+                    selected={dueDate}
+                    onSelect={setDueDate}
                     initialFocus
                   />
                 </PopoverContent>
