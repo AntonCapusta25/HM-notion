@@ -62,7 +62,7 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
         tags,
         status: 'todo' as const,
         subtasks: [],
-        createdBy: userProfile?.id || user.id
+        created_by: userProfile?.id || user.id
       };
       
       if (onCreateTask) {
