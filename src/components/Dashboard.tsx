@@ -228,7 +228,17 @@ export const Dashboard = () => {
     });
 
     return filtered;
-  }, [tasks, filter, userProfile, taskFilters]);
+  }, [
+    tasks.length, 
+    filter, 
+    userProfile?.id, 
+    taskFilters.status.length,
+    taskFilters.priority.length,
+    taskFilters.assignee.length,
+    taskFilters.tags.length,
+    taskFilters.sortBy,
+    taskFilters.sortOrder
+  ]);
 
   // Get available tags for filter dropdown
   const availableTags = useMemo(() => {
@@ -239,7 +249,7 @@ export const Dashboard = () => {
       }
     });
     return Array.from(tagSet).sort();
-  }, [tasks]); 
+  }, [tasks.length]); 
 
   const tasksByStatus = {
     todo: filteredTasks.filter(t => t.status === 'todo'),
