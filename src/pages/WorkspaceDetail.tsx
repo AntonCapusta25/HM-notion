@@ -5,7 +5,7 @@ import { TaskCard } from '../components/TaskCard';
 import { CreateTaskDialog } from '../components/CreateTaskDialog';
 import { TaskDetailDialog } from '../components/TaskDetailDialog';
 import { EditWorkspaceDialog } from '../components/EditWorkspaceDialog';
-import { useTaskContext } from '../contexts/TaskContext'; // CHANGED: from useTaskStore
+import { useTaskContext } from '../contexts/TaskContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,7 +30,7 @@ const WorkspaceDetail = () => {
   const { id: workspaceId } = useParams<{ id: string }>();
   const { user } = useAuth();
   
-  // CHANGED: Switched to useTaskContext to get real-time data
+  // Switched to useTaskContext to get real-time data
   const { 
     tasks, 
     users, 
@@ -48,15 +48,13 @@ const WorkspaceDetail = () => {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showEditWorkspace, setShowEditWorkspace] = useState(false);
 
-  // Find the current workspace from the global context
   const workspace = workspaces.find(w => w.id === workspaceId);
   
-  // Filter tasks for this workspace
   const workspaceTasks = useMemo(() => {
+    if (!workspaceId) return [];
     return tasks.filter(task => task.workspace_id === workspaceId);
   }, [tasks, workspaceId]);
 
-  // Find team members working in this workspace
   const workspaceTeam = useMemo(() => {
     const teamIds = new Set<string>();
     workspaceTasks.forEach(task => {
@@ -66,7 +64,6 @@ const WorkspaceDetail = () => {
     return users.filter(user => teamIds.has(user.id));
   }, [workspaceTasks, users]);
 
-  // Calculate workspace statistics
   const stats = useMemo(() => {
     const total = workspaceTasks.length;
     const completed = workspaceTasks.filter(t => t.status === 'done').length;
@@ -103,7 +100,6 @@ const WorkspaceDetail = () => {
     };
   }, [workspaceTasks]);
 
-  // Group tasks by status
   const tasksByStatus = useMemo(() => ({
     todo: workspaceTasks.filter(t => t.status === 'todo'),
     in_progress: workspaceTasks.filter(t => t.status === 'in_progress'),
@@ -150,6 +146,7 @@ const WorkspaceDetail = () => {
   }
 
   const handleCreateTask = async (taskData: any) => {
+    if (!workspaceId) return;
     try {
       await createTask({
         ...taskData,
@@ -167,6 +164,16 @@ const WorkspaceDetail = () => {
       await updateTask(taskId, { assignedTo: userId });
     } catch (err) {
       console.error('Failed to assign task:', err);
+    }
+  };
+  
+  const handleDeleteTask = async (taskId: string) => {
+    const confirmed = window.confirm('Are you sure you want to delete this task?');
+    if (!confirmed) return;
+    try {
+      await deleteTask(taskId);
+    } catch (err) {
+      console.error('Failed to delete task:', err);
     }
   };
 
@@ -190,7 +197,7 @@ const WorkspaceDetail = () => {
                   style={{ backgroundColor: workspace.color }}
                 />
                 <h1 className="text-3xl font-bold text-gray-900">{workspace.name}</h1>
-                <Badge variant="secondary">{workspace.department}</Badge>
+                {workspace.department && <Badge variant="secondary">{workspace.department}</Badge>}
               </div>
               
               {workspace.description && (
@@ -343,7 +350,7 @@ const WorkspaceDetail = () => {
                     <div key={member.id} className="flex items-center gap-3 p-3 border rounded-lg">
                       <Avatar className="h-10 w-10">
                         <AvatarFallback style={{ backgroundColor: workspace.color, color: 'white' }}>
-                          {member.avatar || member.name.charAt(0)}
+                          {member.avatar || (member.name ? member.name.charAt(0) : '?')}
                         </AvatarFallback>
                       </Avatar>
                       <div>
@@ -473,11 +480,13 @@ const WorkspaceDetail = () => {
           onToggleSubtask={toggleSubtask}
         />
 
-        <EditWorkspaceDialog
-          workspace={workspace}
-          open={showEditWorkspace}
-          onOpenChange={setShowEditWorkspace}
-        />
+        {workspace && (
+          <EditWorkspaceDialog
+            workspace={workspace}
+            open={showEditWorkspace}
+            onOpenChange={setShowEditWorkspace}
+          />
+        )}
       </div>
     </Layout>
   );
