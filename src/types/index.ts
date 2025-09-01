@@ -12,7 +12,8 @@ export interface Task {
   title: string;
   description: string;
   dueDate?: string;
-  assignedTo: string;
+  assignedTo: string; // Keep for backwards compatibility
+  assignees: string[]; // Add this for many-to-many
   priority: 'low' | 'medium' | 'high';
   status: 'todo' | 'in_progress' | 'done';
   tags: string[];
@@ -21,6 +22,7 @@ export interface Task {
   updatedAt: string;
   createdBy: string;
   comments: Comment[];
+  workspaceId?: string;
 }
 
 export interface Subtask {
@@ -103,19 +105,25 @@ const safeParseDueDate = (dateValue: any): string | undefined => {
   return undefined;
 };
 
-// FIXED: Helper function with safe date parsing
-export const formatTaskFromSupabase = (supabaseTask: SupabaseTask): Task => ({
-  id: supabaseTask.id,
-  title: supabaseTask.title,
-  description: supabaseTask.description,
-  dueDate: safeParseDueDate(supabaseTask.due_date),
-  assignedTo: supabaseTask.assigned_to || '',
-  priority: supabaseTask.priority,
-  status: supabaseTask.status,
-  tags: supabaseTask.task_tags?.map(tt => tt.tag) || [],
-  subtasks: supabaseTask.subtasks || [],
-  createdAt: safeParseDate(supabaseTask.created_at),
-  updatedAt: safeParseDate(supabaseTask.updated_at),
-  createdBy: supabaseTask.created_by,
-  comments: supabaseTask.comments || []
-})
+// FIXED: Helper function with safe date parsing and many-to-many support
+export const formatTaskFromSupabase = (supabaseTask: SupabaseTask): Task => {
+  const assignees = supabaseTask.assigned_to ? [supabaseTask.assigned_to] : [];
+  
+  return {
+    id: supabaseTask.id,
+    title: supabaseTask.title || '',
+    description: supabaseTask.description || '',
+    dueDate: safeParseDueDate(supabaseTask.due_date),
+    assignedTo: supabaseTask.assigned_to || '', // Keep for backwards compatibility
+    assignees: assignees, // Convert single assignee to array for many-to-many
+    priority: supabaseTask.priority,
+    status: supabaseTask.status,
+    tags: supabaseTask.task_tags?.map(tt => tt.tag) || [],
+    subtasks: supabaseTask.subtasks || [],
+    createdAt: safeParseDate(supabaseTask.created_at),
+    updatedAt: safeParseDate(supabaseTask.updated_at),
+    createdBy: supabaseTask.created_by,
+    comments: supabaseTask.comments || [],
+    workspaceId: supabaseTask.workspace_id || undefined
+  };
+};
