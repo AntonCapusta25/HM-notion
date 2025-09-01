@@ -1,4 +1,3 @@
-
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -14,6 +13,33 @@ interface TaskCardProps {
   onAssign?: (taskId: string, userId: string) => void;
 }
 
+// FIXED: Safe date formatting utilities
+const safeFormatDate = (dateInput: string | null | undefined, formatStr: string = 'MMM d'): string => {
+  if (!dateInput) return 'No date';
+  
+  try {
+    const date = new Date(dateInput);
+    if (isNaN(date.getTime())) {
+      console.warn('Invalid date in TaskCard:', dateInput);
+      return 'Invalid date';
+    }
+    return format(date, formatStr);
+  } catch (error) {
+    console.error('Error formatting date in TaskCard:', error, 'Input:', dateInput);
+    return 'Invalid date';
+  }
+};
+
+const isValidDate = (dateInput: string | null | undefined): boolean => {
+  if (!dateInput) return false;
+  try {
+    const date = new Date(dateInput);
+    return !isNaN(date.getTime());
+  } catch {
+    return false;
+  }
+};
+
 export const TaskCard = ({ task, onClick, onAssign }: TaskCardProps) => {
   const assignedUser = mockUsers.find(u => u.id === task.assignedTo);
   
@@ -23,8 +49,24 @@ export const TaskCard = ({ task, onClick, onAssign }: TaskCardProps) => {
     high: 'bg-red-100 text-red-800 border-red-200'
   };
 
-  const isOverdue = task.dueDate && isBefore(new Date(task.dueDate), startOfDay(new Date())) && task.status !== 'done';
-  const isDueToday = task.dueDate && format(new Date(task.dueDate), 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+  // FIXED: Safe date comparisons with validation
+  const isOverdue = (() => {
+    if (!task.dueDate || !isValidDate(task.dueDate) || task.status === 'done') return false;
+    try {
+      return isBefore(new Date(task.dueDate), startOfDay(new Date()));
+    } catch {
+      return false;
+    }
+  })();
+
+  const isDueToday = (() => {
+    if (!task.dueDate || !isValidDate(task.dueDate)) return false;
+    try {
+      return format(new Date(task.dueDate), 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+    } catch {
+      return false;
+    }
+  })();
   
   const completedSubtasks = task.subtasks.filter(st => st.completed).length;
 
@@ -67,12 +109,13 @@ export const TaskCard = ({ task, onClick, onAssign }: TaskCardProps) => {
               {task.priority}
             </Badge>
             
-            {task.dueDate && (
+            {/* FIXED: Safe due date display */}
+            {task.dueDate && isValidDate(task.dueDate) && (
               <div className={`flex items-center gap-1 text-xs ${
                 isOverdue ? 'text-red-600' : isDueToday ? 'text-yellow-600' : 'text-gray-500'
               }`}>
                 <Calendar className="h-3 w-3" />
-                {format(new Date(task.dueDate), 'MMM d')}
+                {safeFormatDate(task.dueDate, 'MMM d')}
                 {isOverdue && <span className="ml-1 text-red-600 font-medium">Overdue</span>}
                 {isDueToday && <span className="ml-1 text-yellow-600 font-medium">Due today</span>}
               </div>
@@ -113,9 +156,10 @@ export const TaskCard = ({ task, onClick, onAssign }: TaskCardProps) => {
               )}
             </div>
 
+            {/* FIXED: Safe updated date display */}
             <div className="flex items-center gap-1 text-xs text-gray-500">
               <Clock className="h-3 w-3" />
-              {format(new Date(task.updatedAt), 'MMM d')}
+              {safeFormatDate(task.updatedAt, 'MMM d')}
             </div>
           </div>
         </div>
