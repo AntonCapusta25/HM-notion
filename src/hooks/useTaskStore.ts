@@ -38,22 +38,34 @@ export const useTaskStore = (props: UseTaskStoreProps = {}) => {
   const filtersJSON = useMemo(() => JSON.stringify(filters), [filters]);
 
   const fetchTasks = useCallback(async () => {
+    console.log('🔄 fetchTasks called');
+    console.log('  - user:', user?.id);
+    console.log('  - userProfile:', userProfile?.id);
+    console.log('  - filters:', JSON.parse(filtersJSON));
+    
     if (!user) {
+      console.log('❌ No user found, skipping fetch');
       setLoading(false);
       return;
     }
+    
+    console.log('⏳ Starting task fetch...');
     setLoading(true);
     setError(null);
+    
     try {
       let query = supabase
         .from('tasks')
         .select(`*, assigned_user:assigned_to(*), created_user:created_by(*), subtasks(*), comments(*, author(*)), task_tags(tag), workspace:workspace_id(*)`);
 
       const currentFilters = JSON.parse(filtersJSON);
+      console.log('🔍 Applying filters:', currentFilters);
+      
       Object.entries(currentFilters).forEach(([key, value]) => {
         if (value) {
           switch (key) {
             case 'due_date':
+              console.log(`  - Applying due_date filter: ${value}`);
               if (value === 'today') {
                 query = query.eq('due_date', new Date().toISOString().split('T')[0]);
               } else if (value === 'overdue') {
@@ -61,14 +73,15 @@ export const useTaskStore = (props: UseTaskStoreProps = {}) => {
               }
               break;
             case 'personal_only':
-              // FIXED: Use passed userProfile or fallback to user.id
               const userId = userProfile?.id || user.id;
+              console.log(`  - Applying personal_only filter for user: ${userId}`);
               if (userId) {
                 query = query.or(`assigned_to.eq.${userId},created_by.eq.${userId}`);
               }
               break;
             default:
               if (typeof value === 'string') {
+                console.log(`  - Applying ${key} filter: ${value}`);
                 query = query.eq(key, value);
               }
               break;
@@ -76,51 +89,101 @@ export const useTaskStore = (props: UseTaskStoreProps = {}) => {
         }
       });
 
+      console.log('🌐 Executing Supabase query...');
       const { data, error: fetchError } = await query.order('created_at', { ascending: false });
-      if (fetchError) throw fetchError;
+      
+      if (fetchError) {
+        console.error('❌ Supabase query error:', fetchError);
+        throw fetchError;
+      }
+      
+      console.log('✅ Raw data from Supabase:', data?.length, 'records');
       const formattedTasks: Task[] = data?.map((supabaseTask: any): Task => formatTaskFromSupabase(supabaseTask)) || [];
+      console.log('📝 Formatted tasks:', formattedTasks.length, 'tasks');
+      console.log('📋 Task titles:', formattedTasks.map(t => t.title));
+      
       setTasks(formattedTasks);
+      console.log('✅ Tasks state updated successfully');
+      
     } catch (err) {
+      console.error('❌ Error in fetchTasks:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch tasks');
-      console.error('Error fetching tasks:', err);
     } finally {
       setLoading(false);
+      console.log('⏹️ fetchTasks completed');
     }
   }, [user?.id, userProfile?.id, filtersJSON]); // FIXED: Use stable IDs
 
   // Separate function to fetch workspaces
   const fetchWorkspaces = useCallback(async () => {
-    if (!user) return;
+    console.log('🏢 fetchWorkspaces called');
+    console.log('  - user:', user?.id);
+    
+    if (!user) {
+      console.log('❌ No user found, skipping workspace fetch');
+      return;
+    }
+    
+    console.log('⏳ Starting workspace fetch...');
     try {
       const { data, error } = await supabase.from('workspaces').select('*');
-      if (error) throw error;
-      if (data) setWorkspaces(data);
+      if (error) {
+        console.error('❌ Workspace fetch error:', error);
+        throw error;
+      }
+      
+      console.log('✅ Raw workspace data:', data?.length, 'records');
+      console.log('🏢 Workspace names:', data?.map(w => w.name));
+      
+      if (data) {
+        setWorkspaces(data);
+        console.log('✅ Workspaces state updated successfully');
+      }
     } catch (err) {
-      console.error('Error fetching workspaces:', err);
+      console.error('❌ Error fetching workspaces:', err);
     }
   }, [user?.id]);
 
-  // FIXED: Separated initial data fetches with stable dependencies
   useEffect(() => {
+    console.log('📡 Initial data fetch useEffect triggered');
+    console.log('  - fetchTasks dependency changed');
     fetchTasks();
   }, [fetchTasks]);
 
   useEffect(() => {
+    console.log('👥 Users and workspaces fetch useEffect triggered');
+    console.log('  - user?.id:', user?.id);
+    
     const fetchUsersAndWorkspaces = async () => {
-      if (!user) return;
+      if (!user) {
+        console.log('❌ No user for users/workspaces fetch');
+        return;
+      }
+      
+      console.log('⏳ Fetching users and workspaces...');
       try {
         const [usersRes, workspacesRes] = await Promise.all([
           supabase.from('users').select('*'),
           supabase.from('workspaces').select('*')
         ]);
-        if (usersRes.data) setUsers(usersRes.data);
-        if (workspacesRes.data) setWorkspaces(workspacesRes.data);
+        
+        console.log('👥 Users response:', usersRes.data?.length, 'users');
+        console.log('🏢 Workspaces response:', workspacesRes.data?.length, 'workspaces');
+        
+        if (usersRes.data) {
+          setUsers(usersRes.data);
+          console.log('✅ Users state updated');
+        }
+        if (workspacesRes.data) {
+          setWorkspaces(workspacesRes.data);
+          console.log('✅ Workspaces state updated');
+        }
       } catch (err) {
-        console.error('Error fetching users/workspaces:', err);
+        console.error('❌ Error fetching users/workspaces:', err);
       }
     };
     fetchUsersAndWorkspaces();
-  }, [user?.id]); // FIXED: Use stable user ID
+  }, [user?.id]);
 
   // ENHANCED: Real-time subscriptions for both tasks and workspaces
   useEffect(() => {
@@ -170,15 +233,24 @@ export const useTaskStore = (props: UseTaskStoreProps = {}) => {
         workspacesSubscription.unsubscribe();
       }
     };
-  }, [user?.id]); // Only keep user?.id
+  }, [user?.id, fetchTasks, fetchWorkspaces]);
 
-  // FIXED: Updated createTask to use passed userProfile or fallback
   const createTask = useCallback(async (taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'comments' | 'createdBy'>) => {
-    if (!user) throw new Error('Cannot create task: user not authenticated.');
+    console.log('📝 createTask called');
+    console.log('  - taskData:', taskData);
+    console.log('  - user:', user?.id);
+    console.log('  - userProfile:', userProfile?.id);
+    
+    if (!user) {
+      console.error('❌ Cannot create task: user not authenticated');
+      throw new Error('Cannot create task: user not authenticated.');
+    }
     
     const userId = userProfile?.id || user.id;
+    console.log('  - Using userId:', userId);
     
     try {
+      console.log('⏳ Inserting task to Supabase...');
       const { data, error } = await supabase.from('tasks').insert([{
         title: taskData.title,
         description: taskData.description,
@@ -189,20 +261,32 @@ export const useTaskStore = (props: UseTaskStoreProps = {}) => {
         created_by: userId,
         workspace_id: taskData.workspace_id || null
       }]).select().single();
-      if (error) throw error;
+      
+      if (error) {
+        console.error('❌ Task creation error:', error);
+        throw error;
+      }
+      
+      console.log('✅ Task created:', data);
+      
       if (taskData.tags && taskData.tags.length > 0) {
+        console.log('🏷️ Adding tags:', taskData.tags);
         const tagInserts = taskData.tags.map(tag => ({ task_id: data.id, tag: tag }));
         await supabase.from('task_tags').insert(tagInserts);
       }
       if (taskData.subtasks && taskData.subtasks.length > 0) {
+        console.log('📋 Adding subtasks:', taskData.subtasks);
         const subtaskInserts = taskData.subtasks.map(subtask => ({ task_id: data.id, title: subtask.title, completed: subtask.completed }));
         await supabase.from('subtasks').insert(subtaskInserts);
       }
       if (taskData.assignedTo && taskData.assignedTo !== userId) {
+        console.log('🔔 Creating notification for assignee:', taskData.assignedTo);
         await supabase.from('notifications').insert([{ user_id: taskData.assignedTo, task_id: data.id, type: 'task_assigned', message: `You have been assigned to: ${taskData.title}` }]);
       }
+      
+      console.log('✅ Task creation completed successfully');
     } catch (err) {
-      console.error('Error creating task:', err);
+      console.error('❌ Error creating task:', err);
       setError('Failed to create task');
       throw err;
     }
