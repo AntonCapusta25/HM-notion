@@ -14,7 +14,8 @@ export const useTaskStore = () => {
   const fetchAllData = useCallback(async () => {
     try {
       const [tasksRes, usersRes, workspacesRes] = await Promise.all([
-        supabase.from('tasks').select(`*, comments(*), task_assignees!inner(user_id)`),
+        // FIX: Changed `task_assignees!inner(user_id)` to `task_assignees(user_id)`
+        supabase.from('tasks').select(`*, comments(*), task_assignees(user_id)`),
         supabase.from('users').select('*'),
         supabase.from('workspaces').select('*')
       ]);
@@ -23,7 +24,6 @@ export const useTaskStore = () => {
       if (usersRes.error) throw usersRes.error;
       if (workspacesRes.error) throw workspacesRes.error;
 
-      // Clean the data at the source to prevent all UI errors
       const formattedTasks = (tasksRes.data || []).map(task => ({
         ...task,
         assignees: (task.task_assignees || []).map((a: { user_id: string }) => a.user_id),
@@ -42,7 +42,6 @@ export const useTaskStore = () => {
       setUsers(usersRes.data || []);
       setWorkspaces(workspacesRes.data || []);
     } catch (err: any) {
-      console.error("Error fetching data:", err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -59,17 +58,13 @@ export const useTaskStore = () => {
 
   useEffect(() => {
     if (!user) return;
-    
     const channel = supabase.channel('realtime-all');
     channel
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => fetchAllData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'comments' }, () => fetchAllData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'task_assignees' }, () => fetchAllData())
       .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [user, fetchAllData]);
 
   const createTask = async (taskData: Partial<Task>) => {
@@ -84,7 +79,7 @@ export const useTaskStore = () => {
       if (assigneeError) throw assigneeError;
     }
   };
-
+  
   const updateAssignees = async (taskId: string, assigneeIds: string[]) => {
     await supabase.from('task_assignees').delete().eq('task_id', taskId);
     if (assigneeIds.length > 0) {
@@ -120,17 +115,5 @@ export const useTaskStore = () => {
     await updateTask(taskId, { subtasks: updatedSubtasks });
   };
   
-  return {
-    tasks,
-    users,
-    workspaces,
-    loading,
-    error,
-    createTask,
-    updateTask,
-    deleteTask,
-    addComment,
-    toggleSubtask,
-    updateAssignees,
-  };
+  return { tasks, users, workspaces, loading, error, createTask, updateTask, deleteTask, addComment, toggleSubtask, updateAssignees };
 };
