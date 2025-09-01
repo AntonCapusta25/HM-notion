@@ -32,6 +32,12 @@ export const Dashboard = () => {
   const { user } = useAuth();
   const { profile: userProfile, loading: profileLoading, error: profileError } = useProfile();
   const { tasks, users, createTask, updateTask, deleteTask, addComment, toggleSubtask, loading: tasksLoading, error } = useTaskStore({ userProfile });
+
+  // Add debugging logs for Dashboard
+  console.log('📊 Dashboard render - tasks count:', tasks.length);
+  console.log('📊 Dashboard render - task titles:', tasks.map(t => t.title));
+  console.log('📊 Dashboard render - userProfile:', userProfile?.id);
+  console.log('📊 Dashboard render - loading:', tasksLoading);
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [filter, setFilter] = useState<'all' | 'my' | 'team'>('all');
@@ -75,6 +81,12 @@ export const Dashboard = () => {
 
     fetchDashboardStats();
   }, [userProfile]);
+
+  // Track when Dashboard detects task changes
+  useEffect(() => {
+    console.log('📊 Dashboard detected tasks change:', tasks.length, 'tasks');
+    console.log('📊 Task titles in Dashboard:', tasks.map(t => t.title));
+  }, [tasks]);
 
   // Show loading while profile is loading
   if (profileLoading || statsLoading) {
