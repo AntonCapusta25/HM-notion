@@ -28,7 +28,6 @@ interface DashboardStats {
 }
 
 export const Dashboard = () => {
-  // All hooks are at the top level, before any returns
   const { user } = useAuth();
   const { profile: userProfile, loading: profileLoading, error: profileError } = useProfile();
   const { tasks, users, createTask, updateTask, deleteTask, addComment, toggleSubtask, loading: tasksLoading, error } = useTaskContext();
@@ -75,29 +74,38 @@ export const Dashboard = () => {
 
   const filteredTasks = useMemo(() => {
     let result = tasks;
+    
     if (filter === 'my' && userProfile) {
-      result = result.filter(t => t.assignedTo === userProfile.id || t.createdBy === userProfile.id);
+      result = result.filter(t => 
+        (t.assignees && t.assignees.includes(userProfile.id)) || t.createdBy === userProfile.id
+      );
     }
+
     if (taskFilters.status.length > 0) {
       result = result.filter(t => taskFilters.status.includes(t.status));
     }
     if (taskFilters.priority.length > 0) {
       result = result.filter(t => taskFilters.priority.includes(t.priority));
     }
+
     if (taskFilters.assignee.length > 0) {
-      result = result.filter(t => t.assignedTo && taskFilters.assignee.includes(t.assignedTo));
+      result = result.filter(t => 
+        t.assignees && t.assignees.some(assigneeId => taskFilters.assignee.includes(assigneeId))
+      );
     }
+
     if (taskFilters.tags.length > 0) {
       result = result.filter(t => 
         t.tags && t.tags.some(tag => taskFilters.tags.includes(tag))
       );
     }
+
     return [...result].sort((a, b) => {
       let aValue, bValue;
       switch (taskFilters.sortBy) {
         case 'dueDate':
-          aValue = a.dueDate ? new Date(a.dueDate).getTime() : 0;
-          bValue = b.dueDate ? new Date(b.dueDate).getTime() : 0;
+          aValue = a.dueDate ? new Date(a.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
+          bValue = b.dueDate ? new Date(b.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
           break;
         case 'priority':
           const priorityOrder = { high: 3, medium: 2, low: 1 };
@@ -136,7 +144,6 @@ export const Dashboard = () => {
     done: filteredTasks.filter(t => t.status === 'done')
   }), [filteredTasks]);
 
-  // Conditional returns now happen AFTER all hooks have been called
   if (profileLoading || statsLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -218,7 +225,7 @@ export const Dashboard = () => {
     completed: tasks.filter(t => t.status === 'done').length,
     overdue: tasks.filter(t => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'done').length,
     dueToday: tasks.filter(t => t.dueDate === new Date().toISOString().split('T')[0] && t.status !== 'done').length,
-    myTasks: userProfile ? tasks.filter(t => t.assignedTo === userProfile.id || t.createdBy === userProfile.id).length : 0
+    myTasks: userProfile ? tasks.filter(t => (t.assignees && t.assignees.includes(userProfile.id)) || t.createdBy === userProfile.id).length : 0
   };
 
   const handleCreateTask = async (taskData: any) => {
@@ -229,14 +236,6 @@ export const Dashboard = () => {
       });
     } catch (err) {
       console.error('Failed to create task:', err);
-    }
-  };
-
-  const handleAssignTask = async (taskId: string, userId: string) => {
-    try {
-      await updateTask(taskId, { assignedTo: userId });
-    } catch (err) {
-      console.error('Failed to assign task:', err);
     }
   };
 
@@ -408,7 +407,6 @@ export const Dashboard = () => {
                   key={task.id} 
                   task={task} 
                   onClick={() => setSelectedTask(task)}
-                  onAssign={handleAssignTask}
                 />
               ))}
             </CardContent>
@@ -430,7 +428,6 @@ export const Dashboard = () => {
                   key={task.id} 
                   task={task} 
                   onClick={() => setSelectedTask(task)}
-                  onAssign={handleAssignTask}
                 />
               ))}
             </CardContent>
@@ -452,7 +449,6 @@ export const Dashboard = () => {
                   key={task.id} 
                   task={task} 
                   onClick={() => setSelectedTask(task)}
-                  onAssign={handleAssignTask}
                 />
               ))}
             </CardContent>
@@ -465,7 +461,6 @@ export const Dashboard = () => {
           onCreateTask={handleCreateTask}
           onUpdateTask={updateTask}
           onDeleteTask={handleDeleteTask}
-          onAssignTask={handleAssignTask}
         />
       )}
 
