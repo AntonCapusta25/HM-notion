@@ -165,91 +165,75 @@ export const Dashboard = () => {
     myTasks: userProfile ? tasks.filter(t => t.assignedTo === userProfile.id || t.createdBy === userProfile.id).length : 0
   };
 
-  // Apply filtering and sorting with useMemo for performance
-  const filteredTasks = useMemo(() => {
-    let filtered = tasks;
+  // Apply filtering and sorting - removed useMemo to prevent infinite re-renders
+  let filteredTasks = tasks;
 
-    // Apply basic filter (my/all/team)
-    if (filter === 'my' && userProfile) {
-      filtered = filtered.filter(t => t.assignedTo === userProfile.id || t.createdBy === userProfile.id);
+  // Apply basic filter (my/all/team)
+  if (filter === 'my' && userProfile) {
+    filteredTasks = filteredTasks.filter(t => t.assignedTo === userProfile.id || t.createdBy === userProfile.id);
+  }
+
+  // Apply advanced filters
+  if (taskFilters.status.length > 0) {
+    filteredTasks = filteredTasks.filter(t => taskFilters.status.includes(t.status));
+  }
+
+  if (taskFilters.priority.length > 0) {
+    filteredTasks = filteredTasks.filter(t => taskFilters.priority.includes(t.priority));
+  }
+
+  if (taskFilters.assignee.length > 0) {
+    filteredTasks = filteredTasks.filter(t => t.assignedTo && taskFilters.assignee.includes(t.assignedTo));
+  }
+
+  if (taskFilters.tags.length > 0) {
+    filteredTasks = filteredTasks.filter(t => 
+      t.tags && t.tags.some(tag => taskFilters.tags.includes(tag))
+    );
+  }
+
+  // Apply sorting
+  filteredTasks = [...filteredTasks].sort((a, b) => {
+    let aValue, bValue;
+    
+    switch (taskFilters.sortBy) {
+      case 'dueDate':
+        aValue = a.dueDate ? new Date(a.dueDate).getTime() : 0;
+        bValue = b.dueDate ? new Date(b.dueDate).getTime() : 0;
+        break;
+      case 'priority':
+        const priorityOrder = { high: 3, medium: 2, low: 1 };
+        aValue = priorityOrder[a.priority] || 0;
+        bValue = priorityOrder[b.priority] || 0;
+        break;
+      case 'createdAt':
+        aValue = new Date(a.createdAt).getTime();
+        bValue = new Date(b.createdAt).getTime();
+        break;
+      case 'title':
+        aValue = a.title.toLowerCase();
+        bValue = b.title.toLowerCase();
+        break;
+      default:
+        aValue = new Date(a.createdAt).getTime();
+        bValue = new Date(b.createdAt).getTime();
     }
 
-    // Apply advanced filters
-    if (taskFilters.status.length > 0) {
-      filtered = filtered.filter(t => taskFilters.status.includes(t.status));
+    if (taskFilters.sortOrder === 'desc') {
+      return bValue > aValue ? 1 : -1;
+    } else {
+      return aValue > bValue ? 1 : -1;
     }
+  });
 
-    if (taskFilters.priority.length > 0) {
-      filtered = filtered.filter(t => taskFilters.priority.includes(t.priority));
+  // Get available tags for filter dropdown - also removed useMemo
+  const tagSet = new Set<string>();
+  tasks.forEach(task => {
+    if (task.tags) {
+      task.tags.forEach(tag => tagSet.add(tag));
     }
-
-    if (taskFilters.assignee.length > 0) {
-      filtered = filtered.filter(t => t.assignedTo && taskFilters.assignee.includes(t.assignedTo));
-    }
-
-    if (taskFilters.tags.length > 0) {
-      filtered = filtered.filter(t => 
-        t.tags && t.tags.some(tag => taskFilters.tags.includes(tag))
-      );
-    }
-
-    // Apply sorting
-    filtered.sort((a, b) => {
-      let aValue, bValue;
-      
-      switch (taskFilters.sortBy) {
-        case 'dueDate':
-          aValue = a.dueDate ? new Date(a.dueDate).getTime() : 0;
-          bValue = b.dueDate ? new Date(b.dueDate).getTime() : 0;
-          break;
-        case 'priority':
-          const priorityOrder = { high: 3, medium: 2, low: 1 };
-          aValue = priorityOrder[a.priority] || 0;
-          bValue = priorityOrder[b.priority] || 0;
-          break;
-        case 'createdAt':
-          aValue = new Date(a.createdAt).getTime();
-          bValue = new Date(b.createdAt).getTime();
-          break;
-        case 'title':
-          aValue = a.title.toLowerCase();
-          bValue = b.title.toLowerCase();
-          break;
-        default:
-          aValue = new Date(a.createdAt).getTime();
-          bValue = new Date(b.createdAt).getTime();
-      }
-
-      if (taskFilters.sortOrder === 'desc') {
-        return bValue > aValue ? 1 : -1;
-      } else {
-        return aValue > bValue ? 1 : -1;
-      }
-    });
-
-    return filtered;
-  }, [
-    tasks.length, 
-    filter, 
-    userProfile?.id, 
-    taskFilters.status.length,
-    taskFilters.priority.length,
-    taskFilters.assignee.length,
-    taskFilters.tags.length,
-    taskFilters.sortBy,
-    taskFilters.sortOrder
-  ]);
-
-  // Get available tags for filter dropdown
-  const availableTags = useMemo(() => {
-    const tagSet = new Set<string>();
-    tasks.forEach(task => {
-      if (task.tags) {
-        task.tags.forEach(tag => tagSet.add(tag));
-      }
-    });
-    return Array.from(tagSet).sort();
-  }, [tasks.length]); 
+  });
+  const availableTags = Array.from(tagSet).sort(); 
 
   const tasksByStatus = {
     todo: filteredTasks.filter(t => t.status === 'todo'),
