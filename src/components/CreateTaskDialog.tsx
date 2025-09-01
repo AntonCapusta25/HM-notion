@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Plus, X } from 'lucide-react';
+import { CalendarIcon, Plus, X, UserPlus, Users } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +15,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useTaskContext } from '../contexts/TaskContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useProfile } from '../hooks/useProfile';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
 interface CreateTaskDialogProps {
   open: boolean;
@@ -29,7 +30,8 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
   
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [assignedTo, setAssignedTo] = useState('');
+  // CHANGED: State now holds an array of assignee IDs
+  const [assignees, setAssignees] = useState<string[]>([]);
   const [priority, setPriority] = useState('');
   const [dueDate, setDueDate] = useState<Date>();
   const [tags, setTags] = useState<string[]>([]);
@@ -50,10 +52,11 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
     setError(null);
 
     try {
+      // CHANGED: The payload now sends an array of assignees
       const taskData = {
         title,
         description,
-        assignedTo,
+        assignees, // This is now an array of user IDs
         priority: priority as 'low' | 'medium' | 'high',
         dueDate: dueDate?.toISOString().split('T')[0],
         tags,
@@ -82,12 +85,22 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
   const resetForm = () => {
     setTitle('');
     setDescription('');
-    setAssignedTo('');
+    setAssignees([]); // Reset assignees array
     setPriority('');
     setDueDate(undefined);
     setTags([]);
     setNewTag('');
     setError(null);
+  };
+  
+  const addAssignee = (userId: string) => {
+    if (!assignees.includes(userId)) {
+      setAssignees([...assignees, userId]);
+    }
+  };
+  
+  const removeAssignee = (userId: string) => {
+    setAssignees(assignees.filter(id => id !== userId));
   };
 
   const addTag = () => {
@@ -100,6 +113,10 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
   const removeTag = (tagToRemove: string) => {
     setTags(tags.filter(tag => tag !== tagToRemove));
   };
+
+  // Memoize lists for performance
+  const assignedUsers = useMemo(() => users.filter(u => assignees.includes(u.id)), [users, assignees]);
+  const unassignedUsers = useMemo(() => users.filter(u => !assignees.includes(u.id)), [users, assignees]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -138,24 +155,53 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
               disabled={isSubmitting}
             />
           </div>
+          
+          {/* ==================================================================== */}
+          {/* === NEW: Multi-select UI for Assignees ============================= */}
+          {/* ==================================================================== */}
+          <div className="space-y-2">
+            <Label>Assignees</Label>
+            <div className="flex flex-wrap items-center gap-2 p-2 border rounded-md min-h-[40px]">
+              {assignedUsers.map(user => (
+                <Badge key={user.id} variant="secondary" className="gap-1.5 pl-1.5">
+                  <Avatar className="h-5 w-5">
+                     <AvatarFallback className="text-xs bg-gray-200">{user.name.charAt(0)}</AvatarFallback>
+                  </Avatar>
+                  {user.name}
+                  <X 
+                    className="h-3 w-3 cursor-pointer" 
+                    onClick={() => removeAssignee(user.id)}
+                  />
+                </Badge>
+              ))}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0" disabled={unassignedUsers.length === 0}>
+                    <UserPlus className="h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-0">
+                  <div className="p-1">
+                    {unassignedUsers.map(user => (
+                      <div 
+                        key={user.id}
+                        className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-md cursor-pointer"
+                        onClick={() => addAssignee(user.id)}
+                      >
+                        <Avatar className="h-6 w-6">
+                          <AvatarFallback className="text-xs">{user.name.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <span className="text-sm">{user.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+          {/* ==================================================================== */}
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Assign To</Label>
-              <Select value={assignedTo} onValueChange={setAssignedTo} disabled={isSubmitting}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select team member" />
-                </SelectTrigger>
-                <SelectContent>
-                  {users.map(user => (
-                    <SelectItem key={user.id} value={user.id}>
-                      {user.name} ({user.department})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
             <div className="space-y-2">
               <Label>Priority</Label>
               <Select value={priority} onValueChange={setPriority} disabled={isSubmitting}>
@@ -169,34 +215,33 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
                 </SelectContent>
               </Select>
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Due Date</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !dueDate && "text-muted-foreground"
-                  )}
-                  disabled={isSubmitting}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {dueDate ? format(dueDate, "PPP") : <span>Pick a date</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={dueDate}
-                  onSelect={setDueDate}
-                  initialFocus
-                  className="pointer-events-auto"
-                />
-              </PopoverContent>
-            </Popover>
+            
+            <div className="space-y-2">
+              <Label>Due Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !dueDate && "text-muted-foreground"
+                    )}
+                    disabled={isSubmitting}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dueDate ? format(dueDate, "PPP") : <span>Pick a date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={dueDate}
+                    onSelect={setDueDate}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
 
           <div className="space-y-2">
