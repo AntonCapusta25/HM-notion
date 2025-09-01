@@ -21,6 +21,33 @@ interface TaskDetailDialogProps {
   onToggleSubtask: (taskId: string, subtaskId: string) => void;
 }
 
+// FIXED: Safe date formatting utilities
+const safeFormatDate = (dateInput: string | null | undefined, formatStr: string = 'MMM d, yyyy'): string => {
+  if (!dateInput) return 'No date';
+  
+  try {
+    const date = new Date(dateInput);
+    if (isNaN(date.getTime())) {
+      console.warn('Invalid date in TaskDetailDialog:', dateInput);
+      return 'Invalid date';
+    }
+    return format(date, formatStr);
+  } catch (error) {
+    console.error('Error formatting date in TaskDetailDialog:', error, 'Input:', dateInput);
+    return 'Invalid date';
+  }
+};
+
+const isValidDate = (dateInput: string | null | undefined): boolean => {
+  if (!dateInput) return false;
+  try {
+    const date = new Date(dateInput);
+    return !isNaN(date.getTime());
+  } catch {
+    return false;
+  }
+};
+
 export const TaskDetailDialog = ({ 
   task, 
   users, 
@@ -163,8 +190,12 @@ export const TaskDetailDialog = ({
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
                               <span className="font-medium text-sm">{author?.name || 'Unknown User'}</span>
+                              {/* FIXED: Safe comment date formatting */}
                               <span className="text-xs text-gray-500">
-                                {comment.createdAt && format(new Date(comment.createdAt), 'MMM d, yyyy at h:mm a')}
+                                {isValidDate(comment.createdAt) 
+                                  ? safeFormatDate(comment.createdAt, 'MMM d, yyyy at h:mm a')
+                                  : 'No date'
+                                }
                               </span>
                             </div>
                             <p className="text-sm text-gray-700">{comment.content}</p>
@@ -250,12 +281,13 @@ export const TaskDetailDialog = ({
               </div>
             </div>
 
-            {task.dueDate && (
+            {/* FIXED: Safe due date display */}
+            {task.dueDate && isValidDate(task.dueDate) && (
               <div>
                 <h3 className="font-medium mb-2">Due Date</h3>
                 <div className="flex items-center gap-2 text-sm text-gray-600">
                   <Calendar className="h-4 w-4" />
-                  {format(new Date(task.dueDate), 'MMM d, yyyy')}
+                  {safeFormatDate(task.dueDate, 'MMM d, yyyy')}
                 </div>
               </div>
             )}
@@ -273,13 +305,20 @@ export const TaskDetailDialog = ({
 
             <Separator />
 
+            {/* FIXED: Safe created/updated date display */}
             <div className="text-xs text-gray-500 space-y-1">
               <div>Created by {createdByUser?.name || 'Unknown'}</div>
               <div>
-                {task.createdAt && `Created ${format(new Date(task.createdAt), 'MMM d, yyyy')}`}
+                {isValidDate(task.createdAt) 
+                  ? `Created ${safeFormatDate(task.createdAt, 'MMM d, yyyy')}`
+                  : 'Created date unknown'
+                }
               </div>
               <div>
-                {task.updatedAt && `Updated ${format(new Date(task.updatedAt), 'MMM d, yyyy')}`}
+                {isValidDate(task.updatedAt) 
+                  ? `Updated ${safeFormatDate(task.updatedAt, 'MMM d, yyyy')}`
+                  : 'Updated date unknown'
+                }
               </div>
             </div>
           </div>
