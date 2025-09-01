@@ -30,18 +30,26 @@ export const TaskDetailDialog = ({
   onAddComment, 
   onToggleSubtask 
 }: TaskDetailDialogProps) => {
+  // ====================================================================
+  // === FIX: All hooks are now moved to the top of the component ======
+  // ====================================================================
   const [newComment, setNewComment] = useState('');
   const [newSubtask, setNewSubtask] = useState('');
 
-  if (!task) return null;
-
   const assignedUsers = useMemo(() => {
+    if (!task) return [];
     return users.filter(u => task.assignees?.includes(u.id));
-  }, [users, task.assignees]);
+  }, [users, task]);
   
   const unassignedUsers = useMemo(() => {
+    if (!task) return [];
     return users.filter(u => !task.assignees?.includes(u.id));
-  }, [users, task.assignees]);
+  }, [users, task]);
+  
+  // Now that hooks are done, we can have early returns.
+  if (!task) {
+    return null;
+  }
 
   const createdByUser = users.find(u => u.id === task.createdBy);
 
@@ -102,79 +110,81 @@ export const TaskDetailDialog = ({
         </DialogHeader>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            {/* Description */}
-            <div>
-              <h3 className="font-medium mb-2">Description</h3>
-              <p className="text-gray-600 whitespace-pre-wrap">{task.description || 'No description provided.'}</p>
-            </div>
-
-            {/* Subtasks */}
-            <div>
-              <h3 className="font-medium mb-3">Subtasks ({subtasks.filter(st => st.completed).length}/{subtasks.length})</h3>
-              <div className="space-y-2">
-                {subtasks.map(subtask => (
-                  <div key={subtask.id} className="flex items-center gap-2">
-                    <button
-                      onClick={() => onToggleSubtask(task.id, subtask.id)}
-                      className="text-homemade-orange hover:text-homemade-orange-dark"
-                    >
-                      {subtask.completed ? <CheckSquare className="h-4 w-4" /> : <Square className="h-4 w-4" />}
-                    </button>
-                    <span className={subtask.completed ? 'line-through text-gray-500' : ''}>{subtask.title}</span>
-                  </div>
-                ))}
-                <div className="flex gap-2 mt-3">
-                  <Input
-                    placeholder="Add a subtask..."
-                    value={newSubtask}
-                    onChange={(e) => setNewSubtask(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleAddSubtask()}
-                  />
-                  <Button size="sm" onClick={handleAddSubtask}>
-                    <Plus className="h-4 w-4" />
-                  </Button>
+          <div className="lg-col-span-2 space-y-6">
+            <div className="space-y-6">
+                {/* Description */}
+                <div>
+                  <h3 className="font-medium mb-2">Description</h3>
+                  <p className="text-gray-600 whitespace-pre-wrap">{task.description || 'No description provided.'}</p>
                 </div>
-              </div>
-            </div>
 
-            {/* Comments */}
-            <div>
-              <h3 className="font-medium mb-3">Comments ({comments.length})</h3>
-              <div className="space-y-4">
-                {comments.map(comment => {
-                  const author = users.find(u => u.id === comment.author);
-                  return (
-                    <div key={comment.id} className="flex gap-3">
-                      <Avatar className="h-8 w-8">
-                        <AvatarFallback className="bg-gray-200 text-xs">
-                          {author ? author.name.charAt(0) : '?'}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium text-sm">{author?.name || 'Unknown User'}</span>
-                          <span className="text-xs text-gray-500">
-                            {comment.createdAt && format(new Date(comment.createdAt), 'MMM d, yyyy at h:mm a')}
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-700">{comment.content}</p>
+                {/* Subtasks */}
+                <div>
+                  <h3 className="font-medium mb-3">Subtasks ({subtasks.filter(st => st.completed).length}/{subtasks.length})</h3>
+                  <div className="space-y-2">
+                    {subtasks.map(subtask => (
+                      <div key={subtask.id} className="flex items-center gap-2">
+                        <button
+                          onClick={() => onToggleSubtask(task.id, subtask.id)}
+                          className="text-homemade-orange hover:text-homemade-orange-dark"
+                        >
+                          {subtask.completed ? <CheckSquare className="h-4 w-4" /> : <Square className="h-4 w-4" />}
+                        </button>
+                        <span className={subtask.completed ? 'line-through text-gray-500' : ''}>{subtask.title}</span>
                       </div>
+                    ))}
+                    <div className="flex gap-2 mt-3">
+                      <Input
+                        placeholder="Add a subtask..."
+                        value={newSubtask}
+                        onChange={(e) => setNewSubtask(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && handleAddSubtask()}
+                      />
+                      <Button size="sm" onClick={handleAddSubtask}>
+                        <Plus className="h-4 w-4" />
+                      </Button>
                     </div>
-                  );
-                })}
-                <div className="flex gap-2">
-                  <Textarea
-                    placeholder="Add a comment..."
-                    value={newComment}
-                    onChange={(e) => setNewComment(e.target.value)}
-                    rows={2}
-                  />
-                  <Button onClick={handleAddComment} className="bg-homemade-orange hover:bg-homemade-orange-dark">
-                    <MessageCircle className="h-4 w-4" />
-                  </Button>
+                  </div>
                 </div>
-              </div>
+
+                {/* Comments */}
+                <div>
+                  <h3 className="font-medium mb-3">Comments ({comments.length})</h3>
+                  <div className="space-y-4">
+                    {comments.map(comment => {
+                      const author = users.find(u => u.id === comment.author);
+                      return (
+                        <div key={comment.id} className="flex gap-3">
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback className="bg-gray-200 text-xs">
+                              {author ? author.name.charAt(0) : '?'}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-medium text-sm">{author?.name || 'Unknown User'}</span>
+                              <span className="text-xs text-gray-500">
+                                {comment.createdAt && format(new Date(comment.createdAt), 'MMM d, yyyy at h:mm a')}
+                              </span>
+                            </div>
+                            <p className="text-sm text-gray-700">{comment.content}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div className="flex gap-2">
+                      <Textarea
+                        placeholder="Add a comment..."
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        rows={2}
+                      />
+                      <Button onClick={handleAddComment} className="bg-homemade-orange hover:bg-homemade-orange-dark">
+                        <MessageCircle className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
             </div>
           </div>
 
