@@ -34,7 +34,7 @@ export const useTaskStore = () => {
         tags: task.tags || [],
         createdAt: task.createdAt || null,
         updatedAt: task.updatedAt || null,
-        dueDate: task.dueDate || null
+        due_date: task.due_date || null
       }));
 
       setTasks(formattedTasks);
