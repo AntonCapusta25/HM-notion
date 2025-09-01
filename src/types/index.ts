@@ -1,4 +1,3 @@
-
 export interface User {
   id: string;
   name: string;
@@ -43,7 +42,6 @@ export interface Workspace {
   department: string;
   color: string;
 }
-// ADD these interfaces to your existing types file:
 
 export interface DashboardStats {
   total_tasks: number
@@ -77,19 +75,47 @@ export interface SupabaseTask {
   workspace?: Workspace | null
 }
 
-// Helper function to convert Supabase format to your existing Task format
+// FIXED: Safe date parsing function
+const safeParseDate = (dateValue: any): string => {
+  if (!dateValue) return new Date().toISOString();
+  if (typeof dateValue === 'string') {
+    const date = new Date(dateValue);
+    if (isNaN(date.getTime())) {
+      console.warn(`Invalid date value encountered: ${dateValue}, using current time`);
+      return new Date().toISOString();
+    }
+    return dateValue;
+  }
+  return new Date().toISOString();
+};
+
+// FIXED: Safe due date parsing (can be null)
+const safeParseDueDate = (dateValue: any): string | undefined => {
+  if (!dateValue) return undefined;
+  if (typeof dateValue === 'string') {
+    const date = new Date(dateValue);
+    if (isNaN(date.getTime())) {
+      console.warn(`Invalid due date value encountered: ${dateValue}, returning undefined`);
+      return undefined;
+    }
+    return dateValue;
+  }
+  return undefined;
+};
+
+// FIXED: Helper function with safe date parsing
 export const formatTaskFromSupabase = (supabaseTask: SupabaseTask): Task => ({
   id: supabaseTask.id,
   title: supabaseTask.title,
   description: supabaseTask.description,
-  dueDate: supabaseTask.due_date || undefined,
+  dueDate: safeParseDueDate(supabaseTask.due_date),
   assignedTo: supabaseTask.assigned_to || '',
   priority: supabaseTask.priority,
   status: supabaseTask.status,
   tags: supabaseTask.task_tags?.map(tt => tt.tag) || [],
   subtasks: supabaseTask.subtasks || [],
-  createdAt: supabaseTask.created_at,
-  updatedAt: supabaseTask.updated_at,
+  createdAt: safeParseDate(supabaseTask.created_at),
+  updatedAt: safeParseDate(supabaseTask.updated_at),
   createdBy: supabaseTask.created_by,
   comments: supabaseTask.comments || []
 })
