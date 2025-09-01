@@ -31,7 +31,7 @@ export const Dashboard = () => {
   // Use both useAuth for the authenticated user and useProfile for profile data
   const { user } = useAuth();
   const { profile: userProfile, loading: profileLoading, error: profileError } = useProfile();
-  const { tasks, users, createTask, updateTask, deleteTask, addComment, toggleSubtask, loading: tasksLoading, error } = useTaskStore();
+  const { tasks, users, createTask, updateTask, deleteTask, addComment, toggleSubtask, loading: tasksLoading, error } = useTaskStore({ userProfile });
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [filter, setFilter] = useState<'all' | 'my' | 'team'>('all');
