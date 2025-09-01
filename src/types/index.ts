@@ -60,3 +60,75 @@ export interface Task {
   subtasks: Subtask[]; // From `subtasks`
   comments: Comment[]; // From `comments`
 }
+
+// Dashboard stats interface
+export interface DashboardStats {
+  total_tasks: number;
+  todo_tasks: number;
+  in_progress_tasks: number;
+  done_tasks: number;
+  overdue_tasks: number;
+  due_today: number;
+  high_priority: number;
+  my_tasks: number;
+  my_created_tasks: number;
+}
+
+// Safe date parsing utilities for your existing schema
+const safeParseDate = (dateValue: any): string => {
+  if (!dateValue) return new Date().toISOString();
+  if (typeof dateValue === 'string') {
+    if (dateValue.trim() === '' || dateValue === '0000-00-00' || dateValue === 'null') {
+      return new Date().toISOString();
+    }
+    const date = new Date(dateValue);
+    if (isNaN(date.getTime())) {
+      console.warn(`Invalid date value: "${dateValue}", using current time`);
+      return new Date().toISOString();
+    }
+    return dateValue;
+  }
+  return new Date().toISOString();
+};
+
+const safeParseDueDate = (dateValue: any): string | null => {
+  if (!dateValue) return null;
+  if (typeof dateValue === 'string') {
+    if (dateValue.trim() === '' || dateValue === '0000-00-00' || dateValue === 'null') {
+      return null;
+    }
+    const date = new Date(dateValue);
+    if (isNaN(date.getTime())) {
+      console.warn(`Invalid due date: "${dateValue}"`);
+      return null;
+    }
+    return dateValue;
+  }
+  return null;
+};
+
+// Conversion function to ensure safe data handling
+export const formatTaskFromSupabase = (supabaseTask: any): Task => {
+  return {
+    // Keep your existing field names
+    id: supabaseTask.id,
+    title: supabaseTask.title || '',
+    description: supabaseTask.description || null,
+    due_date: safeParseDueDate(supabaseTask.due_date),
+    priority: supabaseTask.priority,
+    status: supabaseTask.status,
+    created_by: supabaseTask.created_by,
+    workspace_id: supabaseTask.workspace_id || null,
+    created_at: safeParseDate(supabaseTask.created_at),
+    updated_at: safeParseDate(supabaseTask.updated_at),
+    
+    // Many-to-many relationships
+    assignees: (supabaseTask.task_assignees || []).map((ta: any) => ta.user_id),
+    tags: (supabaseTask.task_tags || []).map((tt: any) => tt.tag),
+    subtasks: supabaseTask.subtasks || [],
+    comments: (supabaseTask.comments || []).map((comment: any) => ({
+      ...comment,
+      created_at: safeParseDate(comment.created_at)
+    }))
+  };
+};
