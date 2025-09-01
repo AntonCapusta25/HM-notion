@@ -47,6 +47,12 @@ export const Dashboard = () => {
     sortOrder: 'desc'
   });
 
+  // Debug logging
+  console.log('📊 Dashboard render - tasks count:', tasks.length);
+  console.log('📊 Dashboard render - task titles:', tasks.map(t => t.title));
+  console.log('📊 Dashboard render - userProfile:', userProfile?.id);
+  console.log('📊 Dashboard render - loading:', tasksLoading);
+
   useEffect(() => {
     const fetchDashboardStats = async () => {
       if (!userProfile) {
@@ -72,6 +78,7 @@ export const Dashboard = () => {
     fetchDashboardStats();
   }, [userProfile]);
 
+  // FIXED: Safe filtering and sorting logic
   const filteredTasks = useMemo(() => {
     let result = tasks;
     
@@ -87,44 +94,74 @@ export const Dashboard = () => {
     if (taskFilters.priority.length > 0) {
       result = result.filter(t => taskFilters.priority.includes(t.priority));
     }
-
-    // THIS IS THE CORRECTED LOGIC
     if (taskFilters.assignee.length > 0) {
       result = result.filter(t => 
         t.assignees && t.assignees.some(assigneeId => taskFilters.assignee.includes(assigneeId))
       );
     }
-
     if (taskFilters.tags.length > 0) {
       result = result.filter(t => 
         t.tags && t.tags.some(tag => taskFilters.tags.includes(tag))
       );
     }
 
+    // FIXED: Safe sorting with proper error handling
     return [...result].sort((a, b) => {
-      let aValue, bValue;
-      switch (taskFilters.sortBy) {
-        case 'dueDate':
-          aValue = a.dueDate ? new Date(a.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
-          bValue = b.dueDate ? new Date(b.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
-          break;
-        case 'priority':
-          const priorityOrder = { high: 3, medium: 2, low: 1 };
-          aValue = priorityOrder[a.priority as keyof typeof priorityOrder] || 0;
-          bValue = priorityOrder[b.priority as keyof typeof priorityOrder] || 0;
-          break;
-        case 'title':
-            aValue = a.title.toLowerCase();
-            bValue = b.title.toLowerCase();
+      let aValue: any, bValue: any;
+      
+      try {
+        switch (taskFilters.sortBy) {
+          case 'dueDate':
+            // Safe date parsing for sorting
+            const parseDate = (dateStr?: string) => {
+              if (!dateStr) return new Date('9999-12-31').getTime(); // Far future for null dates
+              try {
+                const date = new Date(dateStr);
+                return isNaN(date.getTime()) ? new Date('9999-12-31').getTime() : date.getTime();
+              } catch {
+                return new Date('9999-12-31').getTime();
+              }
+            };
+            
+            aValue = parseDate(a.dueDate);
+            bValue = parseDate(b.dueDate);
             break;
-        default: // createdAt
-            aValue = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-            bValue = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      }
-      if (taskFilters.sortOrder === 'desc') {
-        return bValue > aValue ? 1 : -1;
-      } else {
-        return aValue > bValue ? 1 : -1;
+            
+          case 'priority':
+            const priorityOrder = { high: 3, medium: 2, low: 1 };
+            aValue = priorityOrder[a.priority] || 0;
+            bValue = priorityOrder[b.priority] || 0;
+            break;
+            
+          case 'title':
+            aValue = (a.title || '').toLowerCase();
+            bValue = (b.title || '').toLowerCase();
+            break;
+            
+          default: // createdAt
+            const parseCreatedDate = (dateStr: string) => {
+              try {
+                const date = new Date(dateStr);
+                return isNaN(date.getTime()) ? 0 : date.getTime();
+              } catch {
+                return 0;
+              }
+            };
+            
+            aValue = parseCreatedDate(a.createdAt);
+            bValue = parseCreatedDate(b.createdAt);
+        }
+        
+        // Handle comparison based on sort order
+        if (taskFilters.sortOrder === 'desc') {
+          return bValue > aValue ? 1 : bValue < aValue ? -1 : 0;
+        } else {
+          return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+        }
+        
+      } catch (error) {
+        console.warn('Error in task sorting:', error);
+        return 0; // Keep original order if sorting fails
       }
     });
   }, [tasks, filter, taskFilters, userProfile]);
@@ -182,7 +219,7 @@ export const Dashboard = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">
-              Good morning, {user.email}! 👋
+              Good morning, {user.email}!
             </h1>
             <p className="text-gray-600 mt-1">
               Profile data is loading...
@@ -213,6 +250,7 @@ export const Dashboard = () => {
     );
   }
 
+  // FIXED: Safe stats calculation with error handling
   const stats = dashboardStats ? {
     total: dashboardStats.total_tasks,
     inProgress: dashboardStats.in_progress_tasks,
@@ -227,7 +265,9 @@ export const Dashboard = () => {
     overdue: tasks.filter(t => {
       if (!t.dueDate || t.status === 'done') return false;
       try {
-        return new Date(t.dueDate) < new Date();
+        const dueDate = new Date(t.dueDate);
+        const today = new Date();
+        return !isNaN(dueDate.getTime()) && dueDate < today;
       } catch {
         return false;
       }
@@ -235,7 +275,9 @@ export const Dashboard = () => {
     dueToday: tasks.filter(t => {
       if (!t.dueDate || t.status === 'done') return false;
       try {
-        return t.dueDate === new Date().toISOString().split('T')[0];
+        const dueDate = new Date(t.dueDate);
+        const today = new Date();
+        return !isNaN(dueDate.getTime()) && dueDate.toDateString() === today.toDateString();
       } catch {
         return false;
       }
@@ -267,7 +309,7 @@ export const Dashboard = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">
-            Good morning, {userProfile?.name || user?.email || 'User'}! 👋
+            Good morning, {userProfile?.name || user?.email || 'User'}!
           </h1>
           <p className="text-gray-600 mt-1">
             You have {stats.inProgress} tasks in progress and {stats.overdue} overdue items
