@@ -9,7 +9,7 @@ import { CreateTaskDialog } from './CreateTaskDialog';
 import { TaskDetailDialog } from './TaskDetailDialog';
 import { ListView } from './ListView';
 import { TaskFilters, TaskFiltersState } from './TaskFilters';
-import { useTaskStore } from '../hooks/useTaskStore';
+import { useTaskContext } from '../contexts/TaskContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useProfile } from '../hooks/useProfile';
 import { supabase } from '../lib/supabase';
@@ -31,20 +31,20 @@ export const Dashboard = () => {
   // Use both useAuth for the authenticated user and useProfile for profile data
   const { user } = useAuth();
   const { profile: userProfile, loading: profileLoading, error: profileError } = useProfile();
-  const { tasks, users, createTask, updateTask, deleteTask, addComment, toggleSubtask, loading: tasksLoading, error } = useTaskStore({ userProfile });
+  const { tasks, users, createTask, updateTask, deleteTask, addComment, toggleSubtask, loading: tasksLoading, error } = useTaskContext();
 
   // Add debugging logs for Dashboard
   console.log('📊 Dashboard render - tasks count:', tasks.length);
   console.log('📊 Dashboard render - task titles:', tasks.map(t => t.title));
   console.log('📊 Dashboard render - userProfile:', userProfile?.id);
   console.log('📊 Dashboard render - loading:', tasksLoading);
+
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [filter, setFilter] = useState<'all' | 'my' | 'team'>('all');
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
-  const [, forceUpdate] = useState({});
   const [taskFilters, setTaskFilters] = useState<TaskFiltersState>({
     status: [],
     priority: [],
@@ -88,15 +88,6 @@ export const Dashboard = () => {
     console.log('📊 Dashboard detected tasks change:', tasks.length, 'tasks');
     console.log('📊 Task titles in Dashboard:', tasks.map(t => t.title));
   }, [tasks]);
-
-  // Quick fix: Force Dashboard to re-render periodically to pick up task changes
-  useEffect(() => {
-    const interval = setInterval(() => {
-      forceUpdate({}); // Force a re-render every 2 seconds
-    }, 2000);
-    
-    return () => clearInterval(interval);
-  }, []);
 
   // Show loading while profile is loading
   if (profileLoading || statsLoading) {
