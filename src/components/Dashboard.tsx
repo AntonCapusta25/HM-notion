@@ -44,6 +44,7 @@ export const Dashboard = () => {
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
+  const [, forceUpdate] = useState({});
   const [taskFilters, setTaskFilters] = useState<TaskFiltersState>({
     status: [],
     priority: [],
@@ -87,6 +88,15 @@ export const Dashboard = () => {
     console.log('📊 Dashboard detected tasks change:', tasks.length, 'tasks');
     console.log('📊 Task titles in Dashboard:', tasks.map(t => t.title));
   }, [tasks]);
+
+  // Quick fix: Force Dashboard to re-render periodically to pick up task changes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      forceUpdate({}); // Force a re-render every 2 seconds
+    }, 2000);
+    
+    return () => clearInterval(interval);
+  }, []);
 
   // Show loading while profile is loading
   if (profileLoading || statsLoading) {
