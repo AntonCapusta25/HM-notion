@@ -1,11 +1,13 @@
-import { useState } from 'react';
+// src/pages/MyTasks.tsx
+
+import { useState, useMemo } from 'react';
 import { Layout } from '../components/Layout';
 import { TaskCard } from '../components/TaskCard';
 import { CreateTaskDialog } from '../components/CreateTaskDialog';
 import { TaskDetailDialog } from '../components/TaskDetailDialog';
 import { WorkspaceSelector } from '../components/WorkspaceSelector';
 import { ListView } from '../components/ListView';
-import { useTaskStore } from '../hooks/useTaskStore';
+import { useTaskContext } from '../contexts/TaskContext'; // Changed from useTaskStore
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,17 +16,12 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Plus, Calendar, AlertCircle, LayoutGrid, List } from 'lucide-react';
 import { Task } from '../types';
 
-// CRITICAL FIX: Move filters object outside component to prevent re-creation
-const PERSONAL_FILTERS = { filters: { personal_only: true } };
-
 const MyTasks = () => {
-  // CRITICAL: ALL hooks must be called first, no conditional hook calls
-  const { user } = useAuth();
-  
+  // Use the centralized TaskContext for real-time data
   const { 
-    tasks: personalTasks, 
+    tasks, 
     users, 
-    workspaces, 
+    workspaces = [], // Use workspaces from context, defaulting to an empty array
     createTask, 
     updateTask, 
     deleteTask, 
@@ -32,7 +29,9 @@ const MyTasks = () => {
     toggleSubtask,
     loading: tasksLoading,
     error
-  } = useTaskStore(PERSONAL_FILTERS); // FIXED: Use constant instead of creating new object
+  } = useTaskContext();
+
+  const { user } = useAuth();
   
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -40,7 +39,51 @@ const MyTasks = () => {
   const [filter, setFilter] = useState<'all' | 'today' | 'week' | 'overdue'>('all');
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
 
-  // NOW we can do conditional rendering after all hooks are called
+  // Memoize the filtering logic to avoid recalculating on every render
+  const myTasks = useMemo(() => {
+    if (!user) return [];
+
+    // 1. Start with tasks assigned to or created by the current user
+    let personalTasks = tasks.filter(task => 
+      task.assignedTo === user.id || task.createdBy === user.id
+    );
+
+    // 2. Apply workspace filter
+    if (selectedWorkspace) {
+      personalTasks = personalTasks.filter(task => task.workspace_id === selectedWorkspace);
+    }
+
+    // 3. Apply date filters
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const weekFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    switch (filter) {
+      case 'today':
+        return personalTasks.filter(task => {
+          if (!task.dueDate) return false;
+          const dueDate = new Date(task.dueDate);
+          return dueDate.toDateString() === today.toDateString() && task.status !== 'done';
+        });
+      case 'week':
+        return personalTasks.filter(task => {
+          if (!task.dueDate) return false;
+          const dueDate = new Date(task.dueDate);
+          return dueDate >= today && dueDate <= weekFromNow && task.status !== 'done';
+        });
+      case 'overdue':
+        return personalTasks.filter(task => {
+          if (!task.dueDate) return false;
+          const dueDate = new Date(task.dueDate);
+          return dueDate < today && task.status !== 'done';
+        });
+      default: // 'all'
+        return personalTasks;
+    }
+  }, [tasks, user, selectedWorkspace, filter]);
+
+
+  // Early returns for loading, error, and auth states
   if (tasksLoading) {
     return (
       <Layout>
@@ -78,41 +121,6 @@ const MyTasks = () => {
     );
   }
 
-  // Simple filtering without useMemo to avoid dependency issues
-  let myTasks = personalTasks || [];
-  
-  // Workspace filtering
-  if (selectedWorkspace) {
-    // FIXED: Filter by workspace_id instead of tags
-    myTasks = myTasks.filter(task => task.workspace_id === selectedWorkspace);
-  }
-
-  // Date filtering
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const weekFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
-
-  if (filter === 'today') {
-    myTasks = myTasks.filter(task => {
-      if (!task.dueDate) return false;
-      const dueDate = new Date(task.dueDate);
-      return dueDate <= today && task.status !== 'done';
-    });
-  } else if (filter === 'week') {
-    myTasks = myTasks.filter(task => {
-      if (!task.dueDate) return false;
-      const dueDate = new Date(task.dueDate);
-      return dueDate <= weekFromNow && task.status !== 'done';
-    });
-  } else if (filter === 'overdue') {
-    myTasks = myTasks.filter(task => {
-      if (!task.dueDate) return false;
-      const dueDate = new Date(task.dueDate);
-      return dueDate < today && task.status !== 'done';
-    });
-  }
-
-  // Simple object creation without useMemo
   const tasksByStatus = {
     todo: myTasks.filter(t => t.status === 'todo'),
     in_progress: myTasks.filter(t => t.status === 'in_progress'),
@@ -121,20 +129,16 @@ const MyTasks = () => {
 
   const stats = {
     total: myTasks.length,
-    overdue: myTasks.filter(t => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'done').length,
-    dueToday: myTasks.filter(t => {
-      if (!t.dueDate) return false;
-      const today = new Date();
-      const dueDate = new Date(t.dueDate);
-      return dueDate.toDateString() === today.toDateString() && t.status !== 'done';
-    }).length
+    overdue: myTasks.filter(t => filter === 'overdue').length, // Simplified since it's pre-filtered
+    dueToday: myTasks.filter(t => filter === 'today').length // Simplified
   };
 
   const handleCreateTask = async (taskData: any) => {
+    if (!user) return;
     try {
       await createTask({
         ...taskData,
-        assignedTo: user.id, // Use user.id directly
+        assignedTo: user.id, // Automatically assign to self
         subtasks: []
       });
     } catch (err) {
@@ -153,12 +157,12 @@ const MyTasks = () => {
   return (
     <Layout>
       <div className="space-y-6">
+        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">My Tasks</h1>
             <p className="text-gray-600 mt-1">
-              {stats.overdue > 0 ? `${stats.overdue} overdue tasks` : 'You\'re up to date!'} 
-              {stats.dueToday > 0 && ` • ${stats.dueToday} due today`}
+              You have {myTasks.length} tasks.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -190,6 +194,7 @@ const MyTasks = () => {
           </div>
         </div>
 
+        {/* Stats Cards (only for kanban view) */}
         {viewMode === 'kanban' && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card>
@@ -205,7 +210,6 @@ const MyTasks = () => {
                 </div>
               </CardContent>
             </Card>
-
             <Card>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
@@ -219,7 +223,6 @@ const MyTasks = () => {
                 </div>
               </CardContent>
             </Card>
-
             <Card>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
@@ -236,17 +239,18 @@ const MyTasks = () => {
           </div>
         )}
 
-        {viewMode === 'kanban' && (
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
-              <WorkspaceSelector 
-                workspaces={workspaces}
-                selectedWorkspace={selectedWorkspace}
-                onWorkspaceChange={setSelectedWorkspace}
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button 
+        {/* Filters */}
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex-1">
+            <WorkspaceSelector 
+              workspaces={workspaces}
+              selectedWorkspace={selectedWorkspace}
+              onWorkspaceChange={setSelectedWorkspace}
+            />
+          </div>
+          <div className="flex gap-2">
+            {/* Filter Buttons ... */}
+             <Button 
                 variant={filter === 'all' ? 'default' : 'outline'} 
                 size="sm"
                 onClick={() => setFilter('all')}
@@ -278,10 +282,10 @@ const MyTasks = () => {
               >
                 Overdue
               </Button>
-            </div>
           </div>
-        )}
+        </div>
 
+        {/* Task View */}
         {viewMode === 'list' ? (
           <ListView
             tasks={myTasks}
@@ -361,6 +365,7 @@ const MyTasks = () => {
           </div>
         )}
 
+        {/* Dialogs */}
         <CreateTaskDialog 
           open={showCreateTask} 
           onOpenChange={setShowCreateTask}
