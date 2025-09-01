@@ -5,7 +5,7 @@ import { TaskCard } from '../components/TaskCard';
 import { CreateTaskDialog } from '../components/CreateTaskDialog';
 import { TaskDetailDialog } from '../components/TaskDetailDialog';
 import { EditWorkspaceDialog } from '../components/EditWorkspaceDialog';
-import { useTaskStore } from '../hooks/useTaskStore';
+import { useTaskContext } from '../contexts/TaskContext'; // CHANGED: from useTaskStore
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,12 +26,11 @@ import {
 } from 'lucide-react';
 import { Task } from '../types';
 
-const NO_FILTERS = {};
-
 const WorkspaceDetail = () => {
   const { id: workspaceId } = useParams<{ id: string }>();
   const { user } = useAuth();
   
+  // CHANGED: Switched to useTaskContext to get real-time data
   const { 
     tasks, 
     users, 
@@ -43,13 +42,13 @@ const WorkspaceDetail = () => {
     toggleSubtask,
     loading: tasksLoading, 
     error 
-  } = useTaskStore(NO_FILTERS);
+  } = useTaskContext();
   
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showEditWorkspace, setShowEditWorkspace] = useState(false);
 
-  // Find the current workspace
+  // Find the current workspace from the global context
   const workspace = workspaces.find(w => w.id === workspaceId);
   
   // Filter tasks for this workspace
@@ -59,7 +58,7 @@ const WorkspaceDetail = () => {
 
   // Find team members working in this workspace
   const workspaceTeam = useMemo(() => {
-    const teamIds = new Set();
+    const teamIds = new Set<string>();
     workspaceTasks.forEach(task => {
       if (task.assignedTo) teamIds.add(task.assignedTo);
       if (task.createdBy) teamIds.add(task.createdBy);
@@ -86,7 +85,6 @@ const WorkspaceDetail = () => {
       return dueDate.toDateString() === today.toDateString() && t.status !== 'done';
     }).length;
 
-    // Recent activity (tasks updated in last 7 days)
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const recentActivity = workspaceTasks.filter(t => {
       const updatedAt = new Date(t.updatedAt || t.createdAt);
@@ -155,7 +153,7 @@ const WorkspaceDetail = () => {
     try {
       await createTask({
         ...taskData,
-        workspace_id: workspaceId, // Auto-assign to current workspace
+        workspace_id: workspaceId,
         assignedTo: taskData.assignedTo || user?.id,
         subtasks: []
       });
@@ -441,7 +439,6 @@ const WorkspaceDetail = () => {
           </Card>
         </div>
 
-        {/* Empty State for No Tasks */}
         {stats.total === 0 && (
           <Card>
             <CardContent className="text-center py-12">
