@@ -29,13 +29,12 @@ export const useTaskStore = () => {
       if (usersRes.error) throw usersRes.error;
       if (workspacesRes.error) throw workspacesRes.error;
 
-      // Assemble the final Task objects with all related data
       const formattedTasks = (tasksRes.data || []).map(task => ({
         ...task,
         assignees: (task.task_assignees || []).map((a: { user_id: string }) => a.user_id),
         tags: (task.task_tags || []).map((t: { tag: string }) => t.tag),
         subtasks: task.subtasks || [],
-        comments: task.comments || [],
+        comments: (task.comments || []).map(c => ({...c, createdAt: c.created_at})),
       }));
 
       setTasks(formattedTasks as unknown as Task[]);
@@ -85,15 +84,39 @@ export const useTaskStore = () => {
       await supabase.from('task_tags').insert(links);
     }
     if (subtasks && subtasks.length > 0) {
-      const links = subtasks.map(subtask => ({ ...subtask, task_id: newTask.id }));
+      const links = subtasks.map(subtask => ({ ...subtask, id: undefined, task_id: newTask.id }));
       await supabase.from('subtasks').insert(links);
     }
   };
-  
+
+  const updateAssignees = async (taskId: string, assigneeIds: string[]) => {
+    await supabase.from('task_assignees').delete().eq('task_id', taskId);
+    if (assigneeIds.length > 0) {
+      const newAssignments = assigneeIds.map(userId => ({ task_id: taskId, user_id: userId }));
+      await supabase.from('task_assignees').insert(newAssignments);
+    }
+  };
+
+  // NEW: Added a dedicated function to update tags
+  const updateTags = async (taskId: string, tags: string[]) => {
+    // 1. Delete all existing tags for the task
+    await supabase.from('task_tags').delete().eq('task_id', taskId);
+    // 2. Insert the new set of tags if any exist
+    if (tags.length > 0) {
+      const newTags = tags.map(tag => ({ task_id: taskId, tag: tag }));
+      await supabase.from('task_tags').insert(newTags);
+    }
+  };
+
   const updateTask = async (taskId: string, updates: Partial<Task>) => {
+    // Updated to handle tags
     const { assignees, tags, subtasks, ...restOfUpdates } = updates;
     await supabase.from('tasks').update(restOfUpdates).eq('id', taskId);
-    // You can add logic here to update assignees, tags, etc. if needed
+    
+    if (assignees) await updateAssignees(taskId, assignees);
+    // Call the new updateTags function if tags are part of the update
+    if (tags) await updateTags(taskId, tags);
+    // Logic for updating subtasks could be added here as well
   };
   
   const deleteTask = async (taskId: string) => {
@@ -105,5 +128,13 @@ export const useTaskStore = () => {
     await supabase.from('comments').insert({ task_id: taskId, content, author: user.id });
   };
   
-  return { tasks, users, workspaces, loading, error, createTask, updateTask, deleteTask, addComment };
+  const toggleSubtask = async (subtaskId: string, completed: boolean) => {
+    await supabase.from('subtasks').update({ completed: completed }).eq('id', subtaskId);
+  };
+  
+  return { 
+    tasks, users, workspaces, loading, error, 
+    createTask, updateTask, deleteTask, addComment, 
+    updateAssignees, updateTags, toggleSubtask // Added updateTags
+  };
 };
