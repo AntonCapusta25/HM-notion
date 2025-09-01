@@ -43,56 +43,62 @@ export const Dashboard = () => {
     priority: [],
     assignee: [],
     tags: [],
-    sortBy: 'createdAt',
+    sortBy: 'created_at',
     sortOrder: 'desc'
   });
 
-  // REMOVED: Excessive debug logging that was causing re-renders
-  // Only log on task count changes
   useEffect(() => {
-    console.log('📊 Dashboard task count changed:', tasks.length);
+    console.log('Dashboard task count changed:', tasks.length);
   }, [tasks.length]);
 
   useEffect(() => {
     const fetchDashboardStats = async () => {
-      if (!userProfile) {
+      if (!userProfile?.id) {
+        console.log('No userProfile.id available for dashboard stats');
         setStatsLoading(false);
         return;
       }
+      
       try {
         setStatsLoading(true);
+        console.log('Calling get_dashboard_stats with user_uuid:', userProfile.id);
+        
         const { data, error } = await supabase
           .rpc('get_dashboard_stats', { user_uuid: userProfile.id });
         
-        if (data && !error) {
-          setDashboardStats(data);
+        console.log('Dashboard stats response:', { data, error });
+        
+        if (error) {
+          console.error('Dashboard stats error:', error);
+          setDashboardStats(null);
         } else {
-          console.error('Error fetching dashboard stats:', error);
+          setDashboardStats(data);
         }
       } catch (err) {
         console.error('Failed to fetch dashboard stats:', err);
+        setDashboardStats(null);
       } finally {
         setStatsLoading(false);
       }
     };
+    
     fetchDashboardStats();
-  }, [userProfile]);
+  }, [userProfile?.id]);
 
-  // Track task changes for real-time updates
   useEffect(() => {
-    console.log('🔄 Dashboard detected task update - count:', tasks.length);
+    console.log('Dashboard detected task update - count:', tasks.length);
     if (tasks.length > 0) {
-      console.log('📋 Current tasks:', tasks.map(t => ({ id: t.id, title: t.title })));
+      console.log('Current tasks:', tasks.map(t => ({ id: t.id, title: t.title })));
     }
   }, [tasks]);
 
-  // FIXED: Memoize filtered tasks properly to prevent unnecessary re-calculations
+  // FIXED: Use correct field names from your database schema
   const filteredTasks = useMemo(() => {
-    let result = [...tasks]; // Create new array to avoid mutations
+    let result = [...tasks];
     
     if (filter === 'my' && userProfile) {
       result = result.filter(t => 
-        (t.assignees && t.assignees.includes(userProfile.id)) || t.createdBy === userProfile.id
+        (t.assignees && t.assignees.includes(userProfile.id)) || t.created_by === userProfile.id
       );
     }
 
@@ -113,14 +119,13 @@ export const Dashboard = () => {
       );
     }
 
-    // FIXED: Safe sorting with proper error handling
     return result.sort((a, b) => {
       let aValue: any, bValue: any;
       
       try {
         switch (taskFilters.sortBy) {
-          case 'dueDate':
-            const parseDate = (dateStr?: string) => {
+          case 'due_date':
+            const parseDate = (dateStr?: string | null) => {
               if (!dateStr) return new Date('9999-12-31').getTime();
               try {
                 const date = new Date(dateStr);
@@ -130,14 +135,14 @@ export const Dashboard = () => {
               }
             };
             
-            aValue = parseDate(a.dueDate);
-            bValue = parseDate(b.dueDate);
+            aValue = parseDate(a.due_date);
+            bValue = parseDate(b.due_date);
             break;
             
           case 'priority':
             const priorityOrder = { high: 3, medium: 2, low: 1 };
-            aValue = priorityOrder[a.priority] || 0;
-            bValue = priorityOrder[b.priority] || 0;
+            aValue = priorityOrder[a.priority as keyof typeof priorityOrder] || 0;
+            bValue = priorityOrder[b.priority as keyof typeof priorityOrder] || 0;
             break;
             
           case 'title':
@@ -145,7 +150,7 @@ export const Dashboard = () => {
             bValue = (b.title || '').toLowerCase();
             break;
             
-          default: // createdAt
+          default: // created_at
             const parseCreatedDate = (dateStr: string) => {
               try {
                 const date = new Date(dateStr);
@@ -155,8 +160,8 @@ export const Dashboard = () => {
               }
             };
             
-            aValue = parseCreatedDate(a.createdAt);
-            bValue = parseCreatedDate(b.createdAt);
+            aValue = parseCreatedDate(a.created_at);
+            bValue = parseCreatedDate(b.created_at);
         }
         
         if (taskFilters.sortOrder === 'desc') {
@@ -256,7 +261,7 @@ export const Dashboard = () => {
     );
   }
 
-  // FIXED: Safe stats calculation with error handling
+  // FIXED: Use correct field names for stats calculation
   const stats = dashboardStats ? {
     total: dashboardStats.total_tasks,
     inProgress: dashboardStats.in_progress_tasks,
@@ -269,9 +274,9 @@ export const Dashboard = () => {
     inProgress: tasks.filter(t => t.status === 'in_progress').length,
     completed: tasks.filter(t => t.status === 'done').length,
     overdue: tasks.filter(t => {
-      if (!t.dueDate || t.status === 'done') return false;
+      if (!t.due_date || t.status === 'done') return false;
       try {
-        const dueDate = new Date(t.dueDate);
+        const dueDate = new Date(t.due_date);
         const today = new Date();
         return !isNaN(dueDate.getTime()) && dueDate < today;
       } catch {
@@ -279,25 +284,25 @@ export const Dashboard = () => {
       }
     }).length,
     dueToday: tasks.filter(t => {
-      if (!t.dueDate || t.status === 'done') return false;
+      if (!t.due_date || t.status === 'done') return false;
       try {
-        const dueDate = new Date(t.dueDate);
+        const dueDate = new Date(t.due_date);
         const today = new Date();
         return !isNaN(dueDate.getTime()) && dueDate.toDateString() === today.toDateString();
       } catch {
         return false;
       }
     }).length,
-    myTasks: userProfile ? tasks.filter(t => (t.assignees && t.assignees.includes(userProfile.id)) || t.createdBy === userProfile.id).length : 0
+    myTasks: userProfile ? tasks.filter(t => (t.assignees && t.assignees.includes(userProfile.id)) || t.created_by === userProfile.id).length : 0
   };
 
   const handleCreateTask = async (taskData: any) => {
     try {
-      console.log('🚀 Creating task from Dashboard...');
+      console.log('Creating task from Dashboard...');
       await createTask(taskData);
-      console.log('✅ Task creation completed from Dashboard');
+      console.log('Task creation completed from Dashboard');
     } catch (err) {
-      console.error('❌ Failed to create task:', err);
+      console.error('Failed to create task:', err);
     }
   };
 
@@ -306,11 +311,11 @@ export const Dashboard = () => {
     if (!confirmed) return;
     
     try {
-      console.log('🗑️ Deleting task from Dashboard:', taskId);
+      console.log('Deleting task from Dashboard:', taskId);
       await deleteTask(taskId);
-      console.log('✅ Task deletion completed from Dashboard');
+      console.log('Task deletion completed from Dashboard');
     } catch (err) {
-      console.error('❌ Failed to delete task:', err);
+      console.error('Failed to delete task:', err);
     }
   };
 
