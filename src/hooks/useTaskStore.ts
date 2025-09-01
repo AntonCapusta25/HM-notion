@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Task, User, Workspace, formatTaskFromSupabase } from '../types';
+// ADD THIS IMPORT:
+import { RealtimeChannel } from '@supabase/supabase-js';
 
 // Your mock data fallback
 import { mockUsers, mockWorkspaces } from '../data/mockData';
@@ -86,6 +88,18 @@ export const useTaskStore = (props: UseTaskStoreProps = {}) => {
     }
   }, [user?.id, userProfile?.id, filtersJSON]); // FIXED: Use stable IDs
 
+  // Separate function to fetch workspaces
+  const fetchWorkspaces = useCallback(async () => {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase.from('workspaces').select('*');
+      if (error) throw error;
+      if (data) setWorkspaces(data);
+    } catch (err) {
+      console.error('Error fetching workspaces:', err);
+    }
+  }, [user?.id]);
+
   // FIXED: Separated initial data fetches with stable dependencies
   useEffect(() => {
     fetchTasks();
@@ -108,20 +122,55 @@ export const useTaskStore = (props: UseTaskStoreProps = {}) => {
     fetchUsersAndWorkspaces();
   }, [user?.id]); // FIXED: Use stable user ID
 
-  // FIXED: Separated real-time subscription with stable dependencies
+  // ENHANCED: Real-time subscriptions for both tasks and workspaces
   useEffect(() => {
-    if (!user) return;
-    const channel = supabase
-      .channel('task-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
-        fetchTasks();
-      })
-      .subscribe();
+    let tasksSubscription: RealtimeChannel;
+    let workspacesSubscription: RealtimeChannel;
 
+    if (user?.id) {
+      console.log('Setting up real-time subscriptions...');
+      
+      // Subscribe to tasks table changes
+      tasksSubscription = supabase
+        .channel('tasks-realtime')
+        .on('postgres_changes', {
+          event: '*', // Listen to INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'tasks'
+        }, (payload) => {
+          console.log('Tasks realtime update:', payload);
+          // Refetch tasks when any change happens
+          fetchTasks();
+        })
+        .subscribe();
+
+      // Subscribe to workspaces table changes
+      workspacesSubscription = supabase
+        .channel('workspaces-realtime')
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public', 
+          table: 'workspaces'
+        }, (payload) => {
+          console.log('Workspaces realtime update:', payload);
+          // Refetch workspaces when any change happens
+          fetchWorkspaces();
+        })
+        .subscribe();
+    }
+
+    // Cleanup subscriptions when component unmounts or user changes
     return () => {
-      supabase.removeChannel(channel);
+      if (tasksSubscription) {
+        console.log('Cleaning up tasks subscription');
+        tasksSubscription.unsubscribe();
+      }
+      if (workspacesSubscription) {
+        console.log('Cleaning up workspaces subscription');
+        workspacesSubscription.unsubscribe();
+      }
     };
-  }, [user?.id, fetchTasks]); // FIXED: Use stable dependencies
+  }, [user?.id, fetchTasks, fetchWorkspaces]);
 
   // FIXED: Updated createTask to use passed userProfile or fallback
   const createTask = useCallback(async (taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'comments' | 'createdBy'>) => {
@@ -138,7 +187,7 @@ export const useTaskStore = (props: UseTaskStoreProps = {}) => {
         priority: taskData.priority,
         status: taskData.status,
         created_by: userId,
-        workspace_id: null
+        workspace_id: taskData.workspace_id || null
       }]).select().single();
       if (error) throw error;
       if (taskData.tags && taskData.tags.length > 0) {
@@ -173,8 +222,11 @@ export const useTaskStore = (props: UseTaskStoreProps = {}) => {
       if (updates.assignedTo !== undefined) supabaseUpdates.assigned_to = updates.assignedTo || null;
       if (updates.priority !== undefined) supabaseUpdates.priority = updates.priority;
       if (updates.status !== undefined) supabaseUpdates.status = updates.status;
+      if (updates.workspace_id !== undefined) supabaseUpdates.workspace_id = updates.workspace_id;
+      
       const { error } = await supabase.from('tasks').update(supabaseUpdates).eq('id', taskId);
       if (error) throw error;
+      
       if (updates.tags) {
         await supabase.from('task_tags').delete().eq('task_id', taskId);
         if (updates.tags.length > 0) {
