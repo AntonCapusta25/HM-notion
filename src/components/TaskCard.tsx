@@ -41,7 +41,8 @@ const isValidDate = (dateInput: string | null | undefined): boolean => {
 };
 
 export const TaskCard = ({ task, onClick, onAssign }: TaskCardProps) => {
-  const assignedUser = mockUsers.find(u => u.id === task.assignedTo);
+  // Use assignees array instead of single assignedTo
+  const assignedUser = mockUsers.find(u => task.assignees?.includes(u.id));
   
   const priorityColors = {
     low: 'bg-green-100 text-green-800 border-green-200',
@@ -49,20 +50,20 @@ export const TaskCard = ({ task, onClick, onAssign }: TaskCardProps) => {
     high: 'bg-red-100 text-red-800 border-red-200'
   };
 
-  // FIXED: Safe date comparisons with validation
+  // FIXED: Use correct field names from your schema
   const isOverdue = (() => {
-    if (!task.dueDate || !isValidDate(task.dueDate) || task.status === 'done') return false;
+    if (!task.due_date || !isValidDate(task.due_date) || task.status === 'done') return false;
     try {
-      return isBefore(new Date(task.dueDate), startOfDay(new Date()));
+      return isBefore(new Date(task.due_date), startOfDay(new Date()));
     } catch {
       return false;
     }
   })();
 
   const isDueToday = (() => {
-    if (!task.dueDate || !isValidDate(task.dueDate)) return false;
+    if (!task.due_date || !isValidDate(task.due_date)) return false;
     try {
-      return format(new Date(task.dueDate), 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+      return format(new Date(task.due_date), 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
     } catch {
       return false;
     }
@@ -89,7 +90,7 @@ export const TaskCard = ({ task, onClick, onAssign }: TaskCardProps) => {
               {task.title}
             </h3>
             <QuickAssignTask
-              currentAssigneeId={task.assignedTo}
+              currentAssigneeId={task.assignees?.length > 0 ? task.assignees[0] : ''}
               users={mockUsers}
               onAssign={handleAssign}
               size="sm"
@@ -109,13 +110,13 @@ export const TaskCard = ({ task, onClick, onAssign }: TaskCardProps) => {
               {task.priority}
             </Badge>
             
-            {/* FIXED: Safe due date display */}
-            {task.dueDate && isValidDate(task.dueDate) && (
+            {/* FIXED: Use correct field name due_date */}
+            {task.due_date && isValidDate(task.due_date) && (
               <div className={`flex items-center gap-1 text-xs ${
                 isOverdue ? 'text-red-600' : isDueToday ? 'text-yellow-600' : 'text-gray-500'
               }`}>
                 <Calendar className="h-3 w-3" />
-                {safeFormatDate(task.dueDate, 'MMM d')}
+                {safeFormatDate(task.due_date, 'MMM d')}
                 {isOverdue && <span className="ml-1 text-red-600 font-medium">Overdue</span>}
                 {isDueToday && <span className="ml-1 text-yellow-600 font-medium">Due today</span>}
               </div>
@@ -156,10 +157,10 @@ export const TaskCard = ({ task, onClick, onAssign }: TaskCardProps) => {
               )}
             </div>
 
-            {/* FIXED: Safe updated date display */}
+            {/* FIXED: Use correct field name updated_at */}
             <div className="flex items-center gap-1 text-xs text-gray-500">
               <Clock className="h-3 w-3" />
-              {safeFormatDate(task.updatedAt, 'MMM d')}
+              {safeFormatDate(task.updated_at, 'MMM d')}
             </div>
           </div>
         </div>
