@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,23 +17,36 @@ interface ListViewProps {
   onCreateTask: (taskData: any) => void;
   onUpdateTask: (taskId: string, updates: Partial<Task>) => void;
   onDeleteTask: (taskId: string) => void;
-  onAssignTask: (taskId: string, userId: string) => void;
 }
+
+// Safe date formatting utility
+const safeFormatDate = (dateInput: string | null | undefined, formatStr: string = 'MMM d'): string => {
+  if (!dateInput) return 'No date';
+  
+  try {
+    const date = new Date(dateInput);
+    if (isNaN(date.getTime())) {
+      return 'Invalid date';
+    }
+    return format(date, formatStr);
+  } catch (error) {
+    return 'Invalid date';
+  }
+};
 
 export const ListView = ({ 
   tasks, 
   users, 
   onCreateTask, 
   onUpdateTask, 
-  onDeleteTask, 
-  onAssignTask 
+  onDeleteTask
 }: ListViewProps) => {
   const [isAddingTask, setIsAddingTask] = useState(false);
   const [newTask, setNewTask] = useState({
     title: '',
     priority: 'medium' as 'low' | 'medium' | 'high',
     status: 'todo' as 'todo' | 'in_progress' | 'done',
-    dueDate: ''
+    due_date: ''
   });
 
   const priorityColors = {
@@ -57,15 +69,16 @@ export const ListView = ({
       description: '',
       priority: newTask.priority,
       status: newTask.status,
-      dueDate: newTask.dueDate || undefined,
-      tags: []
+      due_date: newTask.due_date || null, // Use correct field name
+      tags: [],
+      assignees: []
     });
 
     setNewTask({
       title: '',
       priority: 'medium',
       status: 'todo',
-      dueDate: ''
+      due_date: ''
     });
     setIsAddingTask(false);
   };
@@ -76,6 +89,18 @@ export const ListView = ({
 
   const handlePriorityChange = (taskId: string, priority: string) => {
     onUpdateTask(taskId, { priority: priority as 'low' | 'medium' | 'high' });
+  };
+
+  const handleAssignTask = (taskId: string, userId: string) => {
+    // Update to use assignees array instead of single assignedTo
+    const task = tasks.find(t => t.id === taskId);
+    if (task) {
+      const newAssignees = task.assignees.includes(userId) 
+        ? task.assignees.filter(id => id !== userId) // Remove if already assigned
+        : [...task.assignees, userId]; // Add if not assigned
+      
+      onUpdateTask(taskId, { assignees: newAssignees });
+    }
   };
 
   return (
@@ -100,7 +125,7 @@ export const ListView = ({
               <TableHead className="w-[300px]">Task</TableHead>
               <TableHead className="w-[120px]">Status</TableHead>
               <TableHead className="w-[120px]">Priority</TableHead>
-              <TableHead className="w-[100px]">Assignee</TableHead>
+              <TableHead className="w-[100px]">Assignees</TableHead>
               <TableHead className="w-[120px]">Due Date</TableHead>
               <TableHead className="w-[80px]">Actions</TableHead>
             </TableRow>
@@ -148,16 +173,13 @@ export const ListView = ({
                   </Select>
                 </TableCell>
                 <TableCell>
-                  <QuickAssignTask
-                    users={users}
-                    onAssign={() => {}} // Will be assigned after creation
-                  />
+                  <span className="text-sm text-gray-500">Assign after creation</span>
                 </TableCell>
                 <TableCell>
                   <Input
                     type="date"
-                    value={newTask.dueDate}
-                    onChange={(e) => setNewTask(prev => ({ ...prev, dueDate: e.target.value }))}
+                    value={newTask.due_date}
+                    onChange={(e) => setNewTask(prev => ({ ...prev, due_date: e.target.value }))}
                   />
                 </TableCell>
                 <TableCell>
@@ -174,7 +196,8 @@ export const ListView = ({
             )}
             
             {tasks.map((task) => {
-              const assignedUser = users.find(u => u.id === task.assignedTo);
+              // Use assignees array instead of single assignedTo
+              const assignedUsers = users.filter(u => task.assignees?.includes(u.id));
               
               return (
                 <TableRow key={task.id} className="hover:bg-gray-50">
@@ -228,17 +251,30 @@ export const ListView = ({
                     </Select>
                   </TableCell>
                   <TableCell>
-                    <QuickAssignTask
-                      currentAssigneeId={task.assignedTo}
-                      users={users}
-                      onAssign={(userId) => onAssignTask(task.id, userId)}
-                    />
+                    <div className="flex flex-wrap gap-1">
+                      {assignedUsers.length > 0 ? (
+                        assignedUsers.slice(0, 2).map(user => (
+                          <div key={user.id} className="flex items-center gap-1">
+                            <Avatar className="h-6 w-6">
+                              <AvatarFallback className="text-xs">{user.name.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-sm text-gray-400">Unassigned</span>
+                      )}
+                      {assignedUsers.length > 2 && (
+                        <Badge variant="outline" className="text-xs">
+                          +{assignedUsers.length - 2}
+                        </Badge>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
-                    {task.dueDate ? (
+                    {task.due_date ? (
                       <div className="flex items-center gap-1 text-sm">
                         <Calendar className="h-3 w-3" />
-                        {format(new Date(task.dueDate), 'MMM d')}
+                        {safeFormatDate(task.due_date, 'MMM d')}
                       </div>
                     ) : (
                       <span className="text-gray-400 text-sm">No date</span>
