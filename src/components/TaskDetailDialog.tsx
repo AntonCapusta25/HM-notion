@@ -22,10 +22,12 @@ import {
   User,
   Clock,
   Tag,
-  Trash2
+  Trash2,
+  RefreshCw
 } from 'lucide-react';
 import { Task, User as UserType } from '../types';
 import { format, isToday, isTomorrow, isPast, startOfDay } from 'date-fns';
+import { useTaskContext } from '../contexts/TaskContext';
 
 interface TaskDetailDialogProps {
   task: Task | null;
@@ -67,12 +69,14 @@ export const TaskDetailDialog = ({
   onAddComment, 
   onToggleSubtask 
 }: TaskDetailDialogProps) => {
+  const { refreshTasks } = useTaskContext();
   const [newComment, setNewComment] = useState('');
   const [newSubtask, setNewSubtask] = useState('');
   const [editingTitle, setEditingTitle] = useState(false);
   const [editingDescription, setEditingDescription] = useState(false);
   const [tempTitle, setTempTitle] = useState('');
   const [tempDescription, setTempDescription] = useState('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
 
@@ -85,6 +89,23 @@ export const TaskDetailDialog = ({
     if (!task) return [];
     return users.filter(u => !task.assignees?.includes(u.id));
   }, [users, task]);
+
+  // Manual refresh function for the dialog
+  const handleRefreshDialog = async () => {
+    if (!refreshTasks) return;
+    
+    setIsRefreshing(true);
+    console.log('🔄 TaskDetailDialog - Refreshing task data...');
+    
+    try {
+      await refreshTasks();
+      console.log('✅ TaskDetailDialog - Task data refreshed');
+    } catch (error) {
+      console.error('❌ TaskDetailDialog - Failed to refresh:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   useEffect(() => {
     if (task) {
@@ -235,10 +256,22 @@ export const TaskDetailDialog = ({
                 )}
               </div>
 
-              {/* Task ID */}
-              <Badge variant="outline" className="text-xs font-mono">
-                #{task.id.slice(-6)}
-              </Badge>
+              {/* Task ID and Refresh Button */}
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRefreshDialog}
+                  disabled={isRefreshing}
+                  className="h-8 w-8 p-0"
+                  title="Refresh task data"
+                >
+                  <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                </Button>
+                <Badge variant="outline" className="text-xs font-mono">
+                  #{task.id.slice(-6)}
+                </Badge>
+              </div>
             </div>
           </div>
 
