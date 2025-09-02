@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -197,6 +197,12 @@ export const TaskDetailDialog = ({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden p-0">
+        <DialogHeader className="sr-only">
+          <DialogTitle>{task.title}</DialogTitle>
+          <DialogDescription>
+            Task details and management interface
+          </DialogDescription>
+        </DialogHeader>
         <div className="flex flex-col h-full">
           {/* Header */}
           <div className="px-6 py-4 border-b bg-gray-50">
