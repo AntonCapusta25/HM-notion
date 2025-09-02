@@ -39,7 +39,8 @@ export const Dashboard = () => {
     addComment, 
     toggleSubtask, 
     loading: tasksLoading, 
-    error
+    error,
+    refreshTasks // Add this from the enhanced useTaskStore
   } = useTaskContext();
 
   const [showCreateTask, setShowCreateTask] = useState(false);
@@ -90,17 +91,21 @@ export const Dashboard = () => {
     }
   }, [userProfile?.id]);
 
-  // Manual refresh function
+  // Manual refresh function that forces both tasks and stats refresh
   const handleManualRefresh = useCallback(async () => {
     setIsRefreshing(true);
     console.log('🔄 Manual refresh triggered');
     
     try {
-      // Refresh dashboard stats
-      await refreshDashboardStats();
+      // Force refresh tasks using the exposed refreshTasks method
+      if (refreshTasks) {
+        console.log('🔄 Refreshing tasks via refreshTasks method...');
+        await refreshTasks();
+      }
       
-      // Note: Tasks are automatically refreshed via real-time subscriptions
-      // in your useTaskStore hook, so we don't need to manually fetch them
+      // Refresh dashboard stats
+      console.log('🔄 Refreshing dashboard stats...');
+      await refreshDashboardStats();
       
       console.log('✅ Manual refresh completed');
     } catch (err) {
@@ -108,7 +113,7 @@ export const Dashboard = () => {
     } finally {
       setIsRefreshing(false);
     }
-  }, [refreshDashboardStats]);
+  }, [refreshDashboardStats, refreshTasks]);
 
   // Auto-refresh stats when tasks change (but not on every task change to avoid spam)
   useEffect(() => {
@@ -154,7 +159,7 @@ export const Dashboard = () => {
     fetchInitialStats();
   }, [userProfile?.id]);
 
-  // Enhanced task operations with better error handling
+  // Enhanced task operations with forced refresh
   const handleCreateTask = useCallback(async (taskData: any) => {
     try {
       console.log('📝 Dashboard - Creating task:', taskData.title);
@@ -162,24 +167,35 @@ export const Dashboard = () => {
       setShowCreateTask(false); // Close dialog on success
       console.log('✅ Dashboard - Task creation completed');
       
-      // Stats will auto-refresh via useEffect when tasks change
+      // The enhanced useTaskStore now automatically refreshes after task creation
+      // But we can also refresh stats here
+      setTimeout(() => {
+        refreshDashboardStats();
+      }, 500);
+      
     } catch (err) {
       console.error('❌ Dashboard - Failed to create task:', err);
       // Don't close dialog on error so user can retry
       throw err; // Re-throw to let the dialog handle the error
     }
-  }, [createTask]);
+  }, [createTask, refreshDashboardStats]);
 
   const handleUpdateTask = useCallback(async (taskId: string, updates: any) => {
     try {
       console.log('📝 Dashboard - Updating task:', taskId, updates);
       await updateTask(taskId, updates);
       console.log('✅ Dashboard - Task update completed');
+      
+      // The enhanced useTaskStore now automatically refreshes after task update
+      setTimeout(() => {
+        refreshDashboardStats();
+      }, 300);
+      
     } catch (err) {
       console.error('❌ Dashboard - Failed to update task:', err);
       throw err;
     }
-  }, [updateTask]);
+  }, [updateTask, refreshDashboardStats]);
 
   const handleDeleteTask = useCallback(async (taskId: string) => {
     const confirmed = window.confirm('Are you sure you want to delete this task?');
@@ -189,11 +205,35 @@ export const Dashboard = () => {
       console.log('🗑️ Dashboard - Deleting task:', taskId);
       await deleteTask(taskId);
       console.log('✅ Dashboard - Task deletion completed');
+      
+      // The enhanced useTaskStore now automatically refreshes after task deletion
+      setTimeout(() => {
+        refreshDashboardStats();
+      }, 300);
+      
     } catch (err) {
       console.error('❌ Dashboard - Failed to delete task:', err);
       throw err;
     }
-  }, [deleteTask]);
+  }, [deleteTask, refreshDashboardStats]); this task?');
+    if (!confirmed) return;
+    
+    try {
+      console.log('🗑️ Dashboard - Deleting task:', taskId);
+      await deleteTask(taskId);
+      console.log('✅ Dashboard - Task deletion completed');
+      
+      // Force refresh after deletion
+      console.log('🔄 Forcing dashboard refresh after task deletion...');
+      setTimeout(async () => {
+        await handleManualRefresh();
+      }, 300);
+      
+    } catch (err) {
+      console.error('❌ Dashboard - Failed to delete task:', err);
+      throw err;
+    }
+  }, [deleteTask, handleManualRefresh]);
 
   const handleAddComment = useCallback(async (taskId: string, content: string) => {
     try {
