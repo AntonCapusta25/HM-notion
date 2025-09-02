@@ -198,43 +198,25 @@ export const Dashboard = () => {
   }, [updateTask, refreshDashboardStats]);
 
   const handleDeleteTask = useCallback(async (taskId: string) => {
-    const confirmed = window.confirm('Are you sure you want to delete this task?');
-    if (!confirmed) return;
+  const confirmed = window.confirm('Are you sure you want to delete this task?');
+  if (!confirmed) return;
+  
+  try {
+    console.log('🗑️ Dashboard - Deleting task:', taskId);
+    await deleteTask(taskId);
+    console.log('✅ Dashboard - Task deletion completed');
     
-    try {
-      console.log('🗑️ Dashboard - Deleting task:', taskId);
-      await deleteTask(taskId);
-      console.log('✅ Dashboard - Task deletion completed');
-      
-      // The enhanced useTaskStore now automatically refreshes after task deletion
-      setTimeout(() => {
-        refreshDashboardStats();
-      }, 300);
-      
-    } catch (err) {
-      console.error('❌ Dashboard - Failed to delete task:', err);
-      throw err;
-    }
-  }, [deleteTask, refreshDashboardStats]); this task?');
-    if (!confirmed) return;
+    // The enhanced useTaskStore now automatically refreshes after task deletion
+    setTimeout(() => {
+      refreshDashboardStats();
+    }, 300);
     
-    try {
-      console.log('🗑️ Dashboard - Deleting task:', taskId);
-      await deleteTask(taskId);
-      console.log('✅ Dashboard - Task deletion completed');
-      
-      // Force refresh after deletion
-      console.log('🔄 Forcing dashboard refresh after task deletion...');
-      setTimeout(async () => {
-        await handleManualRefresh();
-      }, 300);
-      
-    } catch (err) {
-      console.error('❌ Dashboard - Failed to delete task:', err);
-      throw err;
-    }
-  }, [deleteTask, handleManualRefresh]);
-
+  } catch (err) {
+    console.error('❌ Dashboard - Failed to delete task:', err);
+    throw err;
+  }
+}, [deleteTask, refreshDashboardStats]);
+  
   const handleAddComment = useCallback(async (taskId: string, content: string) => {
     try {
       console.log('💬 Dashboard - Adding comment to task:', taskId);
