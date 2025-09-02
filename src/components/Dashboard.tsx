@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
-import { Plus, Calendar, BarChart3, Grid3X3, List } from 'lucide-react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { Plus, Calendar, BarChart3, Grid3X3, List, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -30,7 +30,18 @@ interface DashboardStats {
 export const Dashboard = () => {
   const { user } = useAuth();
   const { profile: userProfile, loading: profileLoading, error: profileError } = useProfile();
-  const { tasks, users, createTask, updateTask, deleteTask, addComment, toggleSubtask, loading: tasksLoading, error } = useTaskContext();
+  const { 
+    tasks, 
+    users, 
+    createTask, 
+    updateTask, 
+    deleteTask, 
+    addComment, 
+    toggleSubtask, 
+    loading: tasksLoading, 
+    error,
+    refreshTasks // Add this method to your TaskContext if it doesn't exist
+  } = useTaskContext();
 
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -38,6 +49,7 @@ export const Dashboard = () => {
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [taskFilters, setTaskFilters] = useState<TaskFiltersState>({
     status: [],
     priority: [],
@@ -47,10 +59,60 @@ export const Dashboard = () => {
     sortOrder: 'desc'
   });
 
+  // Add a ref to track the last task count for comparison
+  const [lastTaskCount, setLastTaskCount] = useState(0);
+
+  // Enhanced refresh function
+  const refreshDashboard = useCallback(async (showLoader = false) => {
+    if (!userProfile?.id) return;
+    
+    try {
+      if (showLoader) setIsRefreshing(true);
+      
+      console.log('Refreshing dashboard data...');
+      
+      // Refresh tasks if the method exists in your context
+      if (refreshTasks) {
+        await refreshTasks();
+      }
+      
+      // Refresh dashboard stats
+      const { data, error } = await supabase
+        .rpc('get_dashboard_stats', { user_uuid: userProfile.id });
+      
+      if (error) {
+        console.error('Dashboard stats error:', error);
+        setDashboardStats(null);
+      } else {
+        setDashboardStats(data);
+      }
+      
+      console.log('Dashboard refresh completed');
+      
+    } catch (err) {
+      console.error('Failed to refresh dashboard:', err);
+    } finally {
+      if (showLoader) setIsRefreshing(false);
+    }
+  }, [userProfile?.id, refreshTasks]);
+
+  // Auto-refresh when task count changes
+  useEffect(() => {
+    const currentTaskCount = tasks.length;
+    
+    if (lastTaskCount !== 0 && currentTaskCount !== lastTaskCount) {
+      console.log(`Task count changed from ${lastTaskCount} to ${currentTaskCount} - refreshing dashboard`);
+      refreshDashboard();
+    }
+    
+    setLastTaskCount(currentTaskCount);
+  }, [tasks.length, lastTaskCount, refreshDashboard]);
+
   useEffect(() => {
     console.log('Dashboard task count changed:', tasks.length);
   }, [tasks.length]);
 
+  // Initial dashboard stats fetch
   useEffect(() => {
     const fetchDashboardStats = async () => {
       if (!userProfile?.id) {
@@ -91,6 +153,71 @@ export const Dashboard = () => {
       console.log('Current tasks:', tasks.map(t => ({ id: t.id, title: t.title })));
     }
   }, [tasks]);
+
+  // Enhanced task operations with auto-refresh
+  const handleCreateTask = async (taskData: any) => {
+    try {
+      console.log('Creating task from Dashboard...');
+      await createTask(taskData);
+      console.log('Task creation completed from Dashboard');
+      
+      // Force refresh after creation
+      setTimeout(() => refreshDashboard(), 500);
+    } catch (err) {
+      console.error('Failed to create task:', err);
+    }
+  };
+
+  const handleUpdateTask = async (taskId: string, updates: any) => {
+    try {
+      console.log('Updating task from Dashboard:', taskId);
+      await updateTask(taskId, updates);
+      console.log('Task update completed from Dashboard');
+      
+      // Force refresh after update
+      setTimeout(() => refreshDashboard(), 300);
+    } catch (err) {
+      console.error('Failed to update task:', err);
+    }
+  };
+
+  const handleDeleteTask = async (taskId: string) => {
+    const confirmed = window.confirm('Are you sure you want to delete this task?');
+    if (!confirmed) return;
+    
+    try {
+      console.log('Deleting task from Dashboard:', taskId);
+      await deleteTask(taskId);
+      console.log('Task deletion completed from Dashboard');
+      
+      // Force refresh after deletion
+      setTimeout(() => refreshDashboard(), 300);
+    } catch (err) {
+      console.error('Failed to delete task:', err);
+    }
+  };
+
+  // Enhanced comment handler
+  const handleAddComment = async (taskId: string, content: string) => {
+    try {
+      await addComment(taskId, content);
+      // Refresh after adding comment
+      setTimeout(() => refreshDashboard(), 300);
+    } catch (err) {
+      console.error('Failed to add comment:', err);
+    }
+  };
+
+  // Enhanced subtask handler
+  const handleToggleSubtask = async (taskId: string, subtaskId: string, completed: boolean) => {
+    try {
+      await toggleSubtask(taskId, subtaskId, completed);
+      // Refresh after toggling subtask
+      setTimeout(() => refreshDashboard(), 300);
+    } catch (err) {
+      console.error('Failed to toggle subtask:', err);
+    }
+  };
 
   // FIXED: Use correct field names from your database schema
   const filteredTasks = useMemo(() => {
@@ -296,29 +423,6 @@ export const Dashboard = () => {
     myTasks: userProfile ? tasks.filter(t => (t.assignees && t.assignees.includes(userProfile.id)) || t.created_by === userProfile.id).length : 0
   };
 
-  const handleCreateTask = async (taskData: any) => {
-    try {
-      console.log('Creating task from Dashboard...');
-      await createTask(taskData);
-      console.log('Task creation completed from Dashboard');
-    } catch (err) {
-      console.error('Failed to create task:', err);
-    }
-  };
-
-  const handleDeleteTask = async (taskId: string) => {
-    const confirmed = window.confirm('Are you sure you want to delete this task?');
-    if (!confirmed) return;
-    
-    try {
-      console.log('Deleting task from Dashboard:', taskId);
-      await deleteTask(taskId);
-      console.log('Task deletion completed from Dashboard');
-    } catch (err) {
-      console.error('Failed to delete task:', err);
-    }
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -332,10 +436,22 @@ export const Dashboard = () => {
             {filter === 'all' && ` • Viewing all ${stats.total} team tasks`}
           </p>
         </div>
-        <Button onClick={() => setShowCreateTask(true)} className="bg-homemade-orange hover:bg-homemade-orange-dark">
-          <Plus className="h-4 w-4 mr-2" />
-          New Task
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            onClick={() => refreshDashboard(true)} 
+            variant="outline" 
+            size="sm"
+            disabled={isRefreshing}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? 'Refreshing...' : 'Refresh'}
+          </Button>
+          <Button onClick={() => setShowCreateTask(true)} className="bg-homemade-orange hover:bg-homemade-orange-dark">
+            <Plus className="h-4 w-4 mr-2" />
+            New Task
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -528,7 +644,7 @@ export const Dashboard = () => {
           tasks={filteredTasks}
           users={users}
           onCreateTask={handleCreateTask}
-          onUpdateTask={updateTask}
+          onUpdateTask={handleUpdateTask}
           onDeleteTask={handleDeleteTask}
         />
       )}
@@ -544,9 +660,9 @@ export const Dashboard = () => {
         users={users}
         open={!!selectedTask}
         onOpenChange={(open) => !open && setSelectedTask(null)}
-        onUpdateTask={updateTask}
-        onAddComment={addComment}
-        onToggleSubtask={toggleSubtask}
+        onUpdateTask={handleUpdateTask}
+        onAddComment={handleAddComment}
+        onToggleSubtask={handleToggleSubtask}
       />
     </div>
   );
