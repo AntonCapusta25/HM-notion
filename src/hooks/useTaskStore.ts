@@ -53,32 +53,9 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
 
       console.log('✅ Raw data from Supabase:', data?.length || 0, 'records');
 
+      // FIXED: Pass raw Supabase data directly to formatTaskFromSupabase
       const formattedTasks = (data || []).map(supabaseTask => {
-        // Convert to proper format
-        const task = {
-          id: supabaseTask.id,
-          title: supabaseTask.title || '',
-          description: supabaseTask.description || '',
-          priority: supabaseTask.priority,
-          status: supabaseTask.status,
-          createdBy: supabaseTask.created_by,
-          workspaceId: supabaseTask.workspace_id,
-          created_at: supabaseTask.created_at,
-          updated_at: supabaseTask.updated_at,
-          due_date: supabaseTask.due_date,
-          assigned_to: supabaseTask.assigned_to,
-          assignees: (supabaseTask.task_assignees || []).map((a: { user_id: string }) => a.user_id),
-          tags: (supabaseTask.task_tags || []).map((t: { tag: string }) => t.tag),
-          subtasks: supabaseTask.subtasks || [],
-          comments: (supabaseTask.comments || []).map((c: any) => ({
-            ...c,
-            createdAt: c.created_at || new Date().toISOString()
-          })),
-          task_tags: supabaseTask.task_tags,
-          task_assignees: supabaseTask.task_assignees
-        };
-
-        return formatTaskFromSupabase(task);
+        return formatTaskFromSupabase(supabaseTask);
       });
 
       console.log('📝 Formatted tasks:', formattedTasks.length, 'tasks');
@@ -137,33 +114,87 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
     }
   }, [user, fetchUsers, fetchWorkspaces]);
 
-  // FIXED: Real-time subscriptions with proper cleanup
+  // ENHANCED: Real-time subscriptions with better logging and error handling
   useEffect(() => {
     let tasksSubscription: RealtimeChannel;
     let workspacesSubscription: RealtimeChannel;
 
     if (user?.id) {
-      console.log('🔴 Setting up real-time subscriptions...');
+      console.log('🔴 Setting up real-time subscriptions for user:', user.id);
       
       // Subscribe to tasks table changes
       tasksSubscription = supabase
-        .channel('tasks-realtime')
+        .channel('tasks-realtime-' + user.id)
         .on('postgres_changes', {
           event: '*',
           schema: 'public',
           table: 'tasks'
         }, (payload) => {
-          console.log('🔥 REALTIME: Tasks update received!', payload);
-          console.log('🔄 Triggering fetchTasks...');
-          if (fetchTasksRef.current) {
-            fetchTasksRef.current();
-          }
+          console.log('🔥 REALTIME: Tasks update received!', {
+            eventType: payload.eventType,
+            table: payload.table,
+            new: payload.new,
+            old: payload.old
+          });
+          console.log('🔄 Triggering fetchTasks from real-time...');
+          
+          // Use a small delay to ensure database consistency
+          setTimeout(() => {
+            if (fetchTasksRef.current) {
+              fetchTasksRef.current();
+            }
+          }, 100);
         })
-        .subscribe();
+        .subscribe((status) => {
+          console.log('📡 Tasks subscription status:', status);
+        });
+
+      // Subscribe to related tables that affect tasks
+      const relatedTablesChannel = supabase
+        .channel('task-related-' + user.id)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'task_assignees'
+        }, (payload) => {
+          console.log('🔥 REALTIME: Task assignees update!', payload);
+          setTimeout(() => {
+            if (fetchTasksRef.current) {
+              fetchTasksRef.current();
+            }
+          }, 100);
+        })
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'task_tags'
+        }, (payload) => {
+          console.log('🔥 REALTIME: Task tags update!', payload);
+          setTimeout(() => {
+            if (fetchTasksRef.current) {
+              fetchTasksRef.current();
+            }
+          }, 100);
+        })
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'comments'
+        }, (payload) => {
+          console.log('🔥 REALTIME: Comments update!', payload);
+          setTimeout(() => {
+            if (fetchTasksRef.current) {
+              fetchTasksRef.current();
+            }
+          }, 100);
+        })
+        .subscribe((status) => {
+          console.log('📡 Related tables subscription status:', status);
+        });
 
       // Subscribe to workspaces table changes  
       workspacesSubscription = supabase
-        .channel('workspaces-realtime')
+        .channel('workspaces-realtime-' + user.id)
         .on('postgres_changes', {
           event: '*',
           schema: 'public',
@@ -172,7 +203,9 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
           console.log('🔥 REALTIME: Workspaces update received!', payload);
           fetchWorkspaces();
         })
-        .subscribe();
+        .subscribe((status) => {
+          console.log('📡 Workspaces subscription status:', status);
+        });
     }
 
     return () => {
@@ -206,7 +239,7 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
       .insert({ 
         ...restOfTaskData, 
         created_by: userId,
-        workspace_id: taskData.workspaceId
+        workspace_id: taskData.workspaceId || null
       })
       .select()
       .single();
@@ -220,18 +253,21 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
 
     // Handle many-to-many relationships
     if (assignees && assignees.length > 0) {
+      console.log('Adding assignees:', assignees);
       const links = assignees.map(userId => ({ task_id: newTask.id, user_id: userId }));
       const { error: assigneesError } = await supabase.from('task_assignees').insert(links);
       if (assigneesError) console.error('❌ Assignees error:', assigneesError);
     }
 
     if (tags && tags.length > 0) {
+      console.log('Adding tags:', tags);
       const links = tags.map(tag => ({ task_id: newTask.id, tag: tag }));
       const { error: tagsError } = await supabase.from('task_tags').insert(links);
       if (tagsError) console.error('❌ Tags error:', tagsError);
     }
 
     if (subtasks && subtasks.length > 0) {
+      console.log('Adding subtasks:', subtasks);
       const links = subtasks.map(subtask => ({ ...subtask, id: undefined, task_id: newTask.id }));
       const { error: subtasksError } = await supabase.from('subtasks').insert(links);
       if (subtasksError) console.error('❌ Subtasks error:', subtasksError);
@@ -241,6 +277,7 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
   }, [user?.id, userProfile?.id]);
 
   const updateAssignees = async (taskId: string, assigneeIds: string[]) => {
+    console.log('Updating assignees for task:', taskId, 'assignees:', assigneeIds);
     await supabase.from('task_assignees').delete().eq('task_id', taskId);
     if (assigneeIds.length > 0) {
       const newAssignments = assigneeIds.map(userId => ({ task_id: taskId, user_id: userId }));
@@ -249,6 +286,7 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
   };
 
   const updateTags = async (taskId: string, tags: string[]) => {
+    console.log('Updating tags for task:', taskId, 'tags:', tags);
     await supabase.from('task_tags').delete().eq('task_id', taskId);
     if (tags.length > 0) {
       const newTags = tags.map(tag => ({ task_id: taskId, tag: tag }));
@@ -257,20 +295,31 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
   };
 
   const updateTask = useCallback(async (taskId: string, updates: Partial<Task>) => {
+    console.log('Updating task:', taskId, 'updates:', updates);
     const { assignees, tags, subtasks, ...restOfUpdates } = updates;
-    await supabase.from('tasks').update(restOfUpdates).eq('id', taskId);
     
-    if (assignees) await updateAssignees(taskId, assignees);
-    if (tags) await updateTags(taskId, tags);
+    // Update main task fields
+    const { error } = await supabase.from('tasks').update(restOfUpdates).eq('id', taskId);
+    if (error) {
+      console.error('Task update error:', error);
+      throw error;
+    }
+    
+    // Update related data
+    if (assignees !== undefined) await updateAssignees(taskId, assignees);
+    if (tags !== undefined) await updateTags(taskId, tags);
   }, []);
   
   const deleteTask = useCallback(async (taskId: string) => {
-    await supabase.from('tasks').delete().eq('id', taskId);
+    console.log('Deleting task:', taskId);
+    const { error } = await supabase.from('tasks').delete().eq('id', taskId);
+    if (error) throw error;
   }, []);
 
   const addComment = useCallback(async (taskId: string, content: string) => {
     if (!user) throw new Error("User not authenticated");
     
+    console.log('Adding comment to task:', taskId);
     const { error } = await supabase.from('comments').insert({ 
       task_id: taskId, 
       content, 
@@ -282,6 +331,7 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
   }, [user?.id]);
   
   const toggleSubtask = useCallback(async (taskId: string, subtaskId: string) => {
+    console.log('Toggling subtask:', subtaskId);
     // First get current subtask state
     const { data: subtask } = await supabase
       .from('subtasks')
