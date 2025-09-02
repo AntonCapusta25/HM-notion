@@ -1,650 +1,345 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Calendar } from '@/components/ui/calendar';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { 
-  Calendar as CalendarIcon, 
-  UserPlus, 
-  X, 
-  MessageCircle, 
-  CheckSquare, 
-  Square, 
-  Plus,
-  Flag,
-  Edit3,
-  Send,
-  User,
-  Clock,
-  Tag,
-  Trash2
-} from 'lucide-react';
-import { Task, User as UserType } from '../types';
-import { format, isToday, isTomorrow, isPast, startOfDay } from 'date-fns';
+import { CalendarIcon, Plus, X, UserPlus, Users, Building2 } from 'lucide-react';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useTaskContext } from '../contexts/TaskContext';
+import { useAuth } from '../contexts/AuthContext';
+import { useProfile } from '../hooks/useProfile';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
-interface TaskDetailDialogProps {
-  task: Task | null;
-  users: UserType[];
+interface CreateTaskDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onUpdateTask: (taskId: string, updates: Partial<Task>) => void;
-  onAddComment: (taskId: string, content: string) => void;
-  onToggleSubtask: (taskId: string, subtaskId: string) => void;
+  onCreateTask?: (taskData: any) => void;
 }
 
-const safeFormatDate = (dateInput: string | null | undefined, formatStr: string = 'MMM d, yyyy'): string => {
-  if (!dateInput) return 'No date';
-  try {
-    const date = new Date(dateInput);
-    if (isNaN(date.getTime())) return 'Invalid date';
-    return format(date, formatStr);
-  } catch (error) {
-    return 'Invalid date';
-  }
-};
-
-const isValidDate = (dateInput: string | null | undefined): boolean => {
-  if (!dateInput) return false;
-  try {
-    const date = new Date(dateInput);
-    return !isNaN(date.getTime());
-  } catch {
-    return false;
-  }
-};
-
-export const TaskDetailDialog = ({ 
-  task, 
-  users, 
-  open, 
-  onOpenChange, 
-  onUpdateTask, 
-  onAddComment, 
-  onToggleSubtask 
-}: TaskDetailDialogProps) => {
-  const [newComment, setNewComment] = useState('');
-  const [newSubtask, setNewSubtask] = useState('');
-  const [editingTitle, setEditingTitle] = useState(false);
-  const [editingDescription, setEditingDescription] = useState(false);
-  const [tempTitle, setTempTitle] = useState('');
-  const [tempDescription, setTempDescription] = useState('');
-  const titleInputRef = useRef<HTMLInputElement>(null);
-  const descriptionRef = useRef<HTMLTextAreaElement>(null);
-
-  const assignedUsers = useMemo(() => {
-    if (!task) return [];
-    return users.filter(u => task.assignees?.includes(u.id));
-  }, [users, task]);
+export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTaskDialogProps) => {
+  const { users, workspaces, createTask } = useTaskContext();
+  const { user } = useAuth();
+  const { profile: userProfile } = useProfile();
   
-  const unassignedUsers = useMemo(() => {
-    if (!task) return [];
-    return users.filter(u => !task.assignees?.includes(u.id));
-  }, [users, task]);
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [assignees, setAssignees] = useState<string[]>([]);
+  const [priority, setPriority] = useState('');
+  const [dueDate, setDueDate] = useState<Date>();
+  const [selectedWorkspace, setSelectedWorkspace] = useState<string>('none');
+  const [tags, setTags] = useState<string[]>([]);
+  const [newTag, setNewTag] = useState('');
+  
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (task) {
-      setTempTitle(task.title);
-      setTempDescription(task.description || '');
-    }
-  }, [task]);
-
-  if (!task) return null;
-
-  const createdByUser = users.find(u => u.id === task.created_by);
-
-  const priorityConfig = {
-    low: { color: 'bg-green-100 text-green-700 border-green-300', icon: '🟢', label: 'Low' },
-    medium: { color: 'bg-yellow-100 text-yellow-700 border-yellow-300', icon: '🟡', label: 'Medium' },
-    high: { color: 'bg-red-100 text-red-700 border-red-300', icon: '🔴', label: 'High' }
-  };
-
-  const statusConfig = {
-    todo: { color: 'bg-gray-100 text-gray-700 border-gray-300', label: 'To Do' },
-    in_progress: { color: 'bg-blue-100 text-blue-700 border-blue-300', label: 'In Progress' },
-    done: { color: 'bg-green-100 text-green-700 border-green-300', label: 'Done' }
-  };
-
-  const getDueDateDisplay = () => {
-    if (!task.due_date || !isValidDate(task.due_date)) return null;
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     
-    const dueDate = new Date(task.due_date);
-    if (task.status === 'done') return { text: safeFormatDate(task.due_date, 'MMM d'), color: 'text-green-600', bg: 'bg-green-50' };
-    if (isPast(dueDate) && !isToday(dueDate)) return { text: `${safeFormatDate(task.due_date, 'MMM d')} (Overdue)`, color: 'text-red-600', bg: 'bg-red-50' };
-    if (isToday(dueDate)) return { text: `${safeFormatDate(task.due_date, 'MMM d')} (Today)`, color: 'text-orange-600', bg: 'bg-orange-50' };
-    if (isTomorrow(dueDate)) return { text: `${safeFormatDate(task.due_date, 'MMM d')} (Tomorrow)`, color: 'text-yellow-600', bg: 'bg-yellow-50' };
-    return { text: safeFormatDate(task.due_date, 'MMM d'), color: 'text-gray-600', bg: 'bg-gray-50' };
-  };
-
-  const dueDateDisplay = getDueDateDisplay();
-
-  const handleTitleEdit = () => {
-    setEditingTitle(true);
-    setTimeout(() => titleInputRef.current?.focus(), 0);
-  };
-
-  const saveTitleEdit = async () => {
-    if (tempTitle.trim() && tempTitle !== task.title) {
-      await onUpdateTask(task.id, { title: tempTitle.trim() });
+    if (!user) {
+      setError('You must be logged in to create tasks');
+      return;
     }
-    setEditingTitle(false);
-  };
 
-  const handleDescriptionEdit = () => {
-    setEditingDescription(true);
-    setTimeout(() => descriptionRef.current?.focus(), 0);
-  };
-
-  const saveDescriptionEdit = async () => {
-    if (tempDescription !== task.description) {
-      await onUpdateTask(task.id, { description: tempDescription });
+    if (!title.trim()) {
+      setError('Task title is required');
+      return;
     }
-    setEditingDescription(false);
-  };
 
-  const handleAddComment = () => {
-    if (newComment.trim()) {
-      onAddComment(task.id, newComment.trim());
-      setNewComment('');
-    }
-  };
+    setIsSubmitting(true);
+    setError(null);
 
-  const handleAddSubtask = () => {
-    if (newSubtask.trim()) {
-      const newSubtaskObj = {
-        id: Math.random().toString(36).substr(2, 9),
-        title: newSubtask.trim(),
-        completed: false
+    try {
+      const taskData = {
+        title: title.trim(),
+        description: description.trim(),
+        assignees,
+        priority: priority as 'low' | 'medium' | 'high',
+        due_date: dueDate?.toISOString().split('T')[0],
+        workspace_id: selectedWorkspace === 'none' ? null : selectedWorkspace, // Handle 'none' value properly
+        tags,
+        status: 'todo' as const,
+        subtasks: [],
+        created_by: userProfile?.id || user.id
       };
-      onUpdateTask(task.id, {
-        subtasks: [...(task.subtasks || []), newSubtaskObj]
-      });
-      setNewSubtask('');
+      
+      console.log('Creating task with workspace:', selectedWorkspace);
+      
+      if (onCreateTask) {
+        await onCreateTask(taskData);
+      } else {
+        await createTask(taskData);
+      }
+      
+      onOpenChange(false);
+      resetForm();
+      
+    } catch (err) {
+      console.error('Error creating task:', err);
+      setError('Failed to create task. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleAddAssignee = (userId: string) => {
-    const newAssignees = [...(task.assignees || []), userId];
-    onUpdateTask(task.id, { assignees: newAssignees });
+  const resetForm = () => {
+    setTitle('');
+    setDescription('');
+    setAssignees([]);
+    setPriority('');
+    setDueDate(undefined);
+    setSelectedWorkspace('none');
+    setTags([]);
+    setNewTag('');
+    setError(null);
   };
   
-  const handleRemoveAssignee = (userId: string) => {
-    const newAssignees = (task.assignees || []).filter(id => id !== userId);
-    onUpdateTask(task.id, { assignees: newAssignees });
+  const addAssignee = (userId: string) => {
+    if (!assignees.includes(userId)) {
+      setAssignees([...assignees, userId]);
+    }
+  };
+  
+  const removeAssignee = (userId: string) => {
+    setAssignees(assignees.filter(id => id !== userId));
   };
 
-  const updateDueDate = async (date: Date | undefined) => {
-    const dueDateString = date ? date.toISOString().split('T')[0] : null;
-    await onUpdateTask(task.id, { due_date: dueDateString });
+  const addTag = () => {
+    if (newTag.trim() && !tags.includes(newTag.trim())) {
+      setTags([...tags, newTag.trim()]);
+      setNewTag('');
+    }
   };
 
-  const updatePriority = async (priority: string) => {
-    await onUpdateTask(task.id, { priority: priority as 'low' | 'medium' | 'high' });
+  const removeTag = (tagToRemove: string) => {
+    setTags(tags.filter(tag => tag !== tagToRemove));
   };
 
-  const updateStatus = async (status: string) => {
-    await onUpdateTask(task.id, { status: status as 'todo' | 'in_progress' | 'done' });
-  };
-
-  const subtasks = task.subtasks || [];
-  const comments = task.comments || [];
-  const completedSubtasks = subtasks.filter(st => st.completed).length;
+  const assignedUsers = useMemo(() => users.filter(u => assignees.includes(u.id)), [users, assignees]);
+  const unassignedUsers = useMemo(() => users.filter(u => !assignees.includes(u.id)), [users, assignees]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden p-0">
-        <div className="flex flex-col h-full">
-          {/* Header */}
-          <div className="px-6 py-4 border-b bg-gray-50">
-            <div className="flex items-center gap-3">
-              {/* Status Indicator */}
-              <div className={`w-3 h-3 rounded-full ${
-                task.status === 'todo' ? 'bg-gray-400' :
-                task.status === 'in_progress' ? 'bg-blue-500' : 'bg-green-500'
-              }`} />
-              
-              {/* Editable Title */}
-              <div className="flex-1">
-                {editingTitle ? (
-                  <input
-                    ref={titleInputRef}
-                    value={tempTitle}
-                    onChange={(e) => setTempTitle(e.target.value)}
-                    onBlur={saveTitleEdit}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') saveTitleEdit();
-                      if (e.key === 'Escape') setEditingTitle(false);
-                    }}
-                    className="text-xl font-semibold bg-transparent border-0 outline-none focus:ring-2 focus:ring-blue-500 rounded w-full"
+      <DialogContent className="sm:max-w-[600px]">
+        <DialogHeader>
+          <DialogTitle>Create New Task</DialogTitle>
+          <DialogDescription>
+            Create a new task with assignees, due dates, and other details.
+          </DialogDescription>
+        </DialogHeader>
+        
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="title">Task Title</Label>
+            <Input
+              id="title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Enter task title..."
+              required
+              disabled={isSubmitting}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="description">Description</Label>
+            <Textarea
+              id="description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Describe the task..."
+              rows={3}
+              disabled={isSubmitting}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Workspace</Label>
+            <Select value={selectedWorkspace} onValueChange={setSelectedWorkspace} disabled={isSubmitting}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select workspace (optional)">
+                  {selectedWorkspace && selectedWorkspace !== 'none' && workspaces.find(w => w.id === selectedWorkspace) && (
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4" />
+                      {workspaces.find(w => w.id === selectedWorkspace)?.name}
+                    </div>
+                  )}
+                  {selectedWorkspace === 'none' && (
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4 text-gray-400" />
+                      No workspace (Personal)
+                    </div>
+                  )}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="h-4 w-4 text-gray-400" />
+                    No workspace (Personal)
+                  </div>
+                </SelectItem>
+                {workspaces.map(workspace => (
+                  <SelectItem key={workspace.id} value={workspace.id}>
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4" />
+                      {workspace.name}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div className="space-y-2">
+            <Label>Assignees</Label>
+            <div className="flex flex-wrap items-center gap-2 p-2 border rounded-md min-h-[40px]">
+              {assignedUsers.map(user => (
+                <Badge key={user.id} variant="secondary" className="gap-1.5 pl-1.5">
+                  <Avatar className="h-5 w-5">
+                     <AvatarFallback className="text-xs bg-gray-200">{user.name.charAt(0)}</AvatarFallback>
+                  </Avatar>
+                  {user.name}
+                  <X 
+                    className="h-3 w-3 cursor-pointer" 
+                    onClick={() => removeAssignee(user.id)}
                   />
-                ) : (
-                  <h2 
-                    className="text-xl font-semibold hover:text-blue-600 cursor-pointer transition-colors"
-                    onClick={handleTitleEdit}
-                    title="Click to edit title"
-                  >
-                    {task.title}
-                  </h2>
-                )}
-              </div>
-
-              {/* Task ID */}
-              <Badge variant="outline" className="text-xs font-mono">
-                #{task.id.slice(-6)}
-              </Badge>
-            </div>
-          </div>
-
-          {/* Content */}
-          <div className="flex-1 overflow-y-auto">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-0">
-              {/* Main Content */}
-              <div className="lg:col-span-2 p-6 space-y-6">
-                {/* Description */}
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-medium text-gray-900">Description</h3>
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={handleDescriptionEdit}
-                      className="h-6 w-6 p-0"
-                    >
-                      <Edit3 className="h-3 w-3" />
-                    </Button>
-                  </div>
-                  
-                  {editingDescription ? (
-                    <div className="space-y-2">
-                      <Textarea
-                        ref={descriptionRef}
-                        value={tempDescription}
-                        onChange={(e) => setTempDescription(e.target.value)}
-                        placeholder="Add a description..."
-                        rows={4}
-                        className="resize-none"
-                      />
-                      <div className="flex gap-2">
-                        <Button size="sm" onClick={saveDescriptionEdit} className="bg-blue-600 hover:bg-blue-700">
-                          Save
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => setEditingDescription(false)}>
-                          Cancel
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div 
-                      className="min-h-[80px] p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
-                      onClick={handleDescriptionEdit}
-                    >
-                      {task.description ? (
-                        <p className="text-gray-700 whitespace-pre-wrap">{task.description}</p>
-                      ) : (
-                        <p className="text-gray-400 italic">Click to add description...</p>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Subtasks */}
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-medium text-gray-900">
-                      Subtasks ({completedSubtasks}/{subtasks.length})
-                    </h3>
-                    {subtasks.length > 0 && (
-                      <div className="text-xs text-gray-500">
-                        {Math.round((completedSubtasks / subtasks.length) * 100)}% complete
-                      </div>
-                    )}
-                  </div>
-                  
-                  {/* Progress Bar */}
-                  {subtasks.length > 0 && (
-                    <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
+                </Badge>
+              ))}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0" disabled={unassignedUsers.length === 0}>
+                    <UserPlus className="h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-0">
+                  <div className="p-1">
+                    {unassignedUsers.map(user => (
                       <div 
-                        className="bg-green-500 h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${(completedSubtasks / subtasks.length) * 100}%` }}
-                      />
-                    </div>
-                  )}
-
-                  <div className="space-y-2">
-                    {subtasks.map(subtask => (
-                      <div key={subtask.id} className="group flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg">
-                        <button
-                          onClick={() => onToggleSubtask(task.id, subtask.id)}
-                          className="flex-shrink-0 hover:scale-110 transition-transform"
-                        >
-                          {subtask.completed ? (
-                            <CheckSquare className="h-5 w-5 text-green-500" />
-                          ) : (
-                            <Square className="h-5 w-5 text-gray-400 hover:text-gray-600" />
-                          )}
-                        </button>
-                        <span className={`flex-1 ${subtask.completed ? 'line-through text-gray-500' : 'text-gray-700'}`}>
-                          {subtask.title}
-                        </span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={() => {
-                            const newSubtasks = subtasks.filter(st => st.id !== subtask.id);
-                            onUpdateTask(task.id, { subtasks: newSubtasks });
-                          }}
-                        >
-                          <Trash2 className="h-3 w-3 text-red-500" />
-                        </Button>
+                        key={user.id}
+                        className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-md cursor-pointer"
+                        onClick={() => addAssignee(user.id)}
+                      >
+                        <Avatar className="h-6 w-6">
+                          <AvatarFallback className="text-xs">{user.name.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <span className="text-sm">{user.name}</span>
                       </div>
                     ))}
-                    
-                    {/* Add Subtask */}
-                    <div className="flex gap-2 mt-3">
-                      <Input
-                        placeholder="Add a subtask..."
-                        value={newSubtask}
-                        onChange={(e) => setNewSubtask(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleAddSubtask()}
-                        className="flex-1"
-                      />
-                      <Button size="sm" onClick={handleAddSubtask} disabled={!newSubtask.trim()}>
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
                   </div>
-                </div>
-
-                {/* Comments */}
-                <div>
-                  <h3 className="font-medium text-gray-900 mb-3">
-                    Comments ({comments.length})
-                  </h3>
-                  
-                  <div className="space-y-4">
-                    {comments.map(comment => {
-                      const author = users.find(u => u.id === comment.author);
-                      return (
-                        <div key={comment.id} className="flex gap-3 p-3 bg-gray-50 rounded-lg">
-                          <Avatar className="h-8 w-8 flex-shrink-0">
-                            <AvatarFallback className="bg-blue-500 text-white text-xs">
-                              {author ? author.name.charAt(0).toUpperCase() : '?'}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="font-medium text-sm text-gray-900">
-                                {author?.name || 'Unknown User'}
-                              </span>
-                              <span className="text-xs text-gray-500">
-                                {isValidDate(comment.created_at) 
-                                  ? safeFormatDate(comment.created_at, 'MMM d, h:mm a')
-                                  : 'No date'
-                                }
-                              </span>
-                            </div>
-                            <p className="text-sm text-gray-700 whitespace-pre-wrap">{comment.content}</p>
-                          </div>
-                        </div>
-                      );
-                    })}
-                    
-                    {/* Add Comment */}
-                    <div className="flex gap-2">
-                      <Avatar className="h-8 w-8 flex-shrink-0">
-                        <AvatarFallback className="bg-gray-400 text-white text-xs">
-                          You
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 space-y-2">
-                        <Textarea
-                          placeholder="Add a comment..."
-                          value={newComment}
-                          onChange={(e) => setNewComment(e.target.value)}
-                          rows={2}
-                          className="resize-none"
-                        />
-                        <Button 
-                          size="sm" 
-                          onClick={handleAddComment} 
-                          disabled={!newComment.trim()}
-                          className="bg-blue-600 hover:bg-blue-700"
-                        >
-                          <Send className="h-4 w-4 mr-2" />
-                          Comment
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Properties Sidebar */}
-              <div className="lg:col-span-1 bg-gray-50 p-6 space-y-6 border-l">
-                {/* Status */}
-                <div>
-                  <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 block">
-                    Status
-                  </Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className="w-full justify-start">
-                        <div className={`w-3 h-3 rounded-full mr-2 ${statusConfig[task.status].color.split(' ')[0]}`} />
-                        {statusConfig[task.status].label}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-48 p-1" align="start">
-                      {Object.entries(statusConfig).map(([status, config]) => (
-                        <Button
-                          key={status}
-                          variant="ghost"
-                          size="sm"
-                          className="w-full justify-start"
-                          onClick={() => updateStatus(status)}
-                        >
-                          <div className={`w-3 h-3 rounded-full mr-2 ${config.color.split(' ')[0]}`} />
-                          {config.label}
-                        </Button>
-                      ))}
-                    </PopoverContent>
-                  </Popover>
-                </div>
-
-                {/* Priority */}
-                <div>
-                  <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 block">
-                    Priority
-                  </Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className="w-full justify-start">
-                        <Flag className={`h-4 w-4 mr-2 ${
-                          task.priority === 'high' ? 'text-red-500' :
-                          task.priority === 'medium' ? 'text-yellow-500' : 'text-green-500'
-                        }`} />
-                        {priorityConfig[task.priority].label}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-40 p-1" align="start">
-                      {Object.entries(priorityConfig).map(([priority, config]) => (
-                        <Button
-                          key={priority}
-                          variant="ghost"
-                          size="sm"
-                          className="w-full justify-start"
-                          onClick={() => updatePriority(priority)}
-                        >
-                          <Flag className="h-4 w-4 mr-2" />
-                          {config.label}
-                        </Button>
-                      ))}
-                    </PopoverContent>
-                  </Popover>
-                </div>
-
-                {/* Due Date */}
-                <div>
-                  <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 block">
-                    Due Date
-                  </Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className="w-full justify-start">
-                        <CalendarIcon className="h-4 w-4 mr-2" />
-                        {dueDateDisplay ? (
-                          <span className={dueDateDisplay.color}>{dueDateDisplay.text}</span>
-                        ) : (
-                          <span className="text-gray-400">Set due date</span>
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <div className="p-3">
-                        <Calendar
-                          mode="single"
-                          selected={task.due_date ? new Date(task.due_date) : undefined}
-                          onSelect={updateDueDate}
-                          initialFocus
-                        />
-                        {task.due_date && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full mt-2"
-                            onClick={() => updateDueDate(undefined)}
-                          >
-                            Remove due date
-                          </Button>
-                        )}
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-
-                {/* Assignees */}
-                <div>
-                  <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 block">
-                    Assignees
-                  </Label>
-                  <div className="space-y-2">
-                    {assignedUsers.map(user => (
-                      <div key={user.id} className="flex items-center justify-between group bg-white rounded-lg p-2">
-                        <div className="flex items-center gap-2">
-                          <Avatar className="h-6 w-6">
-                            <AvatarFallback className="text-xs bg-blue-500 text-white">
-                              {user.name.charAt(0).toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="text-sm font-medium">{user.name}</span>
-                        </div>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={() => handleRemoveAssignee(user.id)}
-                        >
-                          <X className="h-3 w-3 text-red-500" />
-                        </Button>
-                      </div>
-                    ))}
-                    
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="w-full justify-start text-gray-500 border-dashed"
-                        >
-                          <UserPlus className="h-4 w-4 mr-2" />
-                          Add assignee
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-56 p-1" align="start">
-                        {unassignedUsers.map(user => (
-                          <div 
-                            key={user.id}
-                            className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-md cursor-pointer"
-                            onClick={() => handleAddAssignee(user.id)}
-                          >
-                            <Avatar className="h-6 w-6">
-                              <AvatarFallback className="text-xs bg-blue-500 text-white">
-                                {user.name.charAt(0).toUpperCase()}
-                              </AvatarFallback>
-                            </Avatar>
-                            <span className="text-sm">{user.name}</span>
-                          </div>
-                        ))}
-                        {unassignedUsers.length === 0 && (
-                          <p className="p-4 text-center text-sm text-gray-500">All users assigned</p>
-                        )}
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                </div>
-
-                {/* Tags */}
-                {task.tags && task.tags.length > 0 && (
-                  <div>
-                    <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 block">
-                      Tags
-                    </Label>
-                    <div className="flex flex-wrap gap-2">
-                      {task.tags.map((tag, index) => (
-                        <Badge key={index} variant="secondary" className="bg-purple-100 text-purple-700">
-                          <Tag className="h-3 w-3 mr-1" />
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Meta Info */}
-                <div className="pt-4 border-t border-gray-200">
-                  <div className="text-xs text-gray-500 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <User className="h-3 w-3" />
-                      <span>Created by {createdByUser?.name || 'Unknown'}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-3 w-3" />
-                      <span>
-                        Created {isValidDate(task.created_at) 
-                          ? safeFormatDate(task.created_at, 'MMM d, yyyy')
-                          : 'unknown date'
-                        }
-                      </span>
-                    </div>
-                    {task.updated_at && task.updated_at !== task.created_at && (
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-3 w-3" />
-                        <span>
-                          Updated {isValidDate(task.updated_at) 
-                            ? safeFormatDate(task.updated_at, 'MMM d, yyyy')
-                            : 'unknown date'
-                          }
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
-        </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Priority</Label>
+              <Select value={priority} onValueChange={setPriority} disabled={isSubmitting}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Due Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !dueDate && "text-muted-foreground"
+                    )}
+                    disabled={isSubmitting}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dueDate ? format(dueDate, "PPP") : <span>Pick a date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={dueDate}
+                    onSelect={setDueDate}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Tags</Label>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {tags.map(tag => (
+                <Badge key={tag} variant="secondary" className="gap-1">
+                  {tag}
+                  <X 
+                    className="h-3 w-3 cursor-pointer" 
+                    onClick={() => removeTag(tag)}
+                  />
+                </Badge>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <Input
+                value={newTag}
+                onChange={(e) => setNewTag(e.target.value)}
+                placeholder="Add tag..."
+                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
+                disabled={isSubmitting}
+              />
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="sm" 
+                onClick={addTag}
+                disabled={isSubmitting}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <Button 
+              type="submit" 
+              className="flex-1 bg-homemade-orange hover:bg-homemade-orange-dark"
+              disabled={isSubmitting || !title.trim()}
+            >
+              {isSubmitting ? 'Creating Task...' : 'Create Task'}
+            </Button>
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => onOpenChange(false)}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+          </div>
+        </form>
       </DialogContent>
     </Dialog>
   );
 };
-
-// Helper component for consistent labeling
-const Label = ({ children, className = '', ...props }: any) => (
-  <label className={`text-sm font-medium ${className}`} {...props}>
-    {children}
-  </label>
-);
