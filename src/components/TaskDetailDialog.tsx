@@ -28,6 +28,7 @@ import {
 import { Task, User as UserType } from '../types';
 import { format, isToday, isTomorrow, isPast, startOfDay } from 'date-fns';
 import { useTaskContext } from '../contexts/TaskContext';
+import { supabase } from '../lib/supabase';
 
 interface TaskDetailDialogProps {
   task: Task | null;
@@ -61,7 +62,7 @@ const isValidDate = (dateInput: string | null | undefined): boolean => {
 };
 
 export const TaskDetailDialog = ({ 
-  task, 
+  task: initialTask, 
   users, 
   open, 
   onOpenChange, 
@@ -69,7 +70,8 @@ export const TaskDetailDialog = ({
   onAddComment, 
   onToggleSubtask 
 }: TaskDetailDialogProps) => {
-  const { refreshTasks } = useTaskContext();
+  const { refreshTasks, tasks } = useTaskContext();
+  const [currentTaskData, setCurrentTaskData] = useState<Task | null>(null);
   const [newComment, setNewComment] = useState('');
   const [newSubtask, setNewSubtask] = useState('');
   const [editingTitle, setEditingTitle] = useState(false);
@@ -79,6 +81,9 @@ export const TaskDetailDialog = ({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
+
+  // Get current task data - prioritize direct fetch data, then context, then initial
+  const task = currentTaskData || (initialTask ? tasks.find(t => t.id === initialTask.id) : null) || initialTask;
 
   const assignedUsers = useMemo(() => {
     if (!task) return [];
@@ -90,23 +95,77 @@ export const TaskDetailDialog = ({
     return users.filter(u => !task.assignees?.includes(u.id));
   }, [users, task]);
 
-  // Manual refresh function for the dialog
-  const handleRefreshDialog = async () => {
-    if (!refreshTasks) return;
+  // Direct database fetch to get fresh task data
+  const forceRefreshTaskData = async () => {
+    if (!initialTask?.id) return;
     
     setIsRefreshing(true);
-    console.log('🔄 TaskDetailDialog - Refreshing task data...');
+    console.log('🔄 TaskDetailDialog - Direct database fetch for task:', initialTask.id);
     
     try {
-      await refreshTasks();
-      console.log('✅ TaskDetailDialog - Task data refreshed');
-    } catch (error) {
-      console.error('❌ TaskDetailDialog - Failed to refresh:', error);
+      const { data, error } = await supabase
+        .from('tasks')
+        .select(`
+          *,
+          comments(*),
+          subtasks(*),
+          task_tags(tag),
+          task_assignees(user_id)
+        `)
+        .eq('id', initialTask.id)
+        .single();
+        
+      if (error) {
+        console.error('❌ Direct fetch error:', error);
+        return;
+      }
+      
+      if (data) {
+        console.log('✅ Fresh task data fetched:', data);
+        
+        // Format the data to match your Task interface
+        const formattedTask: Task = {
+          id: data.id,
+          title: data.title,
+          description: data.description,
+          status: data.status,
+          priority: data.priority,
+          due_date: data.due_date,
+          workspace_id: data.workspace_id,
+          created_by: data.created_by,
+          created_at: data.created_at,
+          updated_at: data.updated_at,
+          assignees: data.task_assignees?.map(ta => ta.user_id) || [],
+          tags: data.task_tags?.map(tt => tt.tag) || [],
+          comments: data.comments || [],
+          subtasks: data.subtasks || []
+        };
+        
+        console.log('📝 Formatted fresh task:', formattedTask);
+        setCurrentTaskData(formattedTask);
+      }
+    } catch (err) {
+      console.error('❌ Direct fetch failed:', err);
     } finally {
       setIsRefreshing(false);
     }
   };
 
+  // Manual refresh function for the dialog
+  const handleRefreshDialog = async () => {
+    console.log('🔄 TaskDetailDialog - Manual refresh triggered');
+    await forceRefreshTaskData();
+  };
+
+  // Auto-refresh when dialog opens or task ID changes
+  useEffect(() => {
+    if (open && initialTask?.id) {
+      console.log('🔄 Dialog opened - fetching fresh task data');
+      forceRefreshTaskData();
+    }
+  }, [open, initialTask?.id]);
+
+  // Update temp values when task data changes
   useEffect(() => {
     if (task) {
       setTempTitle(task.title);
