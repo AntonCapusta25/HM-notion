@@ -1,4 +1,4 @@
-import { Search, Bell, Settings, LogOut, Menu } from 'lucide-react';
+import { Search, Settings, LogOut, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -6,6 +6,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { NotificationCenter } from './NotificationCenter';
 import { useAuth } from '../contexts/AuthContext';
 import { useProfile } from '../hooks/useProfile';
+// 1. Import useNavigate
+import { useNavigate } from 'react-router-dom';
 
 interface HeaderProps {
   onToggleSidebar?: () => void;
@@ -14,10 +16,10 @@ interface HeaderProps {
 export const Header = ({ onToggleSidebar }: HeaderProps) => {
   const { user, logout } = useAuth();
   const { profile, loading: profileLoading } = useProfile();
+  // 2. Call the hook to get the navigate function
+  const navigate = useNavigate();
   
-  // Generate initials from user data - using correct field names
   const getInitials = () => {
-    // Try profile.name first (your actual field name)
     if (profile?.name) {
       return profile.name
         .split(' ')
@@ -25,16 +27,13 @@ export const Header = ({ onToggleSidebar }: HeaderProps) => {
         .slice(0, 2)
         .join('');
     }
-    // Fallback to user email
     if (user?.email) {
       const emailName = user.email.split('@')[0];
-      return emailName.charAt(0).toUpperCase() + 
-             (emailName.charAt(1) || '').toUpperCase();
+      return (emailName.charAt(0) + (emailName.charAt(1) || '')).toUpperCase();
     }
-    return 'U'; // Fallback to 'U' for User
+    return 'U';
   };
 
-  // Display name using correct field names
   const displayName = profile?.name || user?.email?.split('@')[0] || 'User';
 
   const handleLogout = async () => {
@@ -48,7 +47,7 @@ export const Header = ({ onToggleSidebar }: HeaderProps) => {
   return (
     <header className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-40">
       <div className="flex items-center justify-between">
-        {/* Left Side - Menu Toggle and Search */}
+        {/* Left Side */}
         <div className="flex items-center gap-4 flex-1">
           {onToggleSidebar && (
             <Button 
@@ -70,7 +69,7 @@ export const Header = ({ onToggleSidebar }: HeaderProps) => {
           </div>
         </div>
         
-        {/* Right Side - Notifications and User Menu */}
+        {/* Right Side */}
         <div className="flex items-center gap-2">
           <NotificationCenter />
           
@@ -96,17 +95,9 @@ export const Header = ({ onToggleSidebar }: HeaderProps) => {
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm text-gray-900 truncate">
-                      {displayName}
-                    </p>
-                    <p className="text-xs text-gray-500 truncate">
-                      {user?.email}
-                    </p>
-                    {profile?.department && (
-                      <p className="text-xs text-gray-400 truncate">
-                        {profile.department}
-                      </p>
-                    )}
+                    <p className="font-medium text-sm text-gray-900 truncate">{displayName}</p>
+                    <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                    {profile?.department && (<p className="text-xs text-gray-400 truncate">{profile.department}</p>)}
                   </div>
                 </div>
               </div>
@@ -116,6 +107,8 @@ export const Header = ({ onToggleSidebar }: HeaderProps) => {
                   variant="ghost" 
                   size="sm" 
                   className="w-full justify-start"
+                  // 3. Add the onClick handler to navigate
+                  onClick={() => navigate('/settings')}
                 >
                   <Settings className="h-4 w-4 mr-3" />
                   Settings
