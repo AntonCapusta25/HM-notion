@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Plus, X, UserPlus, Users } from 'lucide-react';
+import { CalendarIcon, Plus, X, UserPlus, Users, Building2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -24,7 +24,7 @@ interface CreateTaskDialogProps {
 }
 
 export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTaskDialogProps) => {
-  const { users, createTask } = useTaskContext();
+  const { users, workspaces, createTask } = useTaskContext();
   const { user } = useAuth();
   const { profile: userProfile } = useProfile();
   
@@ -32,8 +32,8 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
   const [description, setDescription] = useState('');
   const [assignees, setAssignees] = useState<string[]>([]);
   const [priority, setPriority] = useState('');
-  // FIXED: Consistent naming for due date
   const [dueDate, setDueDate] = useState<Date>();
+  const [selectedWorkspace, setSelectedWorkspace] = useState<string>('');
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
   
@@ -48,21 +48,29 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
       return;
     }
 
+    if (!title.trim()) {
+      setError('Task title is required');
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
 
     try {
       const taskData = {
-        title,
-        description,
+        title: title.trim(),
+        description: description.trim(),
         assignees,
         priority: priority as 'low' | 'medium' | 'high',
-        due_date: dueDate?.toISOString().split('T')[0], // Convert to database field name
+        due_date: dueDate?.toISOString().split('T')[0],
+        workspace_id: selectedWorkspace || null, // Add workspace to task data
         tags,
         status: 'todo' as const,
         subtasks: [],
         created_by: userProfile?.id || user.id
       };
+      
+      console.log('Creating task with workspace:', selectedWorkspace);
       
       if (onCreateTask) {
         await onCreateTask(taskData);
@@ -81,13 +89,13 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
     }
   };
 
-  // FIXED: Consistent state variable names
   const resetForm = () => {
     setTitle('');
     setDescription('');
     setAssignees([]);
     setPriority('');
-    setDueDate(undefined); // Fixed: was setDue_date
+    setDueDate(undefined);
+    setSelectedWorkspace('');
     setTags([]);
     setNewTag('');
     setError(null);
@@ -153,6 +161,38 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
               rows={3}
               disabled={isSubmitting}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Workspace</Label>
+            <Select value={selectedWorkspace} onValueChange={setSelectedWorkspace} disabled={isSubmitting}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select workspace (optional)">
+                  {selectedWorkspace && workspaces.find(w => w.id === selectedWorkspace) && (
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4" />
+                      {workspaces.find(w => w.id === selectedWorkspace)?.name}
+                    </div>
+                  )}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="h-4 w-4 text-gray-400" />
+                    No workspace (Personal)
+                  </div>
+                </SelectItem>
+                {workspaces.map(workspace => (
+                  <SelectItem key={workspace.id} value={workspace.id}>
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4" />
+                      {workspace.name}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           
           <div className="space-y-2">
