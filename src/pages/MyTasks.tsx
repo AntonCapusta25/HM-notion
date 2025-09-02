@@ -25,7 +25,7 @@ export const MyTasks = () => {
     addComment,
     toggleSubtask,
     updateAssignees,
-    refreshTasks, // Add this if using the enhanced useTaskStore
+    refreshTasks,
     loading: tasksLoading,
     error
   } = useTaskContext();
@@ -153,6 +153,22 @@ export const MyTasks = () => {
     }
   }, [tasks, user, selectedWorkspace, filter]);
 
+  const tasksByStatus = useMemo(() => ({
+    todo: myTasks.filter(t => t.status === 'todo'),
+    in_progress: myTasks.filter(t => t.status === 'in_progress'),
+    done: myTasks.filter(t => t.status === 'done')
+  }), [myTasks]);
+
+  const stats = useMemo(() => {
+    const todayRaw = new Date();
+    const today = new Date(todayRaw.getFullYear(), todayRaw.getMonth(), todayRaw.getDate());
+    return {
+      total: myTasks.length,
+      overdue: myTasks.filter(t => t.due_date && new Date(t.due_date) < today && t.status !== 'done').length,
+      dueToday: myTasks.filter(t => t.due_date && new Date(t.due_date).toDateString() === today.toDateString() && t.status !== 'done').length
+    };
+  }, [myTasks]);
+
   if (tasksLoading) {
     return (
       <Layout>
@@ -190,22 +206,6 @@ export const MyTasks = () => {
       </Layout>
     );
   }
-
-  const tasksByStatus = useMemo(() => ({
-    todo: myTasks.filter(t => t.status === 'todo'),
-    in_progress: myTasks.filter(t => t.status === 'in_progress'),
-    done: myTasks.filter(t => t.status === 'done')
-  }), [myTasks]);
-
-  const stats = useMemo(() => {
-    const todayRaw = new Date();
-    const today = new Date(todayRaw.getFullYear(), todayRaw.getMonth(), todayRaw.getDate());
-    return {
-      total: myTasks.length,
-      overdue: myTasks.filter(t => t.due_date && new Date(t.due_date) < today && t.status !== 'done').length,
-      dueToday: myTasks.filter(t => t.due_date && new Date(t.due_date).toDateString() === today.toDateString() && t.status !== 'done').length
-    };
-  }, [myTasks]);
 
   return (
     <Layout>
