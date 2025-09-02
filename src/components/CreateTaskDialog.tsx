@@ -130,9 +130,6 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>Create New Task</DialogTitle>
-          <DialogDescription>
-            Create a new task with assignees, due dates, and other details.
-          </DialogDescription>
         </DialogHeader>
         
         {error && (
