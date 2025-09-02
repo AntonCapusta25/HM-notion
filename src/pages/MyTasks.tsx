@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Layout } from '../components/Layout';
 import { TaskCard } from '../components/TaskCard';
 import { CreateTaskDialog } from '../components/CreateTaskDialog';
@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Plus, Calendar, AlertCircle, LayoutGrid, List } from 'lucide-react';
+import { Plus, Calendar, AlertCircle, LayoutGrid, List, RefreshCw } from 'lucide-react';
 import { Task } from '../types';
 
 export const MyTasks = () => {
@@ -19,10 +19,13 @@ export const MyTasks = () => {
     tasks, 
     users, 
     workspaces, 
+    createTask,
     deleteTask, 
     updateTask,
     addComment,
+    toggleSubtask,
     updateAssignees,
+    refreshTasks, // Add this if using the enhanced useTaskStore
     loading: tasksLoading,
     error
   } = useTaskContext();
@@ -34,6 +37,84 @@ export const MyTasks = () => {
   const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'today' | 'week' | 'overdue'>('all');
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Manual refresh function
+  const handleManualRefresh = useCallback(async () => {
+    if (!refreshTasks) return;
+    
+    setIsRefreshing(true);
+    console.log('🔄 MyTasks - Manual refresh triggered');
+    
+    try {
+      await refreshTasks();
+      console.log('✅ MyTasks - Manual refresh completed');
+    } catch (err) {
+      console.error('❌ MyTasks - Manual refresh failed:', err);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [refreshTasks]);
+
+  // Enhanced task operations with proper error handling
+  const handleCreateTask = useCallback(async (taskData: any) => {
+    try {
+      console.log('📝 MyTasks - Creating task:', taskData.title);
+      await createTask(taskData);
+      setShowCreateTask(false);
+      console.log('✅ MyTasks - Task creation completed');
+    } catch (err) {
+      console.error('❌ MyTasks - Failed to create task:', err);
+      throw err;
+    }
+  }, [createTask]);
+
+  const handleUpdateTask = useCallback(async (taskId: string, updates: any) => {
+    try {
+      console.log('📝 MyTasks - Updating task:', taskId);
+      await updateTask(taskId, updates);
+      console.log('✅ MyTasks - Task update completed');
+    } catch (err) {
+      console.error('❌ MyTasks - Failed to update task:', err);
+      throw err;
+    }
+  }, [updateTask]);
+
+  const handleDeleteTask = useCallback(async (taskId: string) => {
+    const confirmed = window.confirm('Are you sure you want to delete this task?');
+    if (!confirmed) return;
+    
+    try {
+      console.log('🗑️ MyTasks - Deleting task:', taskId);
+      await deleteTask(taskId);
+      console.log('✅ MyTasks - Task deletion completed');
+    } catch (err) {
+      console.error('❌ MyTasks - Failed to delete task:', err);
+      throw err;
+    }
+  }, [deleteTask]);
+
+  const handleAddComment = useCallback(async (taskId: string, content: string) => {
+    try {
+      console.log('💬 MyTasks - Adding comment to task:', taskId);
+      await addComment(taskId, content);
+      console.log('✅ MyTasks - Comment added successfully');
+    } catch (err) {
+      console.error('❌ MyTasks - Failed to add comment:', err);
+      throw err;
+    }
+  }, [addComment]);
+
+  const handleToggleSubtask = useCallback(async (taskId: string, subtaskId: string) => {
+    try {
+      console.log('☑️ MyTasks - Toggling subtask:', subtaskId);
+      await toggleSubtask(taskId, subtaskId);
+      console.log('✅ MyTasks - Subtask toggled successfully');
+    } catch (err) {
+      console.error('❌ MyTasks - Failed to toggle subtask:', err);
+      throw err;
+    }
+  }, [toggleSubtask]);
 
   const myTasks = useMemo(() => {
     if (!user) return [];
@@ -72,7 +153,6 @@ export const MyTasks = () => {
     }
   }, [tasks, user, selectedWorkspace, filter]);
 
-
   if (tasksLoading) {
     return (
       <Layout>
@@ -86,8 +166,30 @@ export const MyTasks = () => {
     );
   }
 
-  if (error) { /* ... error UI ... */ }
-  if (!user) { /* ... login prompt UI ... */ }
+  if (error) {
+    return (
+      <Layout>
+        <Alert variant="destructive" className="m-6">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Error loading tasks: {error}
+          </AlertDescription>
+        </Alert>
+      </Layout>
+    );
+  }
+
+  if (!user) {
+    return (
+      <Layout>
+        <Alert className="m-6">
+          <AlertDescription>
+            Please log in to view your tasks.
+          </AlertDescription>
+        </Alert>
+      </Layout>
+    );
+  }
 
   const tasksByStatus = useMemo(() => ({
     todo: myTasks.filter(t => t.status === 'todo'),
@@ -105,12 +207,6 @@ export const MyTasks = () => {
     };
   }, [myTasks]);
 
-  const handleDeleteTask = async (taskId: string) => {
-    if (window.confirm('Are you sure you want to delete this task?')) {
-      await deleteTask(taskId);
-    }
-  };
-
   return (
     <Layout>
       <div className="space-y-6">
@@ -123,28 +219,89 @@ export const MyTasks = () => {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {refreshTasks && (
+              <Button 
+                onClick={handleManualRefresh} 
+                variant="outline" 
+                size="sm"
+                disabled={isRefreshing}
+                className="flex items-center gap-2"
+              >
+                <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                {isRefreshing ? 'Refreshing...' : 'Refresh'}
+              </Button>
+            )}
             <div className="flex border rounded-lg p-1 bg-gray-50">
-              <Button variant={viewMode === 'kanban' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('kanban')} className={viewMode === 'kanban' ? 'bg-homemade-orange' : ''}><LayoutGrid className="h-4 w-4 mr-2" />Kanban</Button>
-              <Button variant={viewMode === 'list' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('list')} className={viewMode === 'list' ? 'bg-homemade-orange' : ''}><List className="h-4 w-4 mr-2" />List</Button>
+              <Button 
+                variant={viewMode === 'kanban' ? 'default' : 'ghost'} 
+                size="sm" 
+                onClick={() => setViewMode('kanban')} 
+                className={viewMode === 'kanban' ? 'bg-homemade-orange hover:bg-homemade-orange-dark' : ''}
+              >
+                <LayoutGrid className="h-4 w-4 mr-2" />
+                Kanban
+              </Button>
+              <Button 
+                variant={viewMode === 'list' ? 'default' : 'ghost'} 
+                size="sm" 
+                onClick={() => setViewMode('list')} 
+                className={viewMode === 'list' ? 'bg-homemade-orange hover:bg-homemade-orange-dark' : ''}
+              >
+                <List className="h-4 w-4 mr-2" />
+                List
+              </Button>
             </div>
-            <Button onClick={() => setShowCreateTask(true)} className="bg-homemade-orange"><Plus className="h-4 w-4 mr-2" />New Task</Button>
+            <Button 
+              onClick={() => setShowCreateTask(true)} 
+              className="bg-homemade-orange hover:bg-homemade-orange-dark"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              New Task
+            </Button>
           </div>
         </div>
 
         {viewMode === 'kanban' && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card><CardContent className="p-6">
-                <p className="text-sm text-gray-600">Total Tasks</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
-            </CardContent></Card>
-            <Card><CardContent className="p-6">
-                <p className="text-sm text-gray-600">Due Today</p>
-                <p className="text-2xl font-bold text-yellow-600">{stats.dueToday}</p>
-            </CardContent></Card>
-            <Card><CardContent className="p-6">
-                <p className="text-sm text-gray-600">Overdue</p>
-                <p className="text-2xl font-bold text-red-600">{stats.overdue}</p>
-            </CardContent></Card>
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600">Total Tasks</p>
+                    <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+                  </div>
+                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <Calendar className="h-6 w-6 text-blue-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600">Due Today</p>
+                    <p className="text-2xl font-bold text-yellow-600">{stats.dueToday}</p>
+                  </div>
+                  <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+                    <Calendar className="h-6 w-6 text-yellow-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600">Overdue</p>
+                    <p className="text-2xl font-bold text-red-600">{stats.overdue}</p>
+                  </div>
+                  <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+                    <AlertCircle className="h-6 w-6 text-red-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         )}
 
@@ -157,10 +314,38 @@ export const MyTasks = () => {
             />
           </div>
           <div className="flex gap-2">
-            <Button variant={filter === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('all')} className={filter === 'all' ? 'bg-homemade-orange' : ''}>All</Button>
-            <Button variant={filter === 'today' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('today')} className={filter === 'today' ? 'bg-homemade-orange' : ''}>Due Today</Button>
-            <Button variant={filter === 'week' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('week')} className={filter === 'week' ? 'bg-homemade-orange' : ''}>This Week</Button>
-            <Button variant={filter === 'overdue' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('overdue')} className={filter === 'overdue' ? 'bg-homemade-orange' : ''}>Overdue</Button>
+            <Button 
+              variant={filter === 'all' ? 'default' : 'outline'} 
+              size="sm" 
+              onClick={() => setFilter('all')} 
+              className={filter === 'all' ? 'bg-homemade-orange hover:bg-homemade-orange-dark' : ''}
+            >
+              All
+            </Button>
+            <Button 
+              variant={filter === 'today' ? 'default' : 'outline'} 
+              size="sm" 
+              onClick={() => setFilter('today')} 
+              className={filter === 'today' ? 'bg-homemade-orange hover:bg-homemade-orange-dark' : ''}
+            >
+              Due Today
+            </Button>
+            <Button 
+              variant={filter === 'week' ? 'default' : 'outline'} 
+              size="sm" 
+              onClick={() => setFilter('week')} 
+              className={filter === 'week' ? 'bg-homemade-orange hover:bg-homemade-orange-dark' : ''}
+            >
+              This Week
+            </Button>
+            <Button 
+              variant={filter === 'overdue' ? 'default' : 'outline'} 
+              size="sm" 
+              onClick={() => setFilter('overdue')} 
+              className={filter === 'overdue' ? 'bg-homemade-orange hover:bg-homemade-orange-dark' : ''}
+            >
+              Overdue
+            </Button>
           </div>
         </div>
 
@@ -168,13 +353,22 @@ export const MyTasks = () => {
           <ListView
             tasks={myTasks}
             users={users}
-            onUpdateTask={updateTask}
+            onCreateTask={handleCreateTask}
+            onUpdateTask={handleUpdateTask}
             onDeleteTask={handleDeleteTask}
           />
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <Card>
-              <CardHeader><CardTitle>To Do <Badge variant="secondary">{tasksByStatus.todo.length}</Badge></CardTitle></CardHeader>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center justify-between text-base">
+                  <span className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-gray-400 rounded-full" />
+                    To Do
+                  </span>
+                  <Badge variant="secondary">{tasksByStatus.todo.length}</Badge>
+                </CardTitle>
+              </CardHeader>
               <CardContent className="space-y-3">
                 {tasksByStatus.todo.map(task => (
                   <TaskCard 
@@ -185,8 +379,17 @@ export const MyTasks = () => {
                 ))}
               </CardContent>
             </Card>
+
             <Card>
-              <CardHeader><CardTitle>In Progress <Badge variant="secondary">{tasksByStatus.in_progress.length}</Badge></CardTitle></CardHeader>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center justify-between text-base">
+                  <span className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-yellow-400 rounded-full" />
+                    In Progress
+                  </span>
+                  <Badge variant="secondary">{tasksByStatus.in_progress.length}</Badge>
+                </CardTitle>
+              </CardHeader>
               <CardContent className="space-y-3">
                 {tasksByStatus.in_progress.map(task => (
                   <TaskCard 
@@ -197,8 +400,17 @@ export const MyTasks = () => {
                 ))}
               </CardContent>
             </Card>
+
             <Card>
-              <CardHeader><CardTitle>Done <Badge variant="secondary">{tasksByStatus.done.length}</Badge></CardTitle></CardHeader>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center justify-between text-base">
+                  <span className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-green-400 rounded-full" />
+                    Done
+                  </span>
+                  <Badge variant="secondary">{tasksByStatus.done.length}</Badge>
+                </CardTitle>
+              </CardHeader>
               <CardContent className="space-y-3">
                 {tasksByStatus.done.map(task => (
                   <TaskCard 
@@ -215,15 +427,17 @@ export const MyTasks = () => {
         <CreateTaskDialog 
           open={showCreateTask} 
           onOpenChange={setShowCreateTask}
+          onCreateTask={handleCreateTask}
         />
+
         <TaskDetailDialog
           task={selectedTask}
           users={users}
           open={!!selectedTask}
           onOpenChange={(open) => !open && setSelectedTask(null)}
-          onUpdateTask={updateTask}
-          updateAssignees={updateAssignees}
-          onAddComment={addComment}
+          onUpdateTask={handleUpdateTask}
+          onAddComment={handleAddComment}
+          onToggleSubtask={handleToggleSubtask}
         />
       </div>
     </Layout>
