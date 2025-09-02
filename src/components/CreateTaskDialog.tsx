@@ -33,7 +33,7 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
   const [assignees, setAssignees] = useState<string[]>([]);
   const [priority, setPriority] = useState('');
   const [dueDate, setDueDate] = useState<Date>();
-  const [selectedWorkspace, setSelectedWorkspace] = useState<string>('');
+  const [selectedWorkspace, setSelectedWorkspace] = useState<string>('none');
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
   
@@ -63,7 +63,7 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
         assignees,
         priority: priority as 'low' | 'medium' | 'high',
         due_date: dueDate?.toISOString().split('T')[0],
-        workspace_id: selectedWorkspace || null, // Add workspace to task data
+        workspace_id: selectedWorkspace === 'none' ? null : selectedWorkspace, // Handle 'none' value properly
         tags,
         status: 'todo' as const,
         subtasks: [],
@@ -95,7 +95,7 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
     setAssignees([]);
     setPriority('');
     setDueDate(undefined);
-    setSelectedWorkspace('');
+    setSelectedWorkspace('none');
     setTags([]);
     setNewTag('');
     setError(null);
@@ -168,16 +168,22 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
             <Select value={selectedWorkspace} onValueChange={setSelectedWorkspace} disabled={isSubmitting}>
               <SelectTrigger>
                 <SelectValue placeholder="Select workspace (optional)">
-                  {selectedWorkspace && workspaces.find(w => w.id === selectedWorkspace) && (
+                  {selectedWorkspace && selectedWorkspace !== 'none' && workspaces.find(w => w.id === selectedWorkspace) && (
                     <div className="flex items-center gap-2">
                       <Building2 className="h-4 w-4" />
                       {workspaces.find(w => w.id === selectedWorkspace)?.name}
                     </div>
                   )}
+                  {selectedWorkspace === 'none' && (
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4 text-gray-400" />
+                      No workspace (Personal)
+                    </div>
+                  )}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">
+                <SelectItem value="none">
                   <div className="flex items-center gap-2">
                     <Building2 className="h-4 w-4 text-gray-400" />
                     No workspace (Personal)
