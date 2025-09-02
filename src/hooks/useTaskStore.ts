@@ -72,6 +72,12 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
     }
   }, [user?.id, userProfile?.id]);
 
+  // ADDED: Expose refreshTasks method for manual refresh
+  const refreshTasks = useCallback(async () => {
+    console.log('🔄 refreshTasks called - manual refresh');
+    await fetchTasks();
+  }, [fetchTasks]);
+
   const fetchUsers = useCallback(async () => {
     try {
       const { data, error } = await supabase.from('users').select('*');
@@ -274,7 +280,14 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
     }
 
     console.log('✅ Task creation completed successfully');
-  }, [user?.id, userProfile?.id]);
+    
+    // ADDED: Force refresh after task creation to ensure immediate UI update
+    setTimeout(() => {
+      console.log('🔄 Force refreshing tasks after creation...');
+      refreshTasks();
+    }, 200);
+    
+  }, [user?.id, userProfile?.id, refreshTasks]);
 
   const updateAssignees = async (taskId: string, assigneeIds: string[]) => {
     console.log('Updating assignees for task:', taskId, 'assignees:', assigneeIds);
@@ -308,13 +321,27 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
     // Update related data
     if (assignees !== undefined) await updateAssignees(taskId, assignees);
     if (tags !== undefined) await updateTags(taskId, tags);
-  }, []);
+    
+    // ADDED: Force refresh after task update
+    setTimeout(() => {
+      console.log('🔄 Force refreshing tasks after update...');
+      refreshTasks();
+    }, 200);
+    
+  }, [refreshTasks]);
   
   const deleteTask = useCallback(async (taskId: string) => {
     console.log('Deleting task:', taskId);
     const { error } = await supabase.from('tasks').delete().eq('id', taskId);
     if (error) throw error;
-  }, []);
+    
+    // ADDED: Force refresh after task deletion
+    setTimeout(() => {
+      console.log('🔄 Force refreshing tasks after deletion...');
+      refreshTasks();
+    }, 200);
+    
+  }, [refreshTasks]);
 
   const addComment = useCallback(async (taskId: string, content: string) => {
     if (!user) throw new Error("User not authenticated");
@@ -328,7 +355,14 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
     });
     
     if (error) throw error;
-  }, [user?.id]);
+    
+    // ADDED: Force refresh after adding comment
+    setTimeout(() => {
+      console.log('🔄 Force refreshing tasks after comment...');
+      refreshTasks();
+    }, 200);
+    
+  }, [user?.id, refreshTasks]);
   
   const toggleSubtask = useCallback(async (taskId: string, subtaskId: string) => {
     console.log('Toggling subtask:', subtaskId);
@@ -345,7 +379,14 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
         .update({ completed: !subtask.completed })
         .eq('id', subtaskId);
     }
-  }, []);
+    
+    // ADDED: Force refresh after toggling subtask
+    setTimeout(() => {
+      console.log('🔄 Force refreshing tasks after subtask toggle...');
+      refreshTasks();
+    }, 200);
+    
+  }, [refreshTasks]);
   
   return { 
     tasks, 
@@ -359,6 +400,7 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
     addComment, 
     updateAssignees, 
     updateTags, 
-    toggleSubtask
+    toggleSubtask,
+    refreshTasks // ADDED: Export the refresh method
   };
 };
