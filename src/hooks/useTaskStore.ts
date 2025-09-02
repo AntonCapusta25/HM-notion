@@ -240,12 +240,16 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
     const { assignees, tags, subtasks, ...restOfTaskData } = taskData;
     
     console.log('⏳ Inserting task to Supabase...');
+    console.log('  - workspace_id from taskData:', taskData.workspace_id);
+    console.log('  - workspaceId from taskData:', taskData.workspaceId);
+    
     const { data: newTask, error } = await supabase
       .from('tasks')
       .insert({ 
         ...restOfTaskData, 
         created_by: userId,
-        workspace_id: taskData.workspaceId || null
+        // Fixed: Use workspace_id (snake_case) instead of workspaceId (camelCase)
+        workspace_id: taskData.workspace_id || null
       })
       .select()
       .single();
