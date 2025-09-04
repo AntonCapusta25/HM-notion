@@ -689,5 +689,6 @@ export const Dashboard = () => {
         <aside className="lg:col-span-1">
           <InternalChatbot />
         </aside>
+</div>
   );
 };
