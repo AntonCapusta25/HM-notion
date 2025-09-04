@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { TaskCard } from './TaskCard';
-import { InternalChatbot } from './InternalChatbot';
 import { CreateTaskDialog } from './CreateTaskDialog';
 import { TaskDetailDialog } from './TaskDetailDialog';
 import { ListView } from './ListView';
@@ -686,9 +685,5 @@ export const Dashboard = () => {
         onToggleSubtask={handleToggleSubtask}
       />
     </div>
-        <aside className="lg:col-span-1">
-          <InternalChatbot />
-        </aside>
-</div>
   );
 };
