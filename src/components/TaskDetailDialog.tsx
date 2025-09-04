@@ -79,6 +79,7 @@ export const TaskDetailDialog = ({
   const [tempTitle, setTempTitle] = useState('');
   const [tempDescription, setTempDescription] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isAddingSubtask, setIsAddingSubtask] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
 
@@ -233,17 +234,92 @@ export const TaskDetailDialog = ({
     }
   };
 
-  const handleAddSubtask = () => {
-    if (newSubtask.trim()) {
-      const newSubtaskObj = {
-        id: Math.random().toString(36).substr(2, 9),
-        title: newSubtask.trim(),
-        completed: false
-      };
-      onUpdateTask(task.id, {
-        subtasks: [...(task.subtasks || []), newSubtaskObj]
-      });
+  // Fixed: Add subtask directly to database instead of trying to update task
+  const handleAddSubtask = async () => {
+    if (!newSubtask.trim() || isAddingSubtask) return;
+    
+    setIsAddingSubtask(true);
+    console.log('➕ Adding subtask to database:', newSubtask.trim());
+    
+    try {
+      const { error } = await supabase
+        .from('subtasks')
+        .insert({
+          task_id: task.id,
+          title: newSubtask.trim(),
+          completed: false,
+          created_at: new Date().toISOString()
+        });
+
+      if (error) {
+        console.error('❌ Failed to add subtask:', error);
+        throw error;
+      }
+
+      console.log('✅ Subtask added successfully');
       setNewSubtask('');
+      
+      // Refresh the task data to show the new subtask
+      await forceRefreshTaskData();
+      
+    } catch (err) {
+      console.error('❌ Error adding subtask:', err);
+      // You might want to show a toast notification here
+    } finally {
+      setIsAddingSubtask(false);
+    }
+  };
+
+  // Fixed: Toggle subtask in database instead of local state
+  const handleToggleSubtask = async (subtaskId: string) => {
+    try {
+      const subtask = task.subtasks?.find(st => st.id === subtaskId);
+      if (!subtask) return;
+
+      console.log('🔄 Toggling subtask in database:', subtaskId);
+      
+      const { error } = await supabase
+        .from('subtasks')
+        .update({ completed: !subtask.completed })
+        .eq('id', subtaskId);
+
+      if (error) {
+        console.error('❌ Failed to toggle subtask:', error);
+        throw error;
+      }
+
+      console.log('✅ Subtask toggled successfully');
+      
+      // Refresh the task data to show the updated subtask
+      await forceRefreshTaskData();
+      
+    } catch (err) {
+      console.error('❌ Error toggling subtask:', err);
+    }
+  };
+
+  // Fixed: Delete subtask from database
+  const handleDeleteSubtask = async (subtaskId: string) => {
+    try {
+      console.log('🗑️ Deleting subtask from database:', subtaskId);
+      
+      const { error } = await supabase
+        .from('subtasks')
+        .delete()
+        .eq('id', subtaskId);
+
+      if (error) {
+        console.error('❌ Failed to delete subtask:', error);
+        throw error;
+      }
+
+      console.log('✅ Subtask deleted successfully');
+      
+      // Refresh the task data to remove the deleted subtask
+      await forceRefreshTaskData();
+      
+    } catch (err) {
+      console.error('❌ Error deleting subtask:', err);
     }
   };
 
@@ -413,7 +489,7 @@ export const TaskDetailDialog = ({
                     {subtasks.map(subtask => (
                       <div key={subtask.id} className="group flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg">
                         <button
-                          onClick={() => onToggleSubtask(task.id, subtask.id)}
+                          onClick={() => handleToggleSubtask(subtask.id)}
                           className="flex-shrink-0 hover:scale-110 transition-transform"
                         >
                           {subtask.completed ? (
@@ -429,10 +505,7 @@ export const TaskDetailDialog = ({
                           variant="ghost"
                           size="sm"
                           className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={() => {
-                            const newSubtasks = subtasks.filter(st => st.id !== subtask.id);
-                            onUpdateTask(task.id, { subtasks: newSubtasks });
-                          }}
+                          onClick={() => handleDeleteSubtask(subtask.id)}
                         >
                           <Trash2 className="h-3 w-3 text-red-500" />
                         </Button>
@@ -447,9 +520,18 @@ export const TaskDetailDialog = ({
                         onChange={(e) => setNewSubtask(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleAddSubtask()}
                         className="flex-1"
+                        disabled={isAddingSubtask}
                       />
-                      <Button size="sm" onClick={handleAddSubtask} disabled={!newSubtask.trim()}>
-                        <Plus className="h-4 w-4" />
+                      <Button 
+                        size="sm" 
+                        onClick={handleAddSubtask} 
+                        disabled={!newSubtask.trim() || isAddingSubtask}
+                      >
+                        {isAddingSubtask ? (
+                          <RefreshCw className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Plus className="h-4 w-4" />
+                        )}
                       </Button>
                     </div>
                   </div>
