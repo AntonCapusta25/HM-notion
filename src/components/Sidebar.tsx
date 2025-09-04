@@ -554,7 +554,7 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
 
       {/* Create Workspace Dialog */}
       <CreateWorkspaceDialog 
-        open={showSearchResults}
+        open={showCreateWorkspace}
         onOpenChange={setShowCreateWorkspace}
       />
 
