@@ -370,12 +370,12 @@ const Team = () => {
             />
           </div>
           <div className="flex-1">
-            <Select value={selectedUser || ''} onValueChange={(value) => setSelectedUser(value || null)}>
+            <Select value={selectedUser || 'all'} onValueChange={(value) => setSelectedUser(value === 'all' ? null : value)}>
               <SelectTrigger>
                 <SelectValue placeholder="All Team Members" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Team Members</SelectItem>
+                <SelectItem value="all">All Team Members</SelectItem>
                 {users.map(user => (
                   <SelectItem key={user.id} value={user.id}>
                     <div className="flex items-center gap-2">
