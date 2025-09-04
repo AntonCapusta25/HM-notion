@@ -187,6 +187,9 @@ export const NotificationCenter = () => {
       }
     });
 
+    console.log('📧 Generated notifications:', notifs.length, 'notifications');
+    console.log('📧 Notification details:', notifs);
+
     // Filter out dismissed notifications and sort by date
     return notifs
       .filter(notif => !dismissedNotifications.has(notif.id))
