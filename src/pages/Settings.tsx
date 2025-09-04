@@ -13,18 +13,20 @@ import { User, Bell, Palette, Shield, Download, AlertCircle } from 'lucide-react
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '../contexts/AuthContext';
 import { useProfile } from '../hooks/useProfile';
+import { useTaskContext } from '../contexts/TaskContext';
 import { supabase } from '../lib/supabase';
 
 const Settings = () => {
   const { toast } = useToast();
   const { user, signOut } = useAuth();
   const { profile, loading: profileLoading, error: profileError } = useProfile();
+  const { tasks } = useTaskContext(); // Get tasks for export
   
   const [isUpdating, setIsUpdating] = useState(false);
   const [settings, setSettings] = useState({
     name: '',
     email: '',
-    department: 'Operations', // User can choose, not from database
+    department: 'Operations',
     notifications: {
       email: true,
       desktop: true,
@@ -50,14 +52,16 @@ const Settings = () => {
     }
   }, []);
 
-  // Load user data when profile loads
+  // Load user data when profile loads - using consistent field mapping
   useEffect(() => {
-    if (user) {
+    if (user && profile) {
       setSettings(prev => ({
         ...prev,
-        name: profile?.full_name || user.email?.split('@')[0] || '',
+        // Use profile.name (consistent with Team.tsx user mapping)
+        name: profile.name || profile.full_name || user.email?.split('@')[0] || '',
         email: user.email || '',
-        // Keep user preferences as they set them, don't load from database
+        // Use profile.department (consistent with Team.tsx)
+        department: profile.department || prev.department,
       }));
     }
   }, [user, profile]);
@@ -91,18 +95,21 @@ const Settings = () => {
     setIsUpdating(true);
 
     try {
-      // Only save name to the database, everything else is local preferences
+      // Save profile data using consistent field mapping with Team.tsx
       const { error } = await supabase
         .from('users')
         .upsert({
           id: user.id,
+          // Map to both fields for compatibility
+          name: settings.name,
           full_name: settings.name,
+          department: settings.department,
           updated_at: new Date().toISOString()
         });
 
       if (error) throw error;
 
-      // In a real app, you could save preferences to localStorage or a separate preferences table
+      // Save preferences to localStorage
       localStorage.setItem('userPreferences', JSON.stringify({
         department: settings.department,
         notifications: settings.notifications,
@@ -129,8 +136,8 @@ const Settings = () => {
 
   const exportData = async () => {
     try {
-      // Export user's tasks and profile data
-      const { data: tasks, error: tasksError } = await supabase
+      // Export user's tasks using consistent field mapping
+      const { data: userTasks, error: tasksError } = await supabase
         .from('tasks')
         .select('*')
         .eq('created_by', user?.id);
@@ -139,7 +146,7 @@ const Settings = () => {
 
       const exportData = {
         profile: profile,
-        tasks: tasks,
+        tasks: userTasks,
         settings: settings,
         exportedAt: new Date().toISOString()
       };
@@ -195,7 +202,7 @@ const Settings = () => {
     }
   };
 
-  // Generate user initials
+  // Generate user initials - consistent with Team.tsx approach
   const getInitials = () => {
     if (settings.name) {
       return settings.name
