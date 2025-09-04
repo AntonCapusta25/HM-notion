@@ -38,8 +38,8 @@ export const NotificationCenter = () => {
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
     email: true,
     desktop: true,
-    taskAssigned: true,
-    taskUpdated: false,
+    taskAssigned: true, // Force this to be true
+    taskUpdated: true,  // Force this to be true  
     comments: true,
     dueSoon: true
   });
