@@ -686,9 +686,7 @@ export const Dashboard = () => {
         onToggleSubtask={handleToggleSubtask}
       />
     </div>
-            {/* Chatbot Section */}
         <aside className="lg:col-span-1">
-           {/* 2. Place the chatbot component here */}
           <InternalChatbot />
         </aside>
   );
