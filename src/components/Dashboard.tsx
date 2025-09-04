@@ -695,41 +695,53 @@ export const Dashboard = () => {
         />
       )}
 
-      {/* Floating Chatbot */}
-      {showChatbot && (
-        <div className="fixed bottom-6 right-6 z-50">
-          {isChatbotMinimized ? (
-            <Button
-              onClick={() => setIsChatbotMinimized(false)}
-              className="bg-homemade-orange hover:bg-homemade-orange-dark rounded-full w-14 h-14 shadow-lg"
-            >
-              <MessageCircle className="h-6 w-6" />
-            </Button>
-          ) : (
-            <div className="relative">
-              <div className="absolute top-2 right-2 z-10 flex gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={minimizeChatbot}
-                  className="h-6 w-6 p-0 text-gray-500 hover:text-gray-700 bg-white/80 hover:bg-white"
-                >
-                  <Minimize2 className="h-3 w-3" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={closeChatbot}
-                  className="h-6 w-6 p-0 text-gray-500 hover:text-gray-700 bg-white/80 hover:bg-white"
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              </div>
-              <InternalChatbot />
+      {/* Always Visible Floating Chatbot Icon */}
+      <div className="fixed bottom-6 right-6 z-50">
+        {!showChatbot ? (
+          /* Floating Chat Button - Always Visible */
+          <Button
+            onClick={toggleChatbot}
+            className="bg-homemade-orange hover:bg-homemade-orange-dark rounded-full w-14 h-14 shadow-lg hover:shadow-xl transition-all duration-200 animate-pulse"
+            title="Open Assistant"
+          >
+            <MessageCircle className="h-6 w-6" />
+          </Button>
+        ) : isChatbotMinimized ? (
+          /* Minimized State */
+          <Button
+            onClick={() => setIsChatbotMinimized(false)}
+            className="bg-homemade-orange hover:bg-homemade-orange-dark rounded-full w-14 h-14 shadow-lg"
+            title="Expand Assistant"
+          >
+            <MessageCircle className="h-6 w-6" />
+          </Button>
+        ) : (
+          /* Full Chatbot with Controls */
+          <div className="relative">
+            <div className="absolute top-2 right-2 z-10 flex gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={minimizeChatbot}
+                className="h-6 w-6 p-0 text-gray-500 hover:text-gray-700 bg-white/80 hover:bg-white rounded-full"
+                title="Minimize"
+              >
+                <Minimize2 className="h-3 w-3" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={closeChatbot}
+                className="h-6 w-6 p-0 text-gray-500 hover:text-gray-700 bg-white/80 hover:bg-white rounded-full"
+                title="Close"
+              >
+                <X className="h-3 w-3" />
+              </Button>
             </div>
-          )}
-        </div>
-      )}
+            <InternalChatbot />
+          </div>
+        )}
+      </div>
 
       {/* Dialogs */}
       <CreateTaskDialog 
