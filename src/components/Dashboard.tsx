@@ -701,7 +701,7 @@ export const Dashboard = () => {
           /* Floating Chat Button - Always Visible */
           <Button
             onClick={toggleChatbot}
-            className="bg-homemade-orange hover:bg-homemade-orange-dark rounded-full w-14 h-14 shadow-lg hover:shadow-xl transition-all duration-200 animate-pulse"
+            className="bg-homemade-orange hover:bg-homemade-orange-dark rounded-full w-14 h-14 shadow-lg hover:shadow-xl transition-all duration-200"
             title="Open Assistant"
           >
             <MessageCircle className="h-6 w-6" />
