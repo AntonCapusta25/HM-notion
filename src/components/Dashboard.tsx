@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Plus, Calendar, BarChart3, Grid3X3, List, RefreshCw } from 'lucide-react';
+import { Plus, Calendar, BarChart3, Grid3X3, List, RefreshCw, MessageCircle, X, Minimize2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +9,7 @@ import { CreateTaskDialog } from './CreateTaskDialog';
 import { TaskDetailDialog } from './TaskDetailDialog';
 import { ListView } from './ListView';
 import { TaskFilters, TaskFiltersState } from './TaskFilters';
+import { InternalChatbot } from './InternalChatbot';
 import { useTaskContext } from '../contexts/TaskContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useProfile } from '../hooks/useProfile';
@@ -40,7 +41,7 @@ export const Dashboard = () => {
     toggleSubtask, 
     loading: tasksLoading, 
     error,
-    refreshTasks // Add this from the enhanced useTaskStore
+    refreshTasks
   } = useTaskContext();
 
   const [showCreateTask, setShowCreateTask] = useState(false);
@@ -58,6 +59,11 @@ export const Dashboard = () => {
     sortBy: 'created_at',
     sortOrder: 'desc'
   });
+
+  // Chatbot integration states
+  const [showChatbot, setShowChatbot] = useState(false);
+  const [chatbotPosition, setChatbotPosition] = useState<'floating' | 'sidebar' | 'modal'>('floating');
+  const [isChatbotMinimized, setIsChatbotMinimized] = useState(false);
 
   // Track task changes for logging
   useEffect(() => {
@@ -97,13 +103,11 @@ export const Dashboard = () => {
     console.log('🔄 Manual refresh triggered');
     
     try {
-      // Force refresh tasks using the exposed refreshTasks method
       if (refreshTasks) {
         console.log('🔄 Refreshing tasks via refreshTasks method...');
         await refreshTasks();
       }
       
-      // Refresh dashboard stats
       console.log('🔄 Refreshing dashboard stats...');
       await refreshDashboardStats();
       
@@ -119,7 +123,7 @@ export const Dashboard = () => {
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       refreshDashboardStats();
-    }, 1000); // Debounce for 1 second
+    }, 1000);
 
     return () => clearTimeout(timeoutId);
   }, [tasks.length, refreshDashboardStats]);
@@ -164,19 +168,16 @@ export const Dashboard = () => {
     try {
       console.log('📝 Dashboard - Creating task:', taskData.title);
       await createTask(taskData);
-      setShowCreateTask(false); // Close dialog on success
+      setShowCreateTask(false);
       console.log('✅ Dashboard - Task creation completed');
       
-      // The enhanced useTaskStore now automatically refreshes after task creation
-      // But we can also refresh stats here
       setTimeout(() => {
         refreshDashboardStats();
       }, 500);
       
     } catch (err) {
       console.error('❌ Dashboard - Failed to create task:', err);
-      // Don't close dialog on error so user can retry
-      throw err; // Re-throw to let the dialog handle the error
+      throw err;
     }
   }, [createTask, refreshDashboardStats]);
 
@@ -186,7 +187,6 @@ export const Dashboard = () => {
       await updateTask(taskId, updates);
       console.log('✅ Dashboard - Task update completed');
       
-      // The enhanced useTaskStore now automatically refreshes after task update
       setTimeout(() => {
         refreshDashboardStats();
       }, 300);
@@ -198,24 +198,23 @@ export const Dashboard = () => {
   }, [updateTask, refreshDashboardStats]);
 
   const handleDeleteTask = useCallback(async (taskId: string) => {
-  const confirmed = window.confirm('Are you sure you want to delete this task?');
-  if (!confirmed) return;
-  
-  try {
-    console.log('🗑️ Dashboard - Deleting task:', taskId);
-    await deleteTask(taskId);
-    console.log('✅ Dashboard - Task deletion completed');
+    const confirmed = window.confirm('Are you sure you want to delete this task?');
+    if (!confirmed) return;
     
-    // The enhanced useTaskStore now automatically refreshes after task deletion
-    setTimeout(() => {
-      refreshDashboardStats();
-    }, 300);
-    
-  } catch (err) {
-    console.error('❌ Dashboard - Failed to delete task:', err);
-    throw err;
-  }
-}, [deleteTask, refreshDashboardStats]);
+    try {
+      console.log('🗑️ Dashboard - Deleting task:', taskId);
+      await deleteTask(taskId);
+      console.log('✅ Dashboard - Task deletion completed');
+      
+      setTimeout(() => {
+        refreshDashboardStats();
+      }, 300);
+      
+    } catch (err) {
+      console.error('❌ Dashboard - Failed to delete task:', err);
+      throw err;
+    }
+  }, [deleteTask, refreshDashboardStats]);
   
   const handleAddComment = useCallback(async (taskId: string, content: string) => {
     try {
@@ -340,6 +339,21 @@ export const Dashboard = () => {
     done: filteredTasks.filter(t => t.status === 'done')
   }), [filteredTasks]);
 
+  // Chatbot toggle functions
+  const toggleChatbot = () => {
+    setShowChatbot(!showChatbot);
+    setIsChatbotMinimized(false);
+  };
+
+  const minimizeChatbot = () => {
+    setIsChatbotMinimized(true);
+  };
+
+  const closeChatbot = () => {
+    setShowChatbot(false);
+    setIsChatbotMinimized(false);
+  };
+
   if (profileLoading || tasksLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -444,7 +458,7 @@ export const Dashboard = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">
@@ -467,6 +481,15 @@ export const Dashboard = () => {
             <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             {isRefreshing ? 'Refreshing...' : 'Refresh'}
           </Button>
+          <Button 
+            onClick={toggleChatbot}
+            variant="outline" 
+            size="sm"
+            className="flex items-center gap-2"
+          >
+            <MessageCircle className="h-4 w-4" />
+            Assistant
+          </Button>
           <Button onClick={() => setShowCreateTask(true)} className="bg-homemade-orange hover:bg-homemade-orange-dark">
             <Plus className="h-4 w-4 mr-2" />
             New Task
@@ -474,6 +497,7 @@ export const Dashboard = () => {
         </div>
       </div>
 
+      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
           <CardContent className="p-6">
@@ -536,6 +560,7 @@ export const Dashboard = () => {
         </Card>
       </div>
 
+      {/* Filter and View Controls */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
@@ -594,6 +619,7 @@ export const Dashboard = () => {
         </div>
       </div>
 
+      {/* Task Views */}
       {viewMode === 'cards' ? (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card>
@@ -669,6 +695,43 @@ export const Dashboard = () => {
         />
       )}
 
+      {/* Floating Chatbot */}
+      {showChatbot && (
+        <div className="fixed bottom-6 right-6 z-50">
+          {isChatbotMinimized ? (
+            <Button
+              onClick={() => setIsChatbotMinimized(false)}
+              className="bg-homemade-orange hover:bg-homemade-orange-dark rounded-full w-14 h-14 shadow-lg"
+            >
+              <MessageCircle className="h-6 w-6" />
+            </Button>
+          ) : (
+            <div className="relative">
+              <div className="absolute top-2 right-2 z-10 flex gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={minimizeChatbot}
+                  className="h-6 w-6 p-0 text-gray-500 hover:text-gray-700 bg-white/80 hover:bg-white"
+                >
+                  <Minimize2 className="h-3 w-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={closeChatbot}
+                  className="h-6 w-6 p-0 text-gray-500 hover:text-gray-700 bg-white/80 hover:bg-white"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+              <InternalChatbot />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Dialogs */}
       <CreateTaskDialog 
         open={showCreateTask} 
         onOpenChange={setShowCreateTask}
