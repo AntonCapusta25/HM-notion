@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Calendar } from '@/components/ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { 
   Calendar as CalendarIcon, 
   UserPlus, 
@@ -23,12 +24,38 @@ import {
   Clock,
   Tag,
   Trash2,
-  RefreshCw
+  RefreshCw,
+  Paperclip,
+  Upload,
+  Download,
+  Eye,
+  File,
+  Image,
+  FileText,
+  AlertCircle
 } from 'lucide-react';
 import { Task, User as UserType } from '../types';
 import { format, isToday, isTomorrow, isPast, startOfDay } from 'date-fns';
 import { useTaskContext } from '../contexts/TaskContext';
+import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+
+// Add TaskAttachment interface
+interface TaskAttachment {
+  id: string;
+  task_id: string;
+  file_name: string;
+  file_size?: number;
+  file_type?: string;
+  file_url: string;
+  uploaded_by?: string;
+  created_at: string;
+}
+
+// Update Task interface to include attachments
+interface TaskWithAttachments extends Task {
+  attachments?: TaskAttachment[];
+}
 
 interface TaskDetailDialogProps {
   task: Task | null;
@@ -61,6 +88,25 @@ const isValidDate = (dateInput: string | null | undefined): boolean => {
   }
 };
 
+const formatFileSize = (bytes?: number): string => {
+  if (!bytes) return 'Unknown size';
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  if (bytes === 0) return '0 Bytes';
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+};
+
+const getFileIcon = (fileType?: string) => {
+  if (!fileType) return File;
+  if (fileType.startsWith('image/')) return Image;
+  if (fileType.includes('pdf') || fileType.includes('document') || fileType.includes('text')) return FileText;
+  return File;
+};
+
+const isImageFile = (fileType?: string): boolean => {
+  return fileType?.startsWith('image/') || false;
+};
+
 export const TaskDetailDialog = ({ 
   task: initialTask, 
   users, 
@@ -70,8 +116,9 @@ export const TaskDetailDialog = ({
   onAddComment, 
   onToggleSubtask 
 }: TaskDetailDialogProps) => {
+  const { user } = useAuth();
   const { refreshTasks, tasks } = useTaskContext();
-  const [currentTaskData, setCurrentTaskData] = useState<Task | null>(null);
+  const [currentTaskData, setCurrentTaskData] = useState<TaskWithAttachments | null>(null);
   const [newComment, setNewComment] = useState('');
   const [newSubtask, setNewSubtask] = useState('');
   const [editingTitle, setEditingTitle] = useState(false);
@@ -80,6 +127,9 @@ export const TaskDetailDialog = ({
   const [tempDescription, setTempDescription] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isAddingSubtask, setIsAddingSubtask] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
 
@@ -96,7 +146,7 @@ export const TaskDetailDialog = ({
     return users.filter(u => !task.assignees?.includes(u.id));
   }, [users, task]);
 
-  // Direct database fetch to get fresh task data
+  // Direct database fetch to get fresh task data with attachments
   const forceRefreshTaskData = async () => {
     if (!initialTask?.id) return;
     
@@ -111,7 +161,8 @@ export const TaskDetailDialog = ({
           comments(*),
           subtasks(*),
           task_tags(tag),
-          task_assignees(user_id)
+          task_assignees(user_id),
+          task_attachments(*)
         `)
         .eq('id', initialTask.id)
         .single();
@@ -125,7 +176,7 @@ export const TaskDetailDialog = ({
         console.log('✅ Fresh task data fetched:', data);
         
         // Format the data to match your Task interface
-        const formattedTask: Task = {
+        const formattedTask: TaskWithAttachments = {
           id: data.id,
           title: data.title,
           description: data.description,
@@ -139,7 +190,8 @@ export const TaskDetailDialog = ({
           assignees: data.task_assignees?.map(ta => ta.user_id) || [],
           tags: data.task_tags?.map(tt => tt.tag) || [],
           comments: data.comments || [],
-          subtasks: data.subtasks || []
+          subtasks: data.subtasks || [],
+          attachments: data.task_attachments || []
         };
         
         console.log('📝 Formatted fresh task:', formattedTask);
@@ -150,6 +202,112 @@ export const TaskDetailDialog = ({
     } finally {
       setIsRefreshing(false);
     }
+  };
+
+  // File upload handler
+  const handleFileUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0 || !task || !user) return;
+
+    setIsUploading(true);
+    setUploadError(null);
+
+    try {
+      for (const file of Array.from(files)) {
+        // Validate file size (10MB limit)
+        if (file.size > 10 * 1024 * 1024) {
+          throw new Error(`File ${file.name} is too large. Maximum size is 10MB.`);
+        }
+
+        // Generate unique file name
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+        const filePath = `task-attachments/${task.id}/${fileName}`;
+
+        // Upload to Supabase Storage
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('attachments')
+          .upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (uploadError) throw uploadError;
+
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+          .from('attachments')
+          .getPublicUrl(filePath);
+
+        // Save attachment metadata to database
+        const { error: dbError } = await supabase
+          .from('task_attachments')
+          .insert({
+            task_id: task.id,
+            file_name: file.name,
+            file_size: file.size,
+            file_type: file.type,
+            file_url: publicUrl,
+            uploaded_by: user.id
+          });
+
+        if (dbError) throw dbError;
+      }
+
+      console.log('✅ Files uploaded successfully');
+      await forceRefreshTaskData();
+      
+    } catch (err: any) {
+      console.error('❌ File upload failed:', err);
+      setUploadError(err.message || 'Failed to upload files');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // Delete attachment
+  const handleDeleteAttachment = async (attachment: TaskAttachment) => {
+    try {
+      console.log('🗑️ Deleting attachment:', attachment.id);
+
+      // Extract file path from URL
+      const urlParts = attachment.file_url.split('/');
+      const filePath = urlParts.slice(-3).join('/'); // Get last 3 parts: task-attachments/task-id/filename
+
+      // Delete from storage
+      const { error: storageError } = await supabase.storage
+        .from('attachments')
+        .remove([filePath]);
+
+      if (storageError) {
+        console.warn('Storage deletion failed:', storageError);
+        // Continue with database deletion even if storage deletion fails
+      }
+
+      // Delete from database
+      const { error: dbError } = await supabase
+        .from('task_attachments')
+        .delete()
+        .eq('id', attachment.id);
+
+      if (dbError) throw dbError;
+
+      console.log('✅ Attachment deleted successfully');
+      await forceRefreshTaskData();
+
+    } catch (err) {
+      console.error('❌ Failed to delete attachment:', err);
+    }
+  };
+
+  // Download attachment
+  const handleDownloadAttachment = (attachment: TaskAttachment) => {
+    const link = document.createElement('a');
+    link.href = attachment.file_url;
+    link.download = attachment.file_name;
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   // Manual refresh function for the dialog
@@ -177,6 +335,7 @@ export const TaskDetailDialog = ({
   if (!task) return null;
 
   const createdByUser = users.find(u => u.id === task.created_by);
+  const attachments = (task as TaskWithAttachments).attachments || [];
 
   const priorityConfig = {
     low: { color: 'bg-green-100 text-green-700 border-green-300', icon: '🟢', label: 'Low' },
@@ -264,7 +423,6 @@ export const TaskDetailDialog = ({
       
     } catch (err) {
       console.error('❌ Error adding subtask:', err);
-      // You might want to show a toast notification here
     } finally {
       setIsAddingSubtask(false);
     }
@@ -352,7 +510,7 @@ export const TaskDetailDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden p-0">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden p-0">
         <DialogHeader className="sr-only">
           <DialogTitle>{task.title}</DialogTitle>
         </DialogHeader>
@@ -460,6 +618,110 @@ export const TaskDetailDialog = ({
                       )}
                     </div>
                   )}
+                </div>
+
+                {/* Attachments */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-medium text-gray-900">
+                      Attachments ({attachments.length})
+                    </h3>
+                    <div className="flex gap-2">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        multiple
+                        className="hidden"
+                        onChange={(e) => handleFileUpload(e.target.files)}
+                      />
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploading}
+                        className="text-xs"
+                      >
+                        {isUploading ? (
+                          <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+                        ) : (
+                          <Paperclip className="h-3 w-3 mr-1" />
+                        )}
+                        {isUploading ? 'Uploading...' : 'Add Files'}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {uploadError && (
+                    <Alert variant="destructive" className="mb-4">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>{uploadError}</AlertDescription>
+                    </Alert>
+                  )}
+
+                  <div className="space-y-2">
+                    {attachments.map(attachment => {
+                      const FileIcon = getFileIcon(attachment.file_type);
+                      const uploader = users.find(u => u.id === attachment.uploaded_by);
+                      
+                      return (
+                        <div key={attachment.id} className="group flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50">
+                          <FileIcon className="h-8 w-8 text-gray-500 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm text-gray-900 truncate">
+                              {attachment.file_name}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {formatFileSize(attachment.file_size)} • 
+                              Uploaded by {uploader?.name || 'Unknown'} • 
+                              {safeFormatDate(attachment.created_at, 'MMM d, h:mm a')}
+                            </div>
+                          </div>
+                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {isImageFile(attachment.file_type) && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0"
+                                onClick={() => window.open(attachment.file_url, '_blank')}
+                                title="Preview image"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              onClick={() => handleDownloadAttachment(attachment)}
+                              title="Download file"
+                            >
+                              <Download className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              onClick={() => handleDeleteAttachment(attachment)}
+                              title="Delete attachment"
+                            >
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    
+                    {attachments.length === 0 && (
+                      <div 
+                        className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-gray-400 transition-colors"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                        <p className="text-sm text-gray-500 mb-1">Click to upload files</p>
+                        <p className="text-xs text-gray-400">or drag and drop</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Subtasks */}
