@@ -19,15 +19,62 @@ export interface Notification {
   createdAt: string;
 }
 
+interface NotificationSettings {
+  email: boolean;
+  desktop: boolean;
+  taskAssigned: boolean;
+  taskUpdated: boolean;
+  comments: boolean;
+  dueSoon: boolean;
+}
+
 export const NotificationCenter = () => {
   const { user } = useAuth();
   const { profile } = useProfile();
-  const { tasks } = useTaskContext(); // Use TaskContext instead of useTaskStore directly
+  const { tasks } = useTaskContext();
   const [readNotifications, setReadNotifications] = useState<Set<string>>(new Set());
   const [dismissedNotifications, setDismissedNotifications] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState(false);
+  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
+    email: true,
+    desktop: true,
+    taskAssigned: true,
+    taskUpdated: false,
+    comments: true,
+    dueSoon: true
+  });
 
-  // Generate real-time notifications based on tasks
+  // Load notification settings from localStorage
+  useEffect(() => {
+    const loadSettings = () => {
+      try {
+        const savedPreferences = localStorage.getItem('userPreferences');
+        if (savedPreferences) {
+          const prefs = JSON.parse(savedPreferences);
+          if (prefs.notifications) {
+            setNotificationSettings(prefs.notifications);
+            console.log('📧 Loaded notification settings:', prefs.notifications);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load notification settings:', error);
+      }
+    };
+
+    loadSettings();
+
+    // Listen for settings changes (when user updates settings in another tab/component)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'userPreferences') {
+        loadSettings();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  // Generate real-time notifications based on tasks and user preferences
   const notifications = useMemo(() => {
     if (!user || !tasks.length) return [];
 
@@ -37,12 +84,11 @@ export const NotificationCenter = () => {
     tasks.forEach(task => {
       const taskId = task.id;
       
-      // Fixed: Use correct field names - assignees is an array, created_by instead of createdBy
       const isAssignedToUser = task.assignees && task.assignees.includes(user.id);
       const isCreatedByUser = task.created_by === user.id;
       
-      // Task assigned notifications
-      if (isAssignedToUser && !isCreatedByUser) {
+      // Task assigned notifications - only if enabled
+      if (notificationSettings.taskAssigned && isAssignedToUser && !isCreatedByUser) {
         notifs.push({
           id: `assigned-${taskId}`,
           title: 'New Task Assigned',
@@ -50,13 +96,12 @@ export const NotificationCenter = () => {
           type: 'task_assigned',
           taskId: taskId,
           read: readNotifications.has(`assigned-${taskId}`),
-          createdAt: task.created_at // Fixed: Use created_at
+          createdAt: task.created_at
         });
       }
 
-      // Due soon notifications (due today or tomorrow)
-      // Fixed: Use due_date instead of dueDate
-      if (task.due_date && task.status !== 'done' && (isAssignedToUser || isCreatedByUser)) {
+      // Due soon notifications - only if enabled
+      if (notificationSettings.dueSoon && task.due_date && task.status !== 'done' && (isAssignedToUser || isCreatedByUser)) {
         const dueDate = new Date(task.due_date);
         
         if (isToday(dueDate)) {
@@ -82,8 +127,8 @@ export const NotificationCenter = () => {
         }
       }
 
-      // Overdue notifications
-      if (task.due_date && task.status !== 'done' && (isAssignedToUser || isCreatedByUser)) {
+      // Overdue notifications - always show if due soon is enabled (critical)
+      if (notificationSettings.dueSoon && task.due_date && task.status !== 'done' && (isAssignedToUser || isCreatedByUser)) {
         const dueDate = new Date(task.due_date);
         
         if (isPast(dueDate) && !isToday(dueDate)) {
@@ -99,8 +144,8 @@ export const NotificationCenter = () => {
         }
       }
 
-      // Task completed notifications (for tasks you created but didn't complete yourself)
-      if (task.status === 'done' && isCreatedByUser && !isAssignedToUser) {
+      // Task completed notifications - only if task updates are enabled
+      if (notificationSettings.taskUpdated && task.status === 'done' && isCreatedByUser && !isAssignedToUser) {
         notifs.push({
           id: `completed-${taskId}`,
           title: 'Task Completed',
@@ -108,14 +153,13 @@ export const NotificationCenter = () => {
           type: 'completed',
           taskId: taskId,
           read: readNotifications.has(`completed-${taskId}`),
-          createdAt: task.updated_at || task.created_at // Fixed: Use updated_at and created_at
+          createdAt: task.updated_at || task.created_at
         });
       }
 
-      // Comment notifications (simplified - in real app you'd track actual comments)
-      if (task.comments && task.comments.length > 0 && (isAssignedToUser || isCreatedByUser)) {
+      // Comment notifications - only if comments are enabled
+      if (notificationSettings.comments && task.comments && task.comments.length > 0 && (isAssignedToUser || isCreatedByUser)) {
         const latestComment = task.comments[task.comments.length - 1];
-        // Fixed: Use correct field name for comment author
         if (latestComment.author !== user.id) {
           notifs.push({
             id: `comment-${taskId}-${latestComment.id}`,
@@ -124,9 +168,22 @@ export const NotificationCenter = () => {
             type: 'comment_added',
             taskId: taskId,
             read: readNotifications.has(`comment-${taskId}-${latestComment.id}`),
-            createdAt: latestComment.created_at // Fixed: Use created_at
+            createdAt: latestComment.created_at
           });
         }
+      }
+
+      // Task updated notifications - only if task updates are enabled
+      if (notificationSettings.taskUpdated && task.updated_at && task.updated_at !== task.created_at && (isAssignedToUser && !isCreatedByUser)) {
+        notifs.push({
+          id: `updated-${taskId}`,
+          title: 'Task Updated',
+          message: `"${task.title}" has been updated`,
+          type: 'task_updated',
+          taskId: taskId,
+          read: readNotifications.has(`updated-${taskId}`),
+          createdAt: task.updated_at
+        });
       }
     });
 
@@ -135,7 +192,7 @@ export const NotificationCenter = () => {
       .filter(notif => !dismissedNotifications.has(notif.id))
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, 20); // Limit to 20 most recent
-  }, [tasks, user, readNotifications, dismissedNotifications]);
+  }, [tasks, user, readNotifications, dismissedNotifications, notificationSettings]);
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -143,7 +200,6 @@ export const NotificationCenter = () => {
     const newReadSet = new Set(readNotifications);
     newReadSet.add(id);
     setReadNotifications(newReadSet);
-    // Note: Removed localStorage usage as it's not supported in Claude artifacts
     console.log('📧 Marked notification as read:', id);
   };
 
@@ -199,13 +255,62 @@ export const NotificationCenter = () => {
     }
   };
 
+  // Desktop notification function (respects settings)
+  const showDesktopNotification = (notification: Notification) => {
+    if (!notificationSettings.desktop) return;
+    
+    // Request permission if not granted
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+    
+    if ('Notification' in window && Notification.permission === 'granted') {
+      try {
+        new Notification(notification.title, {
+          body: notification.message,
+          icon: '/favicon.ico', // Use your app icon
+          tag: notification.id // Prevents duplicate notifications
+        });
+      } catch (error) {
+        console.warn('Failed to show desktop notification:', error);
+      }
+    }
+  };
+
+  // Show desktop notification for new unread notifications
+  useEffect(() => {
+    const newUnreadNotifications = notifications.filter(n => !n.read && !readNotifications.has(n.id));
+    
+    newUnreadNotifications.forEach(notification => {
+      // Only show desktop notification for high-priority types
+      if (['overdue', 'due_soon', 'task_assigned'].includes(notification.type)) {
+        showDesktopNotification(notification);
+      }
+    });
+  }, [notifications, notificationSettings.desktop]);
+
+  // Show notification count in document title (if notifications are enabled)
+  useEffect(() => {
+    const originalTitle = document.title.replace(/^\(\d+\) /, ''); // Remove existing count
+    
+    if (unreadCount > 0 && (notificationSettings.desktop || notificationSettings.taskAssigned || notificationSettings.comments || notificationSettings.dueSoon)) {
+      document.title = `(${unreadCount}) ${originalTitle}`;
+    } else {
+      document.title = originalTitle;
+    }
+    
+    return () => {
+      document.title = originalTitle;
+    };
+  }, [unreadCount, notificationSettings]);
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="sm" className="relative">
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
-            <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+            <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
               {unreadCount > 9 ? '9+' : unreadCount}
             </div>
           )}
@@ -215,7 +320,12 @@ export const NotificationCenter = () => {
         <Card className="border-0 shadow-lg">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base">Notifications</CardTitle>
+              <CardTitle className="text-base">
+                Notifications
+                {Object.values(notificationSettings).every(v => !v) && (
+                  <span className="text-xs text-gray-500 font-normal ml-2">(All disabled)</span>
+                )}
+              </CardTitle>
               {unreadCount > 0 && (
                 <Button variant="ghost" size="sm" onClick={markAllAsRead}>
                   Mark all read
@@ -225,7 +335,15 @@ export const NotificationCenter = () => {
           </CardHeader>
           <CardContent className="p-0">
             <div className="max-h-96 overflow-y-auto">
-              {notifications.length === 0 ? (
+              {Object.values(notificationSettings).every(v => !v) ? (
+                <div className="p-8 text-center text-gray-500">
+                  <Bell className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                  <p className="text-sm font-medium">Notifications Disabled</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Enable notifications in Settings to see updates here
+                  </p>
+                </div>
+              ) : notifications.length === 0 ? (
                 <div className="p-8 text-center text-gray-500">
                   <Bell className="h-8 w-8 mx-auto mb-2 text-gray-300" />
                   <p className="text-sm">No notifications</p>
@@ -287,13 +405,17 @@ export const NotificationCenter = () => {
               )}
             </div>
             
-            {notifications.length > 0 && (
-              <div className="p-2 border-t bg-gray-50">
-                <p className="text-xs text-gray-500 text-center">
-                  {notifications.length} recent notifications
-                </p>
-              </div>
-            )}
+            <div className="p-2 border-t bg-gray-50">
+              <p className="text-xs text-gray-500 text-center">
+                {notifications.length > 0 ? (
+                  `${notifications.length} recent notifications`
+                ) : Object.values(notificationSettings).some(v => v) ? (
+                  'No notifications to show'
+                ) : (
+                  'Notifications disabled in settings'
+                )}
+              </p>
+            </div>
           </CardContent>
         </Card>
       </PopoverContent>
