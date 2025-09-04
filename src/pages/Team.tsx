@@ -1,17 +1,19 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Layout } from '../components/Layout';
 import { TaskCard } from '../components/TaskCard';
 import { TaskDetailDialog } from '../components/TaskDetailDialog';
 import { WorkspaceSelector } from '../components/WorkspaceSelector';
-import { useTaskStore } from '../hooks/useTaskStore';
+import { useTaskContext } from '../contexts/TaskContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useProfile } from '../hooks/useProfile';
 import { supabase } from '../lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Users, Calendar, TrendingUp } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Users, Calendar, TrendingUp, RefreshCw } from 'lucide-react';
 import { Task, User } from '../types';
 
 interface TeamDashboardStats {
@@ -24,12 +26,9 @@ interface TeamDashboardStats {
   high_priority: number;
 }
 
-// CRITICAL FIX: Move empty filters outside component to prevent re-creation
-const NO_FILTERS = {};
-
 const Team = () => {
-  // CRITICAL: ALL hooks must be called first, no conditional hook calls
   const { user } = useAuth();
+  const { profile: userProfile } = useProfile();
   
   const { 
     tasks, 
@@ -37,44 +36,210 @@ const Team = () => {
     workspaces, 
     updateTask, 
     addComment, 
-    toggleSubtask, 
+    toggleSubtask,
+    refreshTasks,
     loading: tasksLoading, 
     error 
-  } = useTaskStore(NO_FILTERS); // FIXED: Use constant instead of creating new object
+  } = useTaskContext();
   
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [dashboardStats, setDashboardStats] = useState<TeamDashboardStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // NOW we can do conditional logic after all hooks are called
+  // Fetch team stats
+  const fetchTeamStats = useCallback(async () => {
+    if (!userProfile?.id) {
+      setStatsLoading(false);
+      return;
+    }
+
+    try {
+      setStatsLoading(true);
+      const { data, error } = await supabase
+        .rpc('get_dashboard_stats', { user_uuid: userProfile.id });
+      
+      if (data && !error) {
+        setDashboardStats(data);
+      } else {
+        console.error('Error fetching team stats:', error);
+      }
+    } catch (err) {
+      console.error('Failed to fetch team stats:', err);
+    } finally {
+      setStatsLoading(false);
+    }
+  }, [userProfile?.id]);
+
   useEffect(() => {
-    const fetchTeamStats = async () => {
-      if (!user?.id) {
-        setStatsLoading(false);
-        return;
-      }
-
-      try {
-        setStatsLoading(true);
-        const { data, error } = await supabase
-          .rpc('get_dashboard_stats', { user_uuid: user.id });
-        
-        if (data && !error) {
-          setDashboardStats(data);
-        } else {
-          console.error('Error fetching team stats:', error);
-        }
-      } catch (err) {
-        console.error('Failed to fetch team stats:', err);
-      } finally {
-        setStatsLoading(false);
-      }
-    };
-
     fetchTeamStats();
-  }, [user?.id]);
+  }, [fetchTeamStats]);
+
+  // Manual refresh function
+  const handleManualRefresh = useCallback(async () => {
+    if (!refreshTasks) return;
+    
+    setIsRefreshing(true);
+    console.log('🔄 Team - Manual refresh triggered');
+    
+    try {
+      await refreshTasks();
+      await fetchTeamStats();
+      console.log('✅ Team - Manual refresh completed');
+    } catch (err) {
+      console.error('❌ Team - Manual refresh failed:', err);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [refreshTasks, fetchTeamStats]);
+
+  // Enhanced task operations
+  const handleUpdateTask = useCallback(async (taskId: string, updates: any) => {
+    try {
+      console.log('📝 Team - Updating task:', taskId);
+      await updateTask(taskId, updates);
+      console.log('✅ Team - Task update completed');
+    } catch (err) {
+      console.error('❌ Team - Failed to update task:', err);
+      throw err;
+    }
+  }, [updateTask]);
+
+  const handleAddComment = useCallback(async (taskId: string, content: string) => {
+    try {
+      console.log('💬 Team - Adding comment to task:', taskId);
+      await addComment(taskId, content);
+      console.log('✅ Team - Comment added successfully');
+    } catch (err) {
+      console.error('❌ Team - Failed to add comment:', err);
+      throw err;
+    }
+  }, [addComment]);
+
+  const handleToggleSubtask = useCallback(async (taskId: string, subtaskId: string) => {
+    try {
+      console.log('☑️ Team - Toggling subtask:', subtaskId);
+      await toggleSubtask(taskId, subtaskId);
+      console.log('✅ Team - Subtask toggled successfully');
+    } catch (err) {
+      console.error('❌ Team - Failed to toggle subtask:', err);
+      throw err;
+    }
+  }, [toggleSubtask]);
+
+  // Fixed: Use correct field names for filtering
+  const filteredTasks = useMemo(() => {
+    let result = tasks || [];
+    
+    if (selectedWorkspace) {
+      // Fixed: Filter by workspace_id (correct field name)
+      result = result.filter(task => task.workspace_id === selectedWorkspace);
+    }
+
+    if (selectedUser) {
+      // Fixed: Filter by assignees array instead of assignedTo
+      result = result.filter(task => 
+        task.assignees && task.assignees.includes(selectedUser)
+      );
+    }
+
+    return result;
+  }, [tasks, selectedWorkspace, selectedUser]);
+
+  // Fixed: Use correct field names for stats calculation
+  const teamStats = useMemo(() => {
+    if (dashboardStats) {
+      return {
+        totalTasks: dashboardStats.total_tasks,
+        inProgress: dashboardStats.in_progress_tasks,
+        completed: dashboardStats.done_tasks,
+        overdue: dashboardStats.overdue_tasks
+      };
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return {
+      totalTasks: filteredTasks.length,
+      inProgress: filteredTasks.filter(t => t.status === 'in_progress').length,
+      completed: filteredTasks.filter(t => t.status === 'done').length,
+      overdue: filteredTasks.filter(t => {
+        if (!t.due_date || t.status === 'done') return false;
+        try {
+          const dueDate = new Date(t.due_date);
+          return dueDate < today;
+        } catch {
+          return false;
+        }
+      }).length
+    };
+  }, [dashboardStats, filteredTasks]);
+
+  // Fixed: Use correct field names for user stats
+  const userStats = useMemo(() => {
+    return users.map(user => {
+      // Fixed: Filter by assignees array
+      const userTasks = filteredTasks.filter(t => 
+        t.assignees && t.assignees.includes(user.id)
+      );
+      
+      const completed = userTasks.filter(t => t.status === 'done').length;
+      const inProgress = userTasks.filter(t => t.status === 'in_progress').length;
+      
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const overdue = userTasks.filter(t => {
+        if (!t.due_date || t.status === 'done') return false;
+        try {
+          const dueDate = new Date(t.due_date);
+          return dueDate < today;
+        } catch {
+          return false;
+        }
+      }).length;
+
+      return {
+        ...user,
+        totalTasks: userTasks.length,
+        completed,
+        inProgress,
+        overdue,
+        completionRate: userTasks.length > 0 ? Math.round((completed / userTasks.length) * 100) : 0
+      };
+    });
+  }, [users, filteredTasks]);
+
+  const tasksByStatus = useMemo(() => ({
+    todo: filteredTasks.filter(t => t.status === 'todo'),
+    in_progress: filteredTasks.filter(t => t.status === 'in_progress'),
+    done: filteredTasks.filter(t => t.status === 'done')
+  }), [filteredTasks]);
+
+  // Fixed: Updated to use correct assignees field structure
+  const handleAssignTask = useCallback(async (taskId: string, userId: string) => {
+    try {
+      console.log('👤 Team - Assigning task:', taskId, 'to user:', userId);
+      
+      // Get current task to preserve existing assignees
+      const currentTask = tasks.find(t => t.id === taskId);
+      const currentAssignees = currentTask?.assignees || [];
+      
+      // Add user if not already assigned
+      const newAssignees = currentAssignees.includes(userId) 
+        ? currentAssignees 
+        : [...currentAssignees, userId];
+      
+      await handleUpdateTask(taskId, { assignees: newAssignees });
+      console.log('✅ Team - Task assignment completed');
+    } catch (err) {
+      console.error('❌ Team - Failed to assign task:', err);
+      throw err;
+    }
+  }, [tasks, handleUpdateTask]);
 
   if (tasksLoading || statsLoading) {
     return (
@@ -113,73 +278,6 @@ const Team = () => {
     );
   }
 
-  // Simple filtering without useMemo to avoid dependency issues
-  let filteredTasks = tasks || [];
-  
-  if (selectedWorkspace) {
-    // FIXED: Filter by workspace_id instead of tags
-    filteredTasks = filteredTasks.filter(task => task.workspace_id === selectedWorkspace);
-  }
-
-  if (selectedUser) {
-    filteredTasks = filteredTasks.filter(task => task.assignedTo === selectedUser);
-  }
-
-  // Simple object creation without useMemo
-  const teamStats = dashboardStats ? {
-    totalTasks: dashboardStats.total_tasks,
-    inProgress: dashboardStats.in_progress_tasks,
-    completed: dashboardStats.done_tasks,
-    overdue: dashboardStats.overdue_tasks
-  } : {
-    totalTasks: filteredTasks.length,
-    inProgress: filteredTasks.filter(t => t.status === 'in_progress').length,
-    completed: filteredTasks.filter(t => t.status === 'done').length,
-    overdue: filteredTasks.filter(t => {
-      if (!t.dueDate) return false;
-      const today = new Date();
-      const dueDate = new Date(t.dueDate);
-      return dueDate < today && t.status !== 'done';
-    }).length
-  };
-
-  // Simple user stats calculation
-  const userStats = users.map(user => {
-    const userTasks = filteredTasks.filter(t => t.assignedTo === user.id);
-    const completed = userTasks.filter(t => t.status === 'done').length;
-    const inProgress = userTasks.filter(t => t.status === 'in_progress').length;
-    const overdue = userTasks.filter(t => {
-      if (!t.dueDate) return false;
-      const today = new Date();
-      const dueDate = new Date(t.dueDate);
-      return dueDate < today && t.status !== 'done';
-    }).length;
-
-    return {
-      ...user,
-      totalTasks: userTasks.length,
-      completed,
-      inProgress,
-      overdue,
-      completionRate: userTasks.length > 0 ? Math.round((completed / userTasks.length) * 100) : 0
-    };
-  });
-
-  // Simple task grouping
-  const tasksByStatus = {
-    todo: filteredTasks.filter(t => t.status === 'todo'),
-    in_progress: filteredTasks.filter(t => t.status === 'in_progress'),
-    done: filteredTasks.filter(t => t.status === 'done')
-  };
-
-  const handleAssignTask = async (taskId: string, userId: string) => {
-    try {
-      await updateTask(taskId, { assignedTo: userId });
-    } catch (err) {
-      console.error('Failed to assign task:', err);
-    }
-  };
-
   return (
     <Layout>
       <div className="space-y-6">
@@ -188,8 +286,22 @@ const Team = () => {
             <h1 className="text-3xl font-bold text-gray-900">Team Overview</h1>
             <p className="text-gray-600 mt-1">Track team progress and collaboration</p>
           </div>
+          
+          {refreshTasks && (
+            <Button 
+              onClick={handleManualRefresh} 
+              variant="outline" 
+              size="sm"
+              disabled={isRefreshing}
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              {isRefreshing ? 'Refreshing...' : 'Refresh'}
+            </Button>
+          )}
         </div>
 
+        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <Card>
             <CardContent className="p-6">
@@ -248,6 +360,7 @@ const Team = () => {
           </Card>
         </div>
 
+        {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex-1">
             <WorkspaceSelector 
@@ -257,21 +370,30 @@ const Team = () => {
             />
           </div>
           <div className="flex-1">
-            <select 
-              className="w-full p-2 border border-gray-300 rounded-md"
-              value={selectedUser || ''}
-              onChange={(e) => setSelectedUser(e.target.value || null)}
-            >
-              <option value="">All Team Members</option>
-              {users.map(user => (
-                <option key={user.id} value={user.id}>
-                  {user.name} ({user.department})
-                </option>
-              ))}
-            </select>
+            <Select value={selectedUser || ''} onValueChange={(value) => setSelectedUser(value || null)}>
+              <SelectTrigger>
+                <SelectValue placeholder="All Team Members" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">All Team Members</SelectItem>
+                {users.map(user => (
+                  <SelectItem key={user.id} value={user.id}>
+                    <div className="flex items-center gap-2">
+                      <Avatar className="h-5 w-5">
+                        <AvatarFallback className="text-xs bg-blue-500 text-white">
+                          {user.name.charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      {user.name} {user.department && `(${user.department})`}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
+        {/* Team Performance */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -281,45 +403,47 @@ const Team = () => {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {userStats.map(user => (
-                <div key={user.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+              {userStats.map(userStat => (
+                <div key={userStat.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
                   <div className="flex items-center gap-3 mb-3">
                     <Avatar className="h-10 w-10">
                       <AvatarFallback className="bg-homemade-orange text-white">
-                        {user.avatar}
+                        {userStat.name.charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <h3 className="font-medium">{user.name}</h3>
-                      <p className="text-sm text-gray-600">{user.department}</p>
+                      <h3 className="font-medium">{userStat.name}</h3>
+                      {userStat.department && (
+                        <p className="text-sm text-gray-600">{userStat.department}</p>
+                      )}
                     </div>
                   </div>
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                       <span>Total Tasks:</span>
-                      <span className="font-medium">{user.totalTasks}</span>
+                      <span className="font-medium">{userStat.totalTasks}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span>In Progress:</span>
-                      <span className="font-medium text-yellow-600">{user.inProgress}</span>
+                      <span className="font-medium text-yellow-600">{userStat.inProgress}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span>Completed:</span>
-                      <span className="font-medium text-green-600">{user.completed}</span>
+                      <span className="font-medium text-green-600">{userStat.completed}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span>Overdue:</span>
-                      <span className="font-medium text-red-600">{user.overdue}</span>
+                      <span className="font-medium text-red-600">{userStat.overdue}</span>
                     </div>
                     <div className="pt-2">
                       <div className="flex justify-between text-sm mb-1">
                         <span>Completion Rate:</span>
-                        <span className="font-medium">{user.completionRate}%</span>
+                        <span className="font-medium">{userStat.completionRate}%</span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div 
                           className="bg-homemade-orange h-2 rounded-full transition-all duration-300"
-                          style={{ width: `${user.completionRate}%` }}
+                          style={{ width: `${userStat.completionRate}%` }}
                         />
                       </div>
                     </div>
@@ -330,6 +454,7 @@ const Team = () => {
           </CardContent>
         </Card>
 
+        {/* Task Board */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card>
             <CardHeader className="pb-3">
@@ -347,9 +472,11 @@ const Team = () => {
                   key={task.id} 
                   task={task} 
                   onClick={() => setSelectedTask(task)}
-                  onAssign={handleAssignTask}
                 />
               ))}
+              {tasksByStatus.todo.length === 0 && (
+                <p className="text-gray-500 text-center py-8 text-sm">No tasks in this column</p>
+              )}
             </CardContent>
           </Card>
 
@@ -369,9 +496,11 @@ const Team = () => {
                   key={task.id} 
                   task={task}
                   onClick={() => setSelectedTask(task)}
-                  onAssign={handleAssignTask}
                 />
               ))}
+              {tasksByStatus.in_progress.length === 0 && (
+                <p className="text-gray-500 text-center py-8 text-sm">No tasks in this column</p>
+              )}
             </CardContent>
           </Card>
 
@@ -391,9 +520,11 @@ const Team = () => {
                   key={task.id} 
                   task={task}
                   onClick={() => setSelectedTask(task)}
-                  onAssign={handleAssignTask}
                 />
               ))}
+              {tasksByStatus.done.length === 0 && (
+                <p className="text-gray-500 text-center py-8 text-sm">No tasks in this column</p>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -403,9 +534,9 @@ const Team = () => {
           users={users}
           open={!!selectedTask}
           onOpenChange={(open) => !open && setSelectedTask(null)}
-          onUpdateTask={updateTask}
-          onAddComment={addComment}
-          onToggleSubtask={toggleSubtask}
+          onUpdateTask={handleUpdateTask}
+          onAddComment={handleAddComment}
+          onToggleSubtask={handleToggleSubtask}
         />
       </div>
     </Layout>
