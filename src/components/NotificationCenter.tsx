@@ -8,6 +8,7 @@ import { format, isToday, isTomorrow, isPast } from 'date-fns';
 import { useAuth } from '../contexts/AuthContext';
 import { useProfile } from '../hooks/useProfile';
 import { useTaskContext } from '../contexts/TaskContext';
+import { supabase } from '../lib/supabase';
 
 export interface Notification {
   id: string;
@@ -17,6 +18,17 @@ export interface Notification {
   taskId?: string;
   read: boolean;
   createdAt: string;
+}
+
+export interface DBNotification {
+  id: string;
+  user_id: string;
+  task_id?: string;
+  type: string;
+  title: string;
+  message: string;
+  read: boolean;
+  created_at: string;
 }
 
 interface NotificationSettings {
@@ -32,14 +44,15 @@ export const NotificationCenter = () => {
   const { user } = useAuth();
   const { profile } = useProfile();
   const { tasks } = useTaskContext();
-  const [readNotifications, setReadNotifications] = useState<Set<string>>(new Set());
-  const [dismissedNotifications, setDismissedNotifications] = useState<Set<string>>(new Set());
+  const [dbNotifications, setDbNotifications] = useState<DBNotification[]>([]);
+  const [userTasks, setUserTasks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
     email: true,
     desktop: true,
-    taskAssigned: true, // Force this to be true
-    taskUpdated: true,  // Force this to be true  
+    taskAssigned: true,
+    taskUpdated: true,  
     comments: true,
     dueSoon: true
   });
@@ -63,7 +76,7 @@ export const NotificationCenter = () => {
 
     loadSettings();
 
-    // Listen for settings changes (when user updates settings in another tab/component)
+    // Listen for settings changes
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'userPreferences') {
         loadSettings();
@@ -74,159 +87,376 @@ export const NotificationCenter = () => {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
-  // Generate real-time notifications based on tasks and user preferences
-  const notifications = useMemo(() => {
-    if (!user || !tasks.length) return [];
+  // Load user's tasks with assignees from the actual schema
+  useEffect(() => {
+    if (!user) return;
 
-    const notifs: Notification[] = [];
+    const loadUserTasks = async () => {
+      try {
+        // Get tasks where user is assigned or is the creator
+        const { data: assignedTasks, error: assignedError } = await supabase
+          .from('task_assignees')
+          .select(`
+            task_id,
+            tasks!inner (
+              id,
+              title,
+              due_date,
+              status,
+              created_by,
+              created_at,
+              updated_at
+            )
+          `)
+          .eq('user_id', user.id);
+
+        if (assignedError) throw assignedError;
+
+        // Get tasks created by user
+        const { data: createdTasks, error: createdError } = await supabase
+          .from('tasks')
+          .select('*')
+          .eq('created_by', user.id);
+
+        if (createdError) throw createdError;
+
+        // Combine and deduplicate tasks
+        const allTasks = new Map();
+        
+        // Add assigned tasks
+        assignedTasks?.forEach(assignment => {
+          if (assignment.tasks) {
+            allTasks.set(assignment.tasks.id, {
+              ...assignment.tasks,
+              isAssigned: true,
+              isCreator: assignment.tasks.created_by === user.id
+            });
+          }
+        });
+
+        // Add created tasks
+        createdTasks?.forEach(task => {
+          const existing = allTasks.get(task.id);
+          allTasks.set(task.id, {
+            ...task,
+            isAssigned: existing?.isAssigned || false,
+            isCreator: true
+          });
+        });
+
+        setUserTasks(Array.from(allTasks.values()));
+      } catch (error) {
+        console.error('Error loading user tasks:', error);
+      }
+    };
+
+    loadUserTasks();
+  }, [user]);
+
+  // Load notifications from database
+  useEffect(() => {
+    if (!user) return;
+
+    const loadNotifications = async () => {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from('notifications')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(50);
+
+        if (error) {
+          console.error('Error loading notifications:', error);
+          return;
+        }
+
+        setDbNotifications(data || []);
+      } catch (error) {
+        console.error('Failed to load notifications:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadNotifications();
+
+    // Set up real-time subscription for new notifications
+    const channel = supabase
+      .channel('user-notifications')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          console.log('📧 New notification received:', payload.new);
+          setDbNotifications(prev => [payload.new as DBNotification, ...prev]);
+          
+          // Show desktop notification if enabled
+          const newNotif = payload.new as DBNotification;
+          if (notificationSettings.desktop && 
+              ['overdue', 'due_soon', 'task_assigned'].includes(newNotif.type)) {
+            showDesktopNotification(newNotif);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          setDbNotifications(prev => 
+            prev.map(notif => 
+              notif.id === payload.new.id ? payload.new as DBNotification : notif
+            )
+          );
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, notificationSettings.desktop]);
+
+  // Generate additional real-time notifications based on current tasks
+  const combinedNotifications = useMemo(() => {
+    if (!user || !userTasks.length) return dbNotifications;
+
+    const realTimeNotifs: DBNotification[] = [];
     const now = new Date();
 
-    tasks.forEach(task => {
-      const taskId = task.id;
-      
-      const isAssignedToUser = task.assignees && task.assignees.includes(user.id);
-      const isCreatedByUser = task.created_by === user.id;
-      
-      // Task assigned notifications - only if enabled
-      if (notificationSettings.taskAssigned && isAssignedToUser && !isCreatedByUser) {
-        notifs.push({
-          id: `assigned-${taskId}`,
-          title: 'New Task Assigned',
-          message: `You have been assigned to "${task.title}"`,
-          type: 'task_assigned',
-          taskId: taskId,
-          read: readNotifications.has(`assigned-${taskId}`),
-          createdAt: task.created_at
-        });
-      }
-
-      // Due soon notifications - only if enabled
-      if (notificationSettings.dueSoon && task.due_date && task.status !== 'done' && (isAssignedToUser || isCreatedByUser)) {
-        const dueDate = new Date(task.due_date);
-        
-        if (isToday(dueDate)) {
-          notifs.push({
-            id: `due-today-${taskId}`,
-            title: 'Task Due Today',
-            message: `"${task.title}" is due today`,
-            type: 'due_soon',
-            taskId: taskId,
-            read: readNotifications.has(`due-today-${taskId}`),
-            createdAt: task.due_date
-          });
-        } else if (isTomorrow(dueDate)) {
-          notifs.push({
-            id: `due-tomorrow-${taskId}`,
-            title: 'Task Due Tomorrow',
-            message: `"${task.title}" is due tomorrow`,
-            type: 'due_soon',
-            taskId: taskId,
-            read: readNotifications.has(`due-tomorrow-${taskId}`),
-            createdAt: task.due_date
-          });
+    // Only generate real-time notifications if settings allow them
+    if (notificationSettings.dueSoon || notificationSettings.taskAssigned) {
+      userTasks.forEach(task => {
+        // Task assigned notifications - only if enabled and not from DB
+        if (notificationSettings.taskAssigned && task.isAssigned && !task.isCreator) {
+          const assignedNotifExists = dbNotifications.some(
+            n => n.task_id === task.id && n.type === 'task_assigned'
+          );
+          
+          if (!assignedNotifExists) {
+            realTimeNotifs.push({
+              id: `rt-assigned-${task.id}`,
+              user_id: user.id,
+              task_id: task.id,
+              type: 'task_assigned',
+              title: 'New Task Assigned',
+              message: `You have been assigned to "${task.title}"`,
+              read: false,
+              created_at: task.created_at
+            });
+          }
         }
-      }
 
-      // Overdue notifications - always show if due soon is enabled (critical)
-      if (notificationSettings.dueSoon && task.due_date && task.status !== 'done' && (isAssignedToUser || isCreatedByUser)) {
-        const dueDate = new Date(task.due_date);
-        
-        if (isPast(dueDate) && !isToday(dueDate)) {
-          notifs.push({
-            id: `overdue-${taskId}`,
-            title: 'Task Overdue',
-            message: `"${task.title}" is overdue`,
-            type: 'overdue',
-            taskId: taskId,
-            read: readNotifications.has(`overdue-${taskId}`),
-            createdAt: task.due_date
-          });
+        // Due soon/overdue notifications - only if enabled and not covered by DB
+        if (notificationSettings.dueSoon && task.due_date && task.status !== 'done' && 
+            (task.isAssigned || task.isCreator)) {
+          const dueDate = new Date(task.due_date);
+          
+          if (isToday(dueDate)) {
+            const dueTodayExists = dbNotifications.some(
+              n => n.task_id === task.id && (n.type === 'due_soon' || n.type === 'task_due')
+            );
+            
+            if (!dueTodayExists) {
+              realTimeNotifs.push({
+                id: `rt-due-today-${task.id}`,
+                user_id: user.id,
+                task_id: task.id,
+                type: 'due_soon',
+                title: 'Task Due Today',
+                message: `"${task.title}" is due today`,
+                read: false,
+                created_at: task.due_date
+              });
+            }
+          } else if (isTomorrow(dueDate)) {
+            const dueTomorrowExists = dbNotifications.some(
+              n => n.task_id === task.id && n.type === 'due_soon'
+            );
+            
+            if (!dueTomorrowExists) {
+              realTimeNotifs.push({
+                id: `rt-due-tomorrow-${task.id}`,
+                user_id: user.id,
+                task_id: task.id,
+                type: 'due_soon',
+                title: 'Task Due Tomorrow',
+                message: `"${task.title}" is due tomorrow`,
+                read: false,
+                created_at: task.due_date
+              });
+            }
+          } else if (isPast(dueDate) && !isToday(dueDate)) {
+            const overdueExists = dbNotifications.some(
+              n => n.task_id === task.id && (n.type === 'overdue' || n.type === 'task_overdue')
+            );
+            
+            if (!overdueExists) {
+              realTimeNotifs.push({
+                id: `rt-overdue-${task.id}`,
+                user_id: user.id,
+                task_id: task.id,
+                type: 'overdue',
+                title: 'Task Overdue',
+                message: `"${task.title}" is overdue`,
+                read: false,
+                created_at: task.due_date
+              });
+            }
+          }
         }
-      }
 
-      // Task completed notifications - only if task updates are enabled
-      if (notificationSettings.taskUpdated && task.status === 'done' && isCreatedByUser && !isAssignedToUser) {
-        notifs.push({
-          id: `completed-${taskId}`,
-          title: 'Task Completed',
-          message: `"${task.title}" has been completed`,
-          type: 'completed',
-          taskId: taskId,
-          read: readNotifications.has(`completed-${taskId}`),
-          createdAt: task.updated_at || task.created_at
-        });
-      }
-
-      // Comment notifications - only if comments are enabled
-      if (notificationSettings.comments && task.comments && task.comments.length > 0 && (isAssignedToUser || isCreatedByUser)) {
-        const latestComment = task.comments[task.comments.length - 1];
-        if (latestComment.author !== user.id) {
-          notifs.push({
-            id: `comment-${taskId}-${latestComment.id}`,
-            title: 'New Comment',
-            message: `New comment on "${task.title}"`,
-            type: 'comment_added',
-            taskId: taskId,
-            read: readNotifications.has(`comment-${taskId}-${latestComment.id}`),
-            createdAt: latestComment.created_at
-          });
+        // Task completed notifications - only if task updates are enabled
+        if (notificationSettings.taskUpdated && task.status === 'done' && task.isCreator && !task.isAssigned) {
+          const completedExists = dbNotifications.some(
+            n => n.task_id === task.id && n.type === 'completed'
+          );
+          
+          if (!completedExists) {
+            realTimeNotifs.push({
+              id: `rt-completed-${task.id}`,
+              user_id: user.id,
+              task_id: task.id,
+              type: 'completed',
+              title: 'Task Completed',
+              message: `"${task.title}" has been completed`,
+              read: false,
+              created_at: task.updated_at || task.created_at
+            });
+          }
         }
-      }
+      });
+    }
 
-      // Task updated notifications - only if task updates are enabled
-      if (notificationSettings.taskUpdated && task.updated_at && task.updated_at !== task.created_at && (isAssignedToUser && !isCreatedByUser)) {
-        notifs.push({
-          id: `updated-${taskId}`,
-          title: 'Task Updated',
-          message: `"${task.title}" has been updated`,
-          type: 'task_updated',
-          taskId: taskId,
-          read: readNotifications.has(`updated-${taskId}`),
-          createdAt: task.updated_at
-        });
+    // Combine DB notifications with real-time ones, remove duplicates
+    const combined = [...dbNotifications, ...realTimeNotifs];
+    const uniqueNotifications = combined.filter((notif, index, self) => 
+      index === self.findIndex(n => 
+        (n.id === notif.id) || 
+        (n.task_id === notif.task_id && n.type === notif.type)
+      )
+    );
+
+    return uniqueNotifications
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, 20);
+  }, [dbNotifications, userTasks, user, notificationSettings]);
+
+  // Filter notifications based on user settings
+  const filteredNotifications = useMemo(() => {
+    return combinedNotifications.filter(notif => {
+      switch (notif.type) {
+        case 'task_assigned':
+          return notificationSettings.taskAssigned;
+        case 'task_updated':
+          return notificationSettings.taskUpdated;
+        case 'comment_added':
+          return notificationSettings.comments;
+        case 'due_soon':
+        case 'task_due':
+        case 'overdue':
+        case 'task_overdue':
+          return notificationSettings.dueSoon;
+        case 'completed':
+          return notificationSettings.taskUpdated;
+        default:
+          return true;
       }
     });
+  }, [combinedNotifications, notificationSettings]);
 
-    console.log('📧 Generated notifications:', notifs.length, 'notifications');
-    console.log('📧 Notification details:', notifs);
+  const unreadCount = filteredNotifications.filter(n => !n.read).length;
 
-    // Filter out dismissed notifications and sort by date
-    return notifs
-      .filter(notif => !dismissedNotifications.has(notif.id))
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .slice(0, 20); // Limit to 20 most recent
-  }, [tasks, user, readNotifications, dismissedNotifications, notificationSettings]);
+  const markAsRead = async (id: string) => {
+    // If it's a real-time notification (starts with 'rt-'), just update locally
+    if (id.startsWith('rt-')) {
+      setDbNotifications(prev => 
+        prev.map(notif => notif.id === id ? { ...notif, read: true } : notif)
+      );
+      return;
+    }
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ read: true })
+        .eq('id', id);
 
-  const markAsRead = (id: string) => {
-    const newReadSet = new Set(readNotifications);
-    newReadSet.add(id);
-    setReadNotifications(newReadSet);
-    console.log('📧 Marked notification as read:', id);
+      if (error) {
+        console.error('Error marking notification as read:', error);
+      }
+    } catch (error) {
+      console.error('Failed to mark notification as read:', error);
+    }
   };
 
-  const markAllAsRead = () => {
-    const allIds = notifications.map(n => n.id);
-    const newReadSet = new Set([...readNotifications, ...allIds]);
-    setReadNotifications(newReadSet);
-    console.log('📧 Marked all notifications as read:', allIds.length);
+  const markAllAsRead = async () => {
+    try {
+      const unreadIds = filteredNotifications
+        .filter(n => !n.read && !n.id.startsWith('rt-'))
+        .map(n => n.id);
+
+      if (unreadIds.length > 0) {
+        const { error } = await supabase
+          .from('notifications')
+          .update({ read: true })
+          .in('id', unreadIds);
+
+        if (error) {
+          console.error('Error marking all notifications as read:', error);
+        }
+      }
+
+      // Update real-time notifications locally
+      setDbNotifications(prev => 
+        prev.map(notif => ({ ...notif, read: true }))
+      );
+    } catch (error) {
+      console.error('Failed to mark all notifications as read:', error);
+    }
   };
 
-  const removeNotification = (id: string) => {
-    const newDismissedSet = new Set(dismissedNotifications);
-    newDismissedSet.add(id);
-    setDismissedNotifications(newDismissedSet);
-    console.log('📧 Dismissed notification:', id);
+  const removeNotification = async (id: string) => {
+    // If it's a real-time notification, just remove locally
+    if (id.startsWith('rt-')) {
+      setDbNotifications(prev => prev.filter(notif => notif.id !== id));
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('Error removing notification:', error);
+      }
+    } catch (error) {
+      console.error('Failed to remove notification:', error);
+    }
   };
 
-  const getNotificationColor = (type: Notification['type']) => {
+  const getNotificationColor = (type: string) => {
     switch (type) {
       case 'task_assigned':
         return 'bg-blue-100 text-blue-800';
       case 'due_soon':
+      case 'task_due':
         return 'bg-yellow-100 text-yellow-800';
       case 'overdue':
+      case 'task_overdue':
         return 'bg-red-100 text-red-800';
       case 'comment_added':
         return 'bg-green-100 text-green-800';
@@ -258,11 +488,10 @@ export const NotificationCenter = () => {
     }
   };
 
-  // Desktop notification function (respects settings)
-  const showDesktopNotification = (notification: Notification) => {
+  // Desktop notification function
+  const showDesktopNotification = (notification: DBNotification) => {
     if (!notificationSettings.desktop) return;
     
-    // Request permission if not granted
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
     }
@@ -271,8 +500,8 @@ export const NotificationCenter = () => {
       try {
         new Notification(notification.title, {
           body: notification.message,
-          icon: '/favicon.ico', // Use your app icon
-          tag: notification.id // Prevents duplicate notifications
+          icon: '/favicon.ico',
+          tag: notification.id
         });
       } catch (error) {
         console.warn('Failed to show desktop notification:', error);
@@ -280,23 +509,11 @@ export const NotificationCenter = () => {
     }
   };
 
-  // Show desktop notification for new unread notifications
+  // Update document title with notification count
   useEffect(() => {
-    const newUnreadNotifications = notifications.filter(n => !n.read && !readNotifications.has(n.id));
+    const originalTitle = document.title.replace(/^\(\d+\) /, '');
     
-    newUnreadNotifications.forEach(notification => {
-      // Only show desktop notification for high-priority types
-      if (['overdue', 'due_soon', 'task_assigned'].includes(notification.type)) {
-        showDesktopNotification(notification);
-      }
-    });
-  }, [notifications, notificationSettings.desktop]);
-
-  // Show notification count in document title (if notifications are enabled)
-  useEffect(() => {
-    const originalTitle = document.title.replace(/^\(\d+\) /, ''); // Remove existing count
-    
-    if (unreadCount > 0 && (notificationSettings.desktop || notificationSettings.taskAssigned || notificationSettings.comments || notificationSettings.dueSoon)) {
+    if (unreadCount > 0 && Object.values(notificationSettings).some(v => v)) {
       document.title = `(${unreadCount}) ${originalTitle}`;
     } else {
       document.title = originalTitle;
@@ -306,6 +523,14 @@ export const NotificationCenter = () => {
       document.title = originalTitle;
     };
   }, [unreadCount, notificationSettings]);
+
+  if (loading) {
+    return (
+      <Button variant="ghost" size="sm" className="relative" disabled>
+        <Bell className="h-5 w-5 animate-pulse" />
+      </Button>
+    );
+  }
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -346,7 +571,7 @@ export const NotificationCenter = () => {
                     Enable notifications in Settings to see updates here
                   </p>
                 </div>
-              ) : notifications.length === 0 ? (
+              ) : filteredNotifications.length === 0 ? (
                 <div className="p-8 text-center text-gray-500">
                   <Bell className="h-8 w-8 mx-auto mb-2 text-gray-300" />
                   <p className="text-sm">No notifications</p>
@@ -355,7 +580,7 @@ export const NotificationCenter = () => {
                   </p>
                 </div>
               ) : (
-                notifications.map(notification => (
+                filteredNotifications.map(notification => (
                   <div
                     key={notification.id}
                     className={`p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors ${
@@ -378,7 +603,7 @@ export const NotificationCenter = () => {
                             {notification.type.replace('_', ' ')}
                           </Badge>
                           <p className="text-xs text-gray-500">
-                            {getRelativeTime(notification.createdAt)}
+                            {getRelativeTime(notification.created_at)}
                           </p>
                         </div>
                       </div>
@@ -410,8 +635,8 @@ export const NotificationCenter = () => {
             
             <div className="p-2 border-t bg-gray-50">
               <p className="text-xs text-gray-500 text-center">
-                {notifications.length > 0 ? (
-                  `${notifications.length} recent notifications`
+                {filteredNotifications.length > 0 ? (
+                  `${filteredNotifications.length} recent notifications`
                 ) : Object.values(notificationSettings).some(v => v) ? (
                   'No notifications to show'
                 ) : (
