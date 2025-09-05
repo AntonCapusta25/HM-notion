@@ -45,7 +45,7 @@ const chatbotAPI = {
     task_created?: any;
     query_result?: any;
   }> => {
-    const response = await fetch('/api/chatbot', {
+    const response = await fetch('https://wqpmhnsxqcsplfdyxrih.supabase.co/functions/v1/chatbot', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -67,7 +67,7 @@ const chatbotAPI = {
 
   // Load conversation history
   loadSession: async (sessionId: string, userAuthToken: string): Promise<ChatSession | null> => {
-    const response = await fetch(`/api/chatbot/sessions/${sessionId}`, {
+    const response = await fetch(`https://wqpmhnsxqcsplfdyxrih.supabase.co/functions/v1/chatbot/sessions/${sessionId}`, {
       headers: {
         'Authorization': `Bearer ${userAuthToken}`
       }
@@ -81,7 +81,7 @@ const chatbotAPI = {
 
   // Get all user sessions
   getUserSessions: async (userAuthToken: string): Promise<ChatSession[]> => {
-    const response = await fetch('/api/chatbot/sessions', {
+    const response = await fetch('https://wqpmhnsxqcsplfdyxrih.supabase.co/functions/v1/chatbot/sessions', {
       headers: {
         'Authorization': `Bearer ${userAuthToken}`
       }
@@ -93,7 +93,7 @@ const chatbotAPI = {
 
   // Create new session
   createSession: async (userAuthToken: string): Promise<ChatSession> => {
-    const response = await fetch('/api/chatbot/sessions', {
+    const response = await fetch('https://wqpmhnsxqcsplfdyxrih.supabase.co/functions/v1/chatbot/sessions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
