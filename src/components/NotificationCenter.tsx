@@ -15,7 +15,7 @@ interface SimpleNotification {
   created_at: string;
 }
 
-export const SimpleNotificationCenter = () => {
+export const NotificationCenter = () => {
   const { user } = useAuth();
   const [notifications, setNotifications] = useState<SimpleNotification[]>([]);
   const [open, setOpen] = useState(false);
@@ -242,3 +242,5 @@ export const SimpleNotificationCenter = () => {
     </div>
   );
 };
+
+export { NotificationCenter };
