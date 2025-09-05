@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { User, Bell, Palette, Shield, Download, AlertCircle } from 'lucide-react';
+import { User, Bell, Palette, Shield, Download, AlertCircle, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '../contexts/AuthContext';
 import { useProfile } from '../hooks/useProfile';
@@ -20,18 +20,19 @@ const Settings = () => {
   const { toast } = useToast();
   const { user, signOut } = useAuth();
   const { profile, loading: profileLoading, error: profileError } = useProfile();
-  const { tasks } = useTaskContext(); // Get tasks for export
+  const { tasks } = useTaskContext();
   
   const [isUpdating, setIsUpdating] = useState(false);
   const [settings, setSettings] = useState({
     name: '',
     email: '',
     department: 'Operations',
+    role: 'member',
     notifications: {
       email: true,
       desktop: true,
       taskAssigned: true,
-      taskUpdated: false,
+      taskUpdated: true,
       comments: true,
       dueSoon: true
     },
@@ -44,24 +45,39 @@ const Settings = () => {
   useEffect(() => {
     const savedPreferences = localStorage.getItem('userPreferences');
     if (savedPreferences) {
-      const prefs = JSON.parse(savedPreferences);
-      setSettings(prev => ({
-        ...prev,
-        ...prefs
-      }));
+      try {
+        const prefs = JSON.parse(savedPreferences);
+        setSettings(prev => ({
+          ...prev,
+          ...prefs,
+          // Ensure notifications object exists and has all required fields
+          notifications: {
+            email: true,
+            desktop: true,
+            taskAssigned: true,
+            taskUpdated: true,
+            comments: true,
+            dueSoon: true,
+            ...prefs.notifications
+          }
+        }));
+        console.log('📧 Loaded user preferences:', prefs);
+      } catch (error) {
+        console.error('Error parsing saved preferences:', error);
+      }
     }
   }, []);
 
-  // Load user data when profile loads - using consistent field mapping
+  // Load user data when profile loads - using actual schema fields
   useEffect(() => {
     if (user && profile) {
       setSettings(prev => ({
         ...prev,
-        // Use profile.name (consistent with Team.tsx user mapping)
-        name: profile.name || profile.full_name || user.email?.split('@')[0] || '',
+        // Use actual fields from your users table
+        name: profile.name || user.email?.split('@')[0] || '',
         email: user.email || '',
-        // Use profile.department (consistent with Team.tsx)
         department: profile.department || prev.department,
+        role: profile.role || prev.role,
       }));
     }
   }, [user, profile]);
@@ -95,27 +111,36 @@ const Settings = () => {
     setIsUpdating(true);
 
     try {
-      // Save profile data using consistent field mapping with Team.tsx
+      // Save profile data using actual schema fields
       const { error } = await supabase
         .from('users')
         .upsert({
           id: user.id,
-          // Map to both fields for compatibility
           name: settings.name,
-          full_name: settings.name,
+          email: settings.email,
           department: settings.department,
+          role: settings.role,
           updated_at: new Date().toISOString()
         });
 
       if (error) throw error;
 
-      // Save preferences to localStorage
-      localStorage.setItem('userPreferences', JSON.stringify({
+      // Save preferences to localStorage and trigger storage event for other components
+      const preferencesToSave = {
         department: settings.department,
+        role: settings.role,
         notifications: settings.notifications,
         theme: settings.theme,
         timezone: settings.timezone,
         language: settings.language
+      };
+
+      localStorage.setItem('userPreferences', JSON.stringify(preferencesToSave));
+      
+      // Dispatch storage event to notify other components (like NotificationCenter)
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'userPreferences',
+        newValue: JSON.stringify(preferencesToSave)
       }));
 
       toast({
@@ -136,17 +161,38 @@ const Settings = () => {
 
   const exportData = async () => {
     try {
-      // Export user's tasks using consistent field mapping
+      // Export user's tasks and related data using actual schema
       const { data: userTasks, error: tasksError } = await supabase
+        .from('task_assignees')
+        .select(`
+          task_id,
+          tasks (*)
+        `)
+        .eq('user_id', user?.id);
+
+      if (tasksError) throw tasksError;
+
+      // Get user's created tasks
+      const { data: createdTasks, error: createdError } = await supabase
         .from('tasks')
         .select('*')
         .eq('created_by', user?.id);
 
-      if (tasksError) throw tasksError;
+      if (createdError) throw createdError;
+
+      // Get user's notifications
+      const { data: notifications, error: notifError } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', user?.id);
+
+      if (notifError) throw notifError;
 
       const exportData = {
         profile: profile,
-        tasks: userTasks,
+        assignedTasks: userTasks,
+        createdTasks: createdTasks,
+        notifications: notifications,
         settings: settings,
         exportedAt: new Date().toISOString()
       };
@@ -177,6 +223,35 @@ const Settings = () => {
     }
   };
 
+  const clearAllNotifications = async () => {
+    const confirmed = window.confirm(
+      "Are you sure you want to clear all your notifications? This action cannot be undone."
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Notifications cleared",
+        description: "All your notifications have been removed.",
+      });
+    } catch (error: any) {
+      console.error('Error clearing notifications:', error);
+      toast({
+        title: "Error",
+        description: "Failed to clear notifications. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
   const deleteAccount = async () => {
     const confirmed = window.confirm(
       "Are you sure you want to delete your account? This action cannot be undone and will permanently delete all your data."
@@ -202,7 +277,7 @@ const Settings = () => {
     }
   };
 
-  // Generate user initials - consistent with Team.tsx approach
+  // Generate user initials
   const getInitials = () => {
     if (settings.name) {
       return settings.name
@@ -305,22 +380,38 @@ const Settings = () => {
                 </div>
               </div>
 
-              <div>
-                <Label htmlFor="department">Department</Label>
-                <Select value={settings.department} onValueChange={(value) => updateSetting('department', value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select your department" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Operations">Operations</SelectItem>
-                    <SelectItem value="Marketing">Marketing</SelectItem>
-                    <SelectItem value="Chef Onboarding">Chef Onboarding</SelectItem>
-                    <SelectItem value="Customer Success">Customer Success</SelectItem>
-                    <SelectItem value="Technology">Technology</SelectItem>
-                    <SelectItem value="Finance">Finance</SelectItem>
-                    <SelectItem value="HR">Human Resources</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="department">Department</Label>
+                  <Select value={settings.department} onValueChange={(value) => updateSetting('department', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select your department" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Operations">Operations</SelectItem>
+                      <SelectItem value="Marketing">Marketing</SelectItem>
+                      <SelectItem value="Chef Onboarding">Chef Onboarding</SelectItem>
+                      <SelectItem value="Customer Success">Customer Success</SelectItem>
+                      <SelectItem value="Technology">Technology</SelectItem>
+                      <SelectItem value="Finance">Finance</SelectItem>
+                      <SelectItem value="HR">Human Resources</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="role">Role</Label>
+                  <Select value={settings.role} onValueChange={(value) => updateSetting('role', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select your role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="manager">Manager</SelectItem>
+                      <SelectItem value="member">Member</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <Button 
@@ -398,6 +489,17 @@ const Settings = () => {
                     onCheckedChange={(checked) => updateSetting('notifications.dueSoon', checked)}
                   />
                 </div>
+
+                <Separator />
+
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start" 
+                  onClick={clearAllNotifications}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Clear All Notifications
+                </Button>
               </div>
             </CardContent>
           </Card>
