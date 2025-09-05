@@ -19,24 +19,39 @@ export const NotificationCenter = () => {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [debugLogs, setDebugLogs] = useState<string[]>([]);
-  const [notifications, setNotifications] = useState<TestNotification[]>([
-    {
-      id: '1',
-      title: 'Test Notification 1',
-      message: 'This is a test notification',
-      type: 'task_assigned',
-      read: false,
-      created_at: new Date().toISOString()
-    },
-    {
-      id: '2',
-      title: 'Test Notification 2',
-      message: 'Another test notification',
-      type: 'due_soon',
-      read: true,
-      created_at: new Date(Date.now() - 60000).toISOString()
-    }
-  ]);
+  const [notifications, setNotifications] = useState<TestNotification[]>([]);
+
+  // Initialize test notifications
+  useEffect(() => {
+    const testNotifs = [
+      {
+        id: '1',
+        title: 'Test Notification 1',
+        message: 'This is a test notification - click the buttons!',
+        type: 'task_assigned',
+        read: false,
+        created_at: new Date().toISOString()
+      },
+      {
+        id: '2',
+        title: 'Test Notification 2',
+        message: 'Another test notification - also try these buttons!',
+        type: 'due_soon',
+        read: false,  // Make both unread for testing
+        created_at: new Date(Date.now() - 60000).toISOString()
+      },
+      {
+        id: '3',
+        title: 'Read Notification',
+        message: 'This one is already read (no buttons)',
+        type: 'completed',
+        read: true,
+        created_at: new Date(Date.now() - 120000).toISOString()
+      }
+    ];
+    setNotifications(testNotifs);
+    addLog(`Initialized ${testNotifs.length} test notifications`);
+  }, []);
 
   const addLog = (message: string) => {
     console.log(`[NotificationCenter] ${message}`);
