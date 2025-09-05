@@ -1,17 +1,20 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Layout } from '../components/Layout';
 import { TaskCard } from '../components/TaskCard';
 import { CreateTaskDialog } from '../components/CreateTaskDialog';
 import { TaskDetailDialog } from '../components/TaskDetailDialog';
 import { WorkspaceSelector } from '../components/WorkspaceSelector';
 import { ListView } from '../components/ListView';
+import { EnhancedChatbot } from '../components/EnhancedChatbot';
 import { useTaskContext } from '../contexts/TaskContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useProfile } from '../hooks/useProfile';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Plus, Calendar, AlertCircle, LayoutGrid, List, RefreshCw } from 'lucide-react';
+import { Plus, Calendar, AlertCircle, LayoutGrid, List, RefreshCw, MessageCircle, X, Minimize2 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 import { Task } from '../types';
 
 export const MyTasks = () => {
@@ -31,6 +34,7 @@ export const MyTasks = () => {
   } = useTaskContext();
 
   const { user } = useAuth();
+  const { profile: userProfile } = useProfile();
   
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -38,6 +42,35 @@ export const MyTasks = () => {
   const [filter, setFilter] = useState<'all' | 'today' | 'week' | 'overdue'>('all');
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Chatbot integration states
+  const [showChatbot, setShowChatbot] = useState(false);
+  const [isChatbotMinimized, setIsChatbotMinimized] = useState(false);
+  const [authToken, setAuthToken] = useState<string>('');
+
+  // Get auth token for chatbot
+  useEffect(() => {
+    const getAuthToken = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setAuthToken(session?.access_token || '');
+    };
+    getAuthToken();
+  }, []);
+
+  // Chatbot toggle functions
+  const toggleChatbot = () => {
+    setShowChatbot(!showChatbot);
+    setIsChatbotMinimized(false);
+  };
+
+  const minimizeChatbot = () => {
+    setIsChatbotMinimized(true);
+  };
+
+  const closeChatbot = () => {
+    setShowChatbot(false);
+    setIsChatbotMinimized(false);
+  };
 
   // Manual refresh function
   const handleManualRefresh = useCallback(async () => {
@@ -231,6 +264,15 @@ export const MyTasks = () => {
                 {isRefreshing ? 'Refreshing...' : 'Refresh'}
               </Button>
             )}
+            <Button 
+              onClick={toggleChatbot}
+              variant="outline" 
+              size="sm"
+              className="flex items-center gap-2"
+            >
+              <MessageCircle className="h-4 w-4" />
+              AI Assistant
+            </Button>
             <div className="flex border rounded-lg p-1 bg-gray-50">
               <Button 
                 variant={viewMode === 'kanban' ? 'default' : 'ghost'} 
@@ -423,6 +465,60 @@ export const MyTasks = () => {
             </Card>
           </div>
         )}
+
+        {/* Enhanced Floating Chatbot */}
+        <div className="fixed bottom-6 right-6 z-50">
+          {!showChatbot ? (
+            /* Floating Chat Button */
+            <Button
+              onClick={toggleChatbot}
+              className="bg-homemade-orange hover:bg-homemade-orange-dark rounded-full w-14 h-14 shadow-lg hover:shadow-xl transition-all duration-200"
+              title="Open AI Assistant"
+            >
+              <MessageCircle className="h-6 w-6" />
+            </Button>
+          ) : isChatbotMinimized ? (
+            /* Minimized State */
+            <Button
+              onClick={() => setIsChatbotMinimized(false)}
+              className="bg-homemade-orange hover:bg-homemade-orange-dark rounded-full w-14 h-14 shadow-lg"
+              title="Expand AI Assistant"
+            >
+              <MessageCircle className="h-6 w-6" />
+            </Button>
+          ) : (
+            /* Full Enhanced Chatbot with Controls */
+            <div className="relative">
+              <div className="absolute top-2 right-2 z-10 flex gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={minimizeChatbot}
+                  className="h-6 w-6 p-0 text-gray-500 hover:text-gray-700 bg-white/80 hover:bg-white rounded-full"
+                  title="Minimize"
+                >
+                  <Minimize2 className="h-3 w-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={closeChatbot}
+                  className="h-6 w-6 p-0 text-gray-500 hover:text-gray-700 bg-white/80 hover:bg-white rounded-full"
+                  title="Close"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+              {/* Enhanced Chatbot Component */}
+              {authToken && userProfile && (
+                <EnhancedChatbot 
+                  userAuthToken={authToken}
+                  userId={userProfile.id}
+                />
+              )}
+            </div>
+          )}
+        </div>
 
         <CreateTaskDialog 
           open={showCreateTask} 
