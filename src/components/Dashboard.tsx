@@ -1,3 +1,4 @@
+// Update the Dashboard component to use the EnhancedChatbot
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Plus, Calendar, BarChart3, Grid3X3, List, RefreshCw, MessageCircle, X, Minimize2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -9,7 +10,7 @@ import { CreateTaskDialog } from './CreateTaskDialog';
 import { TaskDetailDialog } from './TaskDetailDialog';
 import { ListView } from './ListView';
 import { TaskFilters, TaskFiltersState } from './TaskFilters';
-import { InternalChatbot } from './InternalChatbot';
+import { EnhancedChatbot } from './EnhancedChatbot'; // Updated import
 import { useTaskContext } from '../contexts/TaskContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useProfile } from '../hooks/useProfile';
@@ -60,9 +61,8 @@ export const Dashboard = () => {
     sortOrder: 'desc'
   });
 
-  // Chatbot integration states
+  // Enhanced chatbot integration states
   const [showChatbot, setShowChatbot] = useState(false);
-  const [chatbotPosition, setChatbotPosition] = useState<'floating' | 'sidebar' | 'modal'>('floating');
   const [isChatbotMinimized, setIsChatbotMinimized] = useState(false);
 
   // Track task changes for logging
@@ -354,6 +354,18 @@ export const Dashboard = () => {
     setIsChatbotMinimized(false);
   };
 
+  // Get auth token for chatbot
+  const getAuthToken = useCallback(async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.access_token || '';
+  }, []);
+
+  const [authToken, setAuthToken] = useState<string>('');
+
+  useEffect(() => {
+    getAuthToken().then(setAuthToken);
+  }, [getAuthToken]);
+
   if (profileLoading || tasksLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -488,7 +500,7 @@ export const Dashboard = () => {
             className="flex items-center gap-2"
           >
             <MessageCircle className="h-4 w-4" />
-            Assistant
+            AI Assistant
           </Button>
           <Button onClick={() => setShowCreateTask(true)} className="bg-homemade-orange hover:bg-homemade-orange-dark">
             <Plus className="h-4 w-4 mr-2" />
@@ -695,14 +707,14 @@ export const Dashboard = () => {
         />
       )}
 
-      {/* Always Visible Floating Chatbot Icon */}
+      {/* Enhanced Floating Chatbot */}
       <div className="fixed bottom-6 right-6 z-50">
         {!showChatbot ? (
           /* Floating Chat Button - Always Visible */
           <Button
             onClick={toggleChatbot}
             className="bg-homemade-orange hover:bg-homemade-orange-dark rounded-full w-14 h-14 shadow-lg hover:shadow-xl transition-all duration-200"
-            title="Open Assistant"
+            title="Open AI Assistant"
           >
             <MessageCircle className="h-6 w-6" />
           </Button>
@@ -711,12 +723,12 @@ export const Dashboard = () => {
           <Button
             onClick={() => setIsChatbotMinimized(false)}
             className="bg-homemade-orange hover:bg-homemade-orange-dark rounded-full w-14 h-14 shadow-lg"
-            title="Expand Assistant"
+            title="Expand AI Assistant"
           >
             <MessageCircle className="h-6 w-6" />
           </Button>
         ) : (
-          /* Full Chatbot with Controls */
+          /* Full Enhanced Chatbot with Controls */
           <div className="relative">
             <div className="absolute top-2 right-2 z-10 flex gap-1">
               <Button
@@ -738,7 +750,13 @@ export const Dashboard = () => {
                 <X className="h-3 w-3" />
               </Button>
             </div>
-            <InternalChatbot />
+            {/* Enhanced Chatbot Component */}
+            {authToken && userProfile && (
+              <EnhancedChatbot 
+                userAuthToken={authToken}
+                userId={userProfile.id}
+              />
+            )}
           </div>
         )}
       </div>
