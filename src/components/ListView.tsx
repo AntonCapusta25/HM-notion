@@ -6,10 +6,11 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, Calendar, Trash2, Check, X } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
+import { Plus, Calendar, Trash2, Check, X, Users, Edit2 } from 'lucide-react';
 import { Task, User as UserType } from '../types';
 import { format } from 'date-fns';
-import { QuickAssignTask } from './QuickAssignTask';
 
 interface ListViewProps {
   tasks: Task[];
@@ -17,6 +18,7 @@ interface ListViewProps {
   onCreateTask: (taskData: any) => void;
   onUpdateTask: (taskId: string, updates: Partial<Task>) => void;
   onDeleteTask: (taskId: string) => void;
+  onAssignTask: (taskId: string, userIds: string[]) => void; // New prop for assignment
 }
 
 // Safe date formatting utility
@@ -34,16 +36,162 @@ const safeFormatDate = (dateInput: string | null | undefined, formatStr: string 
   }
 };
 
+// Component for managing task assignees
+const AssigneeManager = ({ 
+  taskId, 
+  currentAssignees, 
+  users, 
+  onAssign 
+}: { 
+  taskId: string;
+  currentAssignees: string[];
+  users: UserType[];
+  onAssign: (taskId: string, userIds: string[]) => void;
+}) => {
+  const [open, setOpen] = useState(false);
+
+  const assignedUsers = users.filter(u => currentAssignees?.includes(u.id));
+  const unassignedUsers = users.filter(u => !currentAssignees?.includes(u.id));
+
+  const handleAssignUser = (userId: string) => {
+    const newAssignees = [...(currentAssignees || []), userId];
+    onAssign(taskId, newAssignees);
+  };
+
+  const handleUnassignUser = (userId: string) => {
+    const newAssignees = (currentAssignees || []).filter(id => id !== userId);
+    onAssign(taskId, newAssignees);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className="h-8">
+          <Users className="h-3 w-3 mr-1" />
+          {assignedUsers.length > 0 ? `${assignedUsers.length} assigned` : 'Assign'}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Search users..." />
+          <CommandEmpty>No users found.</CommandEmpty>
+          
+          {assignedUsers.length > 0 && (
+            <CommandGroup heading="Assigned">
+              {assignedUsers.map(user => (
+                <CommandItem
+                  key={user.id}
+                  className="flex items-center justify-between cursor-pointer"
+                  onSelect={() => handleUnassignUser(user.id)}
+                >
+                  <div className="flex items-center gap-2">
+                    <Avatar className="h-6 w-6">
+                      <AvatarFallback className="text-xs">{user.name.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <span className="text-sm">{user.name}</span>
+                    <Badge variant="outline" className="text-xs">{user.department}</Badge>
+                  </div>
+                  <X className="h-3 w-3 text-red-500" />
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          )}
+          
+          {unassignedUsers.length > 0 && (
+            <CommandGroup heading="Available">
+              {unassignedUsers.map(user => (
+                <CommandItem
+                  key={user.id}
+                  className="flex items-center justify-between cursor-pointer"
+                  onSelect={() => handleAssignUser(user.id)}
+                >
+                  <div className="flex items-center gap-2">
+                    <Avatar className="h-6 w-6">
+                      <AvatarFallback className="text-xs">{user.name.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <span className="text-sm">{user.name}</span>
+                    <Badge variant="outline" className="text-xs">{user.department}</Badge>
+                  </div>
+                  <Plus className="h-3 w-3 text-green-500" />
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          )}
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+};
+
+// Inline date editor component
+const InlineDateEditor = ({ 
+  taskId, 
+  currentDate, 
+  onUpdate 
+}: { 
+  taskId: string;
+  currentDate: string | null;
+  onUpdate: (taskId: string, updates: Partial<Task>) => void;
+}) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [dateValue, setDateValue] = useState(currentDate || '');
+
+  const handleSave = () => {
+    onUpdate(taskId, { due_date: dateValue || null });
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setDateValue(currentDate || '');
+    setIsEditing(false);
+  };
+
+  if (isEditing) {
+    return (
+      <div className="flex items-center gap-1">
+        <Input
+          type="date"
+          value={dateValue}
+          onChange={(e) => setDateValue(e.target.value)}
+          className="h-7 text-xs"
+          autoFocus
+        />
+        <Button size="sm" variant="ghost" onClick={handleSave} className="h-6 w-6 p-0">
+          <Check className="h-3 w-3 text-green-600" />
+        </Button>
+        <Button size="sm" variant="ghost" onClick={handleCancel} className="h-6 w-6 p-0">
+          <X className="h-3 w-3 text-red-600" />
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div 
+      className="flex items-center gap-1 cursor-pointer hover:bg-gray-100 rounded px-1 py-1"
+      onClick={() => setIsEditing(true)}
+    >
+      <Calendar className="h-3 w-3" />
+      <span className="text-sm">
+        {currentDate ? safeFormatDate(currentDate, 'MMM d') : 'Set date'}
+      </span>
+      <Edit2 className="h-3 w-3 text-gray-400" />
+    </div>
+  );
+};
+
 export const ListView = ({ 
   tasks, 
   users, 
   onCreateTask, 
   onUpdateTask, 
-  onDeleteTask
+  onDeleteTask,
+  onAssignTask
 }: ListViewProps) => {
   const [isAddingTask, setIsAddingTask] = useState(false);
   const [newTask, setNewTask] = useState({
     title: '',
+    description: '',
     priority: 'medium' as 'low' | 'medium' | 'high',
     status: 'todo' as 'todo' | 'in_progress' | 'done',
     due_date: ''
@@ -65,17 +213,16 @@ export const ListView = ({
     if (!newTask.title.trim()) return;
     
     onCreateTask({
-      title: newTask.title,
-      description: '',
+      title: newTask.title.trim(),
+      description: newTask.description.trim(),
       priority: newTask.priority,
       status: newTask.status,
-      due_date: newTask.due_date || null, // Use correct field name
-      tags: [],
-      assignees: []
+      due_date: newTask.due_date || null
     });
 
     setNewTask({
       title: '',
+      description: '',
       priority: 'medium',
       status: 'todo',
       due_date: ''
@@ -89,18 +236,6 @@ export const ListView = ({
 
   const handlePriorityChange = (taskId: string, priority: string) => {
     onUpdateTask(taskId, { priority: priority as 'low' | 'medium' | 'high' });
-  };
-
-  const handleAssignTask = (taskId: string, userId: string) => {
-    // Update to use assignees array instead of single assignedTo
-    const task = tasks.find(t => t.id === taskId);
-    if (task) {
-      const newAssignees = task.assignees.includes(userId) 
-        ? task.assignees.filter(id => id !== userId) // Remove if already assigned
-        : [...task.assignees, userId]; // Add if not assigned
-      
-      onUpdateTask(taskId, { assignees: newAssignees });
-    }
   };
 
   return (
@@ -125,8 +260,8 @@ export const ListView = ({
               <TableHead className="w-[300px]">Task</TableHead>
               <TableHead className="w-[120px]">Status</TableHead>
               <TableHead className="w-[120px]">Priority</TableHead>
-              <TableHead className="w-[100px]">Assignees</TableHead>
-              <TableHead className="w-[120px]">Due Date</TableHead>
+              <TableHead className="w-[150px]">Assignees</TableHead>
+              <TableHead className="w-[140px]">Due Date</TableHead>
               <TableHead className="w-[80px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -134,13 +269,20 @@ export const ListView = ({
             {isAddingTask && (
               <TableRow className="bg-blue-50">
                 <TableCell>
-                  <Input
-                    placeholder="Enter task title..."
-                    value={newTask.title}
-                    onChange={(e) => setNewTask(prev => ({ ...prev, title: e.target.value }))}
-                    onKeyPress={(e) => e.key === 'Enter' && handleCreateTask()}
-                    autoFocus
-                  />
+                  <div className="space-y-2">
+                    <Input
+                      placeholder="Enter task title..."
+                      value={newTask.title}
+                      onChange={(e) => setNewTask(prev => ({ ...prev, title: e.target.value }))}
+                      onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleCreateTask()}
+                      autoFocus
+                    />
+                    <Input
+                      placeholder="Enter task description (optional)..."
+                      value={newTask.description}
+                      onChange={(e) => setNewTask(prev => ({ ...prev, description: e.target.value }))}
+                    />
+                  </div>
                 </TableCell>
                 <TableCell>
                   <Select 
@@ -196,8 +338,11 @@ export const ListView = ({
             )}
             
             {tasks.map((task) => {
-              // Use assignees array instead of single assignedTo
-              const assignedUsers = users.filter(u => task.assignees?.includes(u.id));
+              // Get assignees from the task_assignees relationship
+              const assignedUsers = users.filter(u => 
+                task.assignees?.includes(u.id) || 
+                (task as any).task_assignees?.some((ta: any) => ta.user_id === u.id)
+              );
               
               return (
                 <TableRow key={task.id} className="hover:bg-gray-50">
@@ -251,34 +396,35 @@ export const ListView = ({
                     </Select>
                   </TableCell>
                   <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {assignedUsers.length > 0 ? (
-                        assignedUsers.slice(0, 2).map(user => (
-                          <div key={user.id} className="flex items-center gap-1">
-                            <Avatar className="h-6 w-6">
-                              <AvatarFallback className="text-xs">{user.name.charAt(0)}</AvatarFallback>
-                            </Avatar>
+                    <div className="flex items-center gap-2">
+                      <div className="flex -space-x-1">
+                        {assignedUsers.slice(0, 3).map(user => (
+                          <Avatar key={user.id} className="h-6 w-6 border-2 border-white">
+                            <AvatarFallback className="text-xs bg-blue-100">
+                              {user.name.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
+                        ))}
+                        {assignedUsers.length > 3 && (
+                          <div className="h-6 w-6 rounded-full bg-gray-200 border-2 border-white flex items-center justify-center">
+                            <span className="text-xs text-gray-600">+{assignedUsers.length - 3}</span>
                           </div>
-                        ))
-                      ) : (
-                        <span className="text-sm text-gray-400">Unassigned</span>
-                      )}
-                      {assignedUsers.length > 2 && (
-                        <Badge variant="outline" className="text-xs">
-                          +{assignedUsers.length - 2}
-                        </Badge>
-                      )}
+                        )}
+                      </div>
+                      <AssigneeManager
+                        taskId={task.id}
+                        currentAssignees={task.assignees || []}
+                        users={users}
+                        onAssign={onAssignTask}
+                      />
                     </div>
                   </TableCell>
                   <TableCell>
-                    {task.due_date ? (
-                      <div className="flex items-center gap-1 text-sm">
-                        <Calendar className="h-3 w-3" />
-                        {safeFormatDate(task.due_date, 'MMM d')}
-                      </div>
-                    ) : (
-                      <span className="text-gray-400 text-sm">No date</span>
-                    )}
+                    <InlineDateEditor
+                      taskId={task.id}
+                      currentDate={task.due_date}
+                      onUpdate={onUpdateTask}
+                    />
                   </TableCell>
                   <TableCell>
                     <Button 
