@@ -62,7 +62,7 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
         description: description.trim(),
         assignees,
         priority: priority as 'low' | 'medium' | 'high',
-        due_date: dueDate?.toISOString().split('T')[0],
+        due_date: dueDate ? `${dueDate.getFullYear()}-${String(dueDate.getMonth() + 1).padStart(2, '0')}-${String(dueDate.getDate()).padStart(2, '0')}` : undefined,
         workspace_id: selectedWorkspace === 'none' ? null : selectedWorkspace, // Handle 'none' value properly
         tags,
         status: 'todo' as const,
