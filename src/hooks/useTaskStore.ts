@@ -35,15 +35,31 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
       setLoading(true);
       console.log('⏳ Starting task fetch...');
 
+      // ENHANCED: Ensure we get all assignment data properly
       const { data, error } = await supabase
         .from('tasks')
         .select(`
           *,
-          comments(*),
-          subtasks(*),
-          task_tags(tag),
-          task_assignees(user_id)
-        `);
+          comments(
+            id,
+            content,
+            author,
+            created_at
+          ),
+          subtasks(
+            id,
+            title,
+            completed,
+            created_at
+          ),
+          task_tags(
+            tag
+          ),
+          task_assignees(
+            user_id
+          )
+        `)
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error('❌ Task fetch error:', error);
@@ -52,14 +68,31 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
       }
 
       console.log('✅ Raw data from Supabase:', data?.length || 0, 'records');
+      
+      // Debug: Log raw assignment data for first task
+      if (data && data.length > 0) {
+        console.log('🔍 Raw Supabase task sample:', {
+          task_title: data[0].title,
+          raw_task_assignees: data[0].task_assignees,
+          assignment_count: data[0].task_assignees?.length || 0
+        });
+      }
 
-      // FIXED: Pass raw Supabase data directly to formatTaskFromSupabase
+      // Format tasks with proper assignment data preserved
       const formattedTasks = (data || []).map(supabaseTask => {
-        return formatTaskFromSupabase(supabaseTask);
+        const formatted = formatTaskFromSupabase(supabaseTask);
+        
+        // CRITICAL: Preserve the raw task_assignees data for filtering
+        formatted.task_assignees = supabaseTask.task_assignees || [];
+        
+        console.log(`📋 Task "${formatted.title}": assignees=${formatted.assignees}, task_assignees=${JSON.stringify(formatted.task_assignees)}`);
+        
+        return formatted;
       });
 
       console.log('📝 Formatted tasks:', formattedTasks.length, 'tasks');
       console.log('📋 Task titles:', formattedTasks.map(t => t.title));
+      
       setTasks(formattedTasks);
       console.log('✅ Tasks state updated successfully');
       setError(null);
@@ -241,14 +274,12 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
     
     console.log('⏳ Inserting task to Supabase...');
     console.log('  - workspace_id from taskData:', taskData.workspace_id);
-    console.log('  - workspaceId from taskData:', taskData.workspaceId);
     
     const { data: newTask, error } = await supabase
       .from('tasks')
       .insert({ 
         ...restOfTaskData, 
         created_by: userId,
-        // Fixed: Use workspace_id (snake_case) instead of workspaceId (camelCase)
         workspace_id: taskData.workspace_id || null
       })
       .select()
@@ -285,7 +316,7 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
 
     console.log('✅ Task creation completed successfully');
     
-    // ADDED: Force refresh after task creation to ensure immediate UI update
+    // Force refresh after task creation
     setTimeout(() => {
       console.log('🔄 Force refreshing tasks after creation...');
       refreshTasks();
@@ -293,17 +324,45 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
     
   }, [user?.id, userProfile?.id, refreshTasks]);
 
-  const updateAssignees = async (taskId: string, assigneeIds: string[]) => {
-    console.log('Updating assignees for task:', taskId, 'assignees:', assigneeIds);
-    await supabase.from('task_assignees').delete().eq('task_id', taskId);
+  const updateAssignees = useCallback(async (taskId: string, assigneeIds: string[]) => {
+    console.log('👥 updateAssignees called for task:', taskId, 'assignees:', assigneeIds);
+    
+    // Delete existing assignments
+    const { error: deleteError } = await supabase
+      .from('task_assignees')
+      .delete()
+      .eq('task_id', taskId);
+    
+    if (deleteError) {
+      console.error('❌ Error deleting assignments:', deleteError);
+      throw deleteError;
+    }
+    
+    // Insert new assignments if any
     if (assigneeIds.length > 0) {
       const newAssignments = assigneeIds.map(userId => ({ task_id: taskId, user_id: userId }));
-      await supabase.from('task_assignees').insert(newAssignments);
+      const { error: insertError } = await supabase
+        .from('task_assignees')
+        .insert(newAssignments);
+      
+      if (insertError) {
+        console.error('❌ Error inserting assignments:', insertError);
+        throw insertError;
+      }
     }
-  };
+    
+    console.log('✅ Task assignments updated successfully');
+    
+    // Force refresh to get updated assignment data
+    setTimeout(() => {
+      console.log('🔄 Force refreshing tasks after assignment update...');
+      refreshTasks();
+    }, 200);
+    
+  }, [refreshTasks]);
 
   const updateTags = async (taskId: string, tags: string[]) => {
-    console.log('Updating tags for task:', taskId, 'tags:', tags);
+    console.log('🏷️ Updating tags for task:', taskId, 'tags:', tags);
     await supabase.from('task_tags').delete().eq('task_id', taskId);
     if (tags.length > 0) {
       const newTags = tags.map(tag => ({ task_id: taskId, tag: tag }));
@@ -312,13 +371,13 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
   };
 
   const updateTask = useCallback(async (taskId: string, updates: Partial<Task>) => {
-    console.log('Updating task:', taskId, 'updates:', updates);
+    console.log('📝 Updating task:', taskId, 'updates:', updates);
     const { assignees, tags, subtasks, ...restOfUpdates } = updates;
     
     // Update main task fields
     const { error } = await supabase.from('tasks').update(restOfUpdates).eq('id', taskId);
     if (error) {
-      console.error('Task update error:', error);
+      console.error('❌ Task update error:', error);
       throw error;
     }
     
@@ -326,20 +385,20 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
     if (assignees !== undefined) await updateAssignees(taskId, assignees);
     if (tags !== undefined) await updateTags(taskId, tags);
     
-    // ADDED: Force refresh after task update
+    // Force refresh after task update
     setTimeout(() => {
       console.log('🔄 Force refreshing tasks after update...');
       refreshTasks();
     }, 200);
     
-  }, [refreshTasks]);
+  }, [updateAssignees, refreshTasks]);
   
   const deleteTask = useCallback(async (taskId: string) => {
-    console.log('Deleting task:', taskId);
+    console.log('🗑️ Deleting task:', taskId);
     const { error } = await supabase.from('tasks').delete().eq('id', taskId);
     if (error) throw error;
     
-    // ADDED: Force refresh after task deletion
+    // Force refresh after task deletion
     setTimeout(() => {
       console.log('🔄 Force refreshing tasks after deletion...');
       refreshTasks();
@@ -350,7 +409,7 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
   const addComment = useCallback(async (taskId: string, content: string) => {
     if (!user) throw new Error("User not authenticated");
     
-    console.log('Adding comment to task:', taskId);
+    console.log('💬 Adding comment to task:', taskId);
     const { error } = await supabase.from('comments').insert({ 
       task_id: taskId, 
       content, 
@@ -360,7 +419,7 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
     
     if (error) throw error;
     
-    // ADDED: Force refresh after adding comment
+    // Force refresh after adding comment
     setTimeout(() => {
       console.log('🔄 Force refreshing tasks after comment...');
       refreshTasks();
@@ -369,7 +428,7 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
   }, [user?.id, refreshTasks]);
   
   const toggleSubtask = useCallback(async (taskId: string, subtaskId: string) => {
-    console.log('Toggling subtask:', subtaskId);
+    console.log('☑️ Toggling subtask:', subtaskId);
     // First get current subtask state
     const { data: subtask } = await supabase
       .from('subtasks')
@@ -384,7 +443,7 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
         .eq('id', subtaskId);
     }
     
-    // ADDED: Force refresh after toggling subtask
+    // Force refresh after toggling subtask
     setTimeout(() => {
       console.log('🔄 Force refreshing tasks after subtask toggle...');
       refreshTasks();
@@ -405,6 +464,6 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
     updateAssignees, 
     updateTags, 
     toggleSubtask,
-    refreshTasks // ADDED: Export the refresh method
+    refreshTasks
   };
 };
