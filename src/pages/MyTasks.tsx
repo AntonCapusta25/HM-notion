@@ -149,17 +149,66 @@ export const MyTasks = () => {
     }
   }, [toggleSubtask]);
 
+  // Handle task assignment updates
+  const handleAssignTask = useCallback(async (taskId: string, userIds: string[]) => {
+    try {
+      console.log('👥 MyTasks - Updating task assignments:', taskId, userIds);
+      
+      // Delete existing assignments for this task
+      const { error: deleteError } = await supabase
+        .from('task_assignees')
+        .delete()
+        .eq('task_id', taskId);
+      
+      if (deleteError) throw deleteError;
+      
+      // Insert new assignments if any
+      if (userIds.length > 0) {
+        const assignments = userIds.map(userId => ({
+          task_id: taskId,
+          user_id: userId
+        }));
+        
+        const { error: insertError } = await supabase
+          .from('task_assignees')
+          .insert(assignments);
+        
+        if (insertError) throw insertError;
+      }
+      
+      // Refresh tasks to get updated assignments
+      await refreshTasks();
+      console.log('✅ MyTasks - Task assignment completed');
+    } catch (err) {
+      console.error('❌ MyTasks - Failed to update task assignments:', err);
+      throw err;
+    }
+  }, [refreshTasks]);
+
+  // FIXED: Properly filter tasks assigned TO the current user
   const myTasks = useMemo(() => {
     if (!user) return [];
 
-    let personalTasks = tasks.filter(task => 
-      (task.assignees && task.assignees.includes(user.id)) || task.created_by === user.id
-    );
+    // Get tasks that are assigned to the current user through task_assignees table
+    // OR tasks created by the current user (for their own visibility)
+    let personalTasks = tasks.filter(task => {
+      // Check if task is assigned to current user via task_assignees relationship
+      const isAssignedToMe = task.task_assignees && 
+        task.task_assignees.some((assignment: any) => assignment.user_id === user.id);
+      
+      // Also include tasks created by the user (for visibility of their own tasks)
+      const isCreatedByMe = task.created_by === user.id;
+      
+      // Show tasks if they are assigned to me OR created by me
+      return isAssignedToMe || isCreatedByMe;
+    });
 
+    // Apply workspace filter
     if (selectedWorkspace) {
       personalTasks = personalTasks.filter(task => task.workspace_id === selectedWorkspace);
     }
 
+    // Apply date filters
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const weekFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -195,12 +244,19 @@ export const MyTasks = () => {
   const stats = useMemo(() => {
     const todayRaw = new Date();
     const today = new Date(todayRaw.getFullYear(), todayRaw.getMonth(), todayRaw.getDate());
+    
+    // Only count tasks assigned to the current user for stats
+    const assignedTasks = myTasks.filter(task => 
+      task.task_assignees && 
+      task.task_assignees.some((assignment: any) => assignment.user_id === user?.id)
+    );
+    
     return {
-      total: myTasks.length,
-      overdue: myTasks.filter(t => t.due_date && new Date(t.due_date) < today && t.status !== 'done').length,
-      dueToday: myTasks.filter(t => t.due_date && new Date(t.due_date).toDateString() === today.toDateString() && t.status !== 'done').length
+      total: assignedTasks.length,
+      overdue: assignedTasks.filter(t => t.due_date && new Date(t.due_date) < today && t.status !== 'done').length,
+      dueToday: assignedTasks.filter(t => t.due_date && new Date(t.due_date).toDateString() === today.toDateString() && t.status !== 'done').length
     };
-  }, [myTasks]);
+  }, [myTasks, user]);
 
   if (tasksLoading) {
     return (
@@ -309,7 +365,7 @@ export const MyTasks = () => {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-600">Total Tasks</p>
+                    <p className="text-sm text-gray-600">Tasks Assigned to Me</p>
                     <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
                   </div>
                   <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -398,6 +454,7 @@ export const MyTasks = () => {
             onCreateTask={handleCreateTask}
             onUpdateTask={handleUpdateTask}
             onDeleteTask={handleDeleteTask}
+            onAssignTask={handleAssignTask}
           />
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -419,6 +476,11 @@ export const MyTasks = () => {
                     onClick={() => setSelectedTask(task)}
                   />
                 ))}
+                {tasksByStatus.todo.length === 0 && (
+                  <div className="text-center py-8 text-gray-400">
+                    <p className="text-sm">No tasks to do</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -440,6 +502,11 @@ export const MyTasks = () => {
                     onClick={() => setSelectedTask(task)}
                   />
                 ))}
+                {tasksByStatus.in_progress.length === 0 && (
+                  <div className="text-center py-8 text-gray-400">
+                    <p className="text-sm">No tasks in progress</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -461,6 +528,11 @@ export const MyTasks = () => {
                     onClick={() => setSelectedTask(task)}
                   />
                 ))}
+                {tasksByStatus.done.length === 0 && (
+                  <div className="text-center py-8 text-gray-400">
+                    <p className="text-sm">No completed tasks</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
