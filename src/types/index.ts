@@ -1,5 +1,3 @@
-// src/types.ts
-
 // From your `users` table
 export interface User {
   id: string;
@@ -55,10 +53,13 @@ export interface Task {
   updated_at: string;
   
   // Data loaded from related tables
-  assignees: string[]; // From `task_assignees`
+  assignees: string[]; // From `task_assignees` - formatted as array of user IDs
   tags: string[];      // From `task_tags`
   subtasks: Subtask[]; // From `subtasks`
   comments: Comment[]; // From `comments`
+  
+  // ADDED: Raw assignment data for filtering (preserve original Supabase structure)
+  task_assignees?: Array<{ user_id: string }>; // Raw data from Supabase join
 }
 
 // Dashboard stats interface
@@ -122,13 +123,16 @@ export const formatTaskFromSupabase = (supabaseTask: any): Task => {
     created_at: safeParseDate(supabaseTask.created_at),
     updated_at: safeParseDate(supabaseTask.updated_at),
     
-    // Many-to-many relationships
+    // Many-to-many relationships - formatted for easy use
     assignees: (supabaseTask.task_assignees || []).map((ta: any) => ta.user_id),
     tags: (supabaseTask.task_tags || []).map((tt: any) => tt.tag),
     subtasks: supabaseTask.subtasks || [],
     comments: (supabaseTask.comments || []).map((comment: any) => ({
       ...comment,
       created_at: safeParseDate(comment.created_at)
-    }))
+    })),
+    
+    // Raw assignment data will be added by useTaskStore - this ensures type safety
+    task_assignees: undefined // Will be populated by useTaskStore.fetchTasks()
   };
 };
