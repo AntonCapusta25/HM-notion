@@ -185,35 +185,54 @@ export const MyTasks = () => {
     }
   }, [refreshTasks]);
 
-  // FIXED: Properly filter tasks assigned TO the current user
+  // FIXED: Properly filter tasks assigned TO the current user ONLY
   const myTasks = useMemo(() => {
     if (!user) return [];
+    
+    console.log('🔍 MyTasks - Filtering tasks for user:', user.id);
+    console.log('📋 MyTasks - Total tasks available:', tasks.length);
+    
+    // Debug: Log the first task structure and current user info
+    if (tasks.length > 0) {
+      console.log('📄 MyTasks - Sample task structure (first task):', {
+        id: tasks[0].id,
+        title: tasks[0].title,
+        created_by: tasks[0].created_by,
+        task_assignees: tasks[0].task_assignees,
+        has_assignments: tasks[0].task_assignees?.length > 0
+      });
+      
+      console.log('👤 Current user ID:', user.id);
+      console.log('📧 Current user email:', user.email);
+    }
 
-    // Get tasks that are assigned to the current user through task_assignees table
-    // OR tasks created by the current user (for their own visibility)
+    // Filter tasks based ONLY on assignment data from task_assignees
     let personalTasks = tasks.filter(task => {
       // Check if task is assigned to current user via task_assignees relationship
-      const isAssignedToMe = task.task_assignees && 
-        task.task_assignees.some((assignment: any) => assignment.user_id === user.id);
+      let isAssignedToMe = false;
       
-      // Also include tasks created by the user (for visibility of their own tasks)
-      const isCreatedByMe = task.created_by === user.id;
-      
-      // TEMPORARY: If no assignment logic works, show tasks created by user or show all
-      if (!isAssignedToMe && !isCreatedByMe) {
-        console.log(`⚠️ No assignment found for "${task.title}", including anyway (temporary fix)`);
-        // Return true to show all tasks temporarily
-        // Later, we'll only show assigned tasks once assignment system is working
-        return true;
+      if (task.task_assignees && Array.isArray(task.task_assignees)) {
+        isAssignedToMe = task.task_assignees.some((assignment: any) => assignment.user_id === user.id);
       }
       
-      // Show tasks if they are assigned to me OR created by me
-      return isAssignedToMe || isCreatedByMe;
+      console.log(`🔍 Task "${task.title}": assigned=${isAssignedToMe}, created_by=${task.created_by}`);
+      
+      if (isAssignedToMe) {
+        console.log(`✅ Including task "${task.title}" - assigned to me`);
+      } else {
+        console.log(`❌ Excluding task "${task.title}" - not assigned to me`);
+      }
+      
+      // ONLY show tasks assigned to me (strict filtering)
+      return isAssignedToMe;
     });
+
+    console.log('📊 MyTasks - Personal tasks found:', personalTasks.length);
 
     // Apply workspace filter
     if (selectedWorkspace) {
       personalTasks = personalTasks.filter(task => task.workspace_id === selectedWorkspace);
+      console.log('🏢 MyTasks - After workspace filter:', personalTasks.length);
     }
 
     // Apply date filters
@@ -249,22 +268,22 @@ export const MyTasks = () => {
     done: myTasks.filter(t => t.status === 'done')
   }), [myTasks]);
 
+  // FIXED: Use myTasks directly for stats since they're already properly filtered
   const stats = useMemo(() => {
     const todayRaw = new Date();
     const today = new Date(todayRaw.getFullYear(), todayRaw.getMonth(), todayRaw.getDate());
     
-    // Only count tasks assigned to the current user for stats
-    const assignedTasks = myTasks.filter(task => 
-      task.task_assignees && 
-      task.task_assignees.some((assignment: any) => assignment.user_id === user?.id)
-    );
+    console.log('📈 MyTasks - Calculating stats for filtered tasks:', myTasks.length);
     
-    return {
-      total: assignedTasks.length,
-      overdue: assignedTasks.filter(t => t.due_date && new Date(t.due_date) < today && t.status !== 'done').length,
-      dueToday: assignedTasks.filter(t => t.due_date && new Date(t.due_date).toDateString() === today.toDateString() && t.status !== 'done').length
+    const stats = {
+      total: myTasks.length,
+      overdue: myTasks.filter(t => t.due_date && new Date(t.due_date) < today && t.status !== 'done').length,
+      dueToday: myTasks.filter(t => t.due_date && new Date(t.due_date).toDateString() === today.toDateString() && t.status !== 'done').length
     };
-  }, [myTasks, user]);
+    
+    console.log('📊 MyTasks - Final stats:', stats);
+    return stats;
+  }, [myTasks]);
 
   if (tasksLoading) {
     return (
@@ -549,7 +568,6 @@ export const MyTasks = () => {
         {/* Enhanced Floating Chatbot */}
         <div className="fixed bottom-6 right-6 z-50">
           {!showChatbot ? (
-            /* Floating Chat Button */
             <Button
               onClick={toggleChatbot}
               className="bg-homemade-orange hover:bg-homemade-orange-dark rounded-full w-14 h-14 shadow-lg hover:shadow-xl transition-all duration-200"
@@ -558,7 +576,6 @@ export const MyTasks = () => {
               <MessageCircle className="h-6 w-6" />
             </Button>
           ) : isChatbotMinimized ? (
-            /* Minimized State */
             <Button
               onClick={() => setIsChatbotMinimized(false)}
               className="bg-homemade-orange hover:bg-homemade-orange-dark rounded-full w-14 h-14 shadow-lg"
@@ -567,7 +584,6 @@ export const MyTasks = () => {
               <MessageCircle className="h-6 w-6" />
             </Button>
           ) : (
-            /* Full Enhanced Chatbot with Controls */
             <div className="relative">
               <div className="absolute top-2 right-2 z-10 flex gap-1">
                 <Button
@@ -589,7 +605,6 @@ export const MyTasks = () => {
                   <X className="h-3 w-3" />
                 </Button>
               </div>
-              {/* Enhanced Chatbot Component */}
               {authToken && userProfile && (
                 <EnhancedChatbot 
                   userAuthToken={authToken}
@@ -610,7 +625,7 @@ export const MyTasks = () => {
           task={selectedTask}
           users={users}
           open={!!selectedTask}
-          onOpenChange={(open) => !open && setSelectedTask(null)}
+          onOpenChange={(open) => !open && setSelectedTask(task)}
           onUpdateTask={handleUpdateTask}
           onAddComment={handleAddComment}
           onToggleSubtask={handleToggleSubtask}
