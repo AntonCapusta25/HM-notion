@@ -199,10 +199,12 @@ export const MyTasks = () => {
       // Also include tasks created by the user (for visibility of their own tasks)
       const isCreatedByMe = task.created_by === user.id;
       
-      // TEMPORARY: If no assignment logic works, show all tasks for now
+      // TEMPORARY: If no assignment logic works, show tasks created by user or show all
       if (!isAssignedToMe && !isCreatedByMe) {
         console.log(`⚠️ No assignment found for "${task.title}", including anyway (temporary fix)`);
-        return true; // Temporary - show all tasks until assignments are properly set up
+        // Return true to show all tasks temporarily
+        // Later, we'll only show assigned tasks once assignment system is working
+        return true;
       }
       
       // Show tasks if they are assigned to me OR created by me
