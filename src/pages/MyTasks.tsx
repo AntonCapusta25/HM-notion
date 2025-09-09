@@ -199,6 +199,12 @@ export const MyTasks = () => {
       // Also include tasks created by the user (for visibility of their own tasks)
       const isCreatedByMe = task.created_by === user.id;
       
+      // TEMPORARY: If no assignment logic works, show all tasks for now
+      if (!isAssignedToMe && !isCreatedByMe) {
+        console.log(`⚠️ No assignment found for "${task.title}", including anyway (temporary fix)`);
+        return true; // Temporary - show all tasks until assignments are properly set up
+      }
+      
       // Show tasks if they are assigned to me OR created by me
       return isAssignedToMe || isCreatedByMe;
     });
@@ -365,7 +371,7 @@ export const MyTasks = () => {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-600">Tasks Assigned to Me</p>
+                    <p className="text-sm text-gray-600">My Tasks</p>
                     <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
                   </div>
                   <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
