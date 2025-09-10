@@ -26,15 +26,12 @@ const Login = () => {
   // Get the user and the loading state from the AuthProvider
   const { user, signIn, loading: authLoading } = useAuth();
 
-  // --- THE FIX ---
-  // 1. First, check if the AuthProvider is still doing its initial load.
-  //    If it is, we show a loading screen and wait.
+  // Check if the AuthProvider is still doing its initial load
   if (authLoading) {
     return <LoadingScreen />;
   }
 
-  // 2. Only after the initial load is complete, we check if a user exists.
-  //    If they do, we can now safely redirect them.
+  // Only after the initial load is complete, check if a user exists
   if (user) {
     return <Navigate to="/" replace />;
   }
@@ -55,12 +52,11 @@ const Login = () => {
     setIsSubmitting(false);
   };
 
-  // 3. If the initial load is done and there's no user, we show the login form.
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">Welcome to Homemade</CardTitle>
+          <CardTitle className="text-2xl font-bold">Welcome to Homebase</CardTitle>
           <CardDescription>
             Sign in to access your task management platform
           </CardDescription>
@@ -103,21 +99,12 @@ const Login = () => {
             
             <Button 
               type="submit" 
-              className="w-full" 
+              className="w-full bg-homemade-orange hover:bg-homemade-orange-dark" 
               disabled={isSubmitting}
             >
               {isSubmitting ? 'Signing in...' : 'Sign In'}
             </Button>
           </form>
-
-          {/* Development helper */}
-          <div className="mt-6 p-4 bg-muted rounded-lg">
-            <p className="text-sm text-muted-foreground mb-2">Test Accounts:</p>
-            <div className="text-xs space-y-1">
-              <div>Admin: ali@homemade.com / password123</div>
-              <div>Member: menna@homemade.com / password123</div>
-            </div>
-          </div>
         </CardContent>
       </Card>
     </div>
