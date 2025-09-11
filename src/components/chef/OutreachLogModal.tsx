@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useChefStore } from '@/hooks/useChefStore';
 import { 
@@ -9,7 +8,7 @@ import {
   CONTACT_METHOD_CONFIG,
   RESPONSE_TYPE_CONFIG 
 } from '@/types';
-import { X } from 'lucide-react';
+import { X, Info } from 'lucide-react';
 
 interface OutreachLogModalProps {
   log?: OutreachLog | null;
@@ -37,6 +36,9 @@ export const OutreachLogModal: React.FC<OutreachLogModalProps> = ({
     notes: ''
   });
 
+  // NEW: Track status change information
+  const [statusChangeInfo, setStatusChangeInfo] = useState<string | null>(null);
+
   useEffect(() => {
     if (log) {
       setFormData({
@@ -49,6 +51,33 @@ export const OutreachLogModal: React.FC<OutreachLogModalProps> = ({
       });
     }
   }, [log]);
+
+  // NEW: Update status change info when response type changes
+  useEffect(() => {
+    if (formData.response_type && formData.chef_id) {
+      const chef = chefs.find(c => c.id === formData.chef_id);
+      if (chef) {
+        let newStatus = '';
+        switch (formData.response_type) {
+          case 'interested':
+            newStatus = 'In Progress';
+            break;
+          case 'not_interested':
+            newStatus = 'Not Interested';
+            break;
+          case 'asked_to_contact_later':
+            newStatus = 'Interested but not now';
+            break;
+          default:
+            setStatusChangeInfo(null);
+            return;
+        }
+        setStatusChangeInfo(`Chef status will be automatically updated to "${newStatus}"`);
+      }
+    } else {
+      setStatusChangeInfo(null);
+    }
+  }, [formData.response_type, formData.chef_id, chefs]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,9 +129,12 @@ export const OutreachLogModal: React.FC<OutreachLogModalProps> = ({
     });
   };
 
+  // NEW: Get selected chef info for display
+  const selectedChef = chefs.find(c => c.id === formData.chef_id);
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-lg mx-4">
+      <div className="bg-white rounded-lg p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold">
             {log ? 'Edit Outreach Log' : 'Log New Outreach'}
@@ -118,6 +150,14 @@ export const OutreachLogModal: React.FC<OutreachLogModalProps> = ({
         {error && (
           <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
             {error}
+          </div>
+        )}
+
+        {/* NEW: Status change notification */}
+        {statusChangeInfo && (
+          <div className="mb-4 p-3 bg-blue-100 border border-blue-400 text-blue-700 rounded flex items-start gap-2">
+            <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
+            <span className="text-sm">{statusChangeInfo}</span>
           </div>
         )}
 
@@ -142,6 +182,13 @@ export const OutreachLogModal: React.FC<OutreachLogModalProps> = ({
                 </option>
               ))}
             </select>
+            
+            {/* NEW: Show current chef status */}
+            {selectedChef && (
+              <div className="mt-1 text-xs text-gray-500">
+                Current status: <span className="font-medium">{selectedChef.status.replace('_', ' ')}</span>
+              </div>
+            )}
           </div>
 
           {/* Outreach Date */}
@@ -197,6 +244,9 @@ export const OutreachLogModal: React.FC<OutreachLogModalProps> = ({
                 </option>
               ))}
             </select>
+            <div className="text-xs text-gray-500 mt-1">
+              Selecting a response will automatically update the chef's status
+            </div>
           </div>
 
           {/* Follow-up Date */}
