@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useChefStore } from '@/hooks/useChefStore';
-import { Chef, ChefStatus, CHEF_STATUS_CONFIG } from '@/types/chef';
+import { Chef, ChefStatus, CHEF_STATUS_CONFIG } from '@/types';
 import { Phone, Mail, MapPin, MessageCircle, Plus } from 'lucide-react';
 
 interface ChefStatusBoardProps {
