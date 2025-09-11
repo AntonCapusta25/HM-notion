@@ -6,10 +6,12 @@ import { OutreachLogView } from './OutreachLogView';
 import { OutreachCalendarView } from './OutreachCalendarView';
 import { ChefModal } from './ChefModal';
 import { OutreachLogModal } from './OutreachLogModal';
+import { EnhancedChatbot } from '@/components/EnhancedChatbot';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useChefStore } from '@/hooks/useChefStore';
+import { useAuth } from '@/contexts/AuthContext';
 import { 
   Users, 
   Layout, 
@@ -21,14 +23,17 @@ import {
   Upload,
   CheckCircle,
   AlertTriangle,
-  X
+  X,
+  Bot,
+  Minimize2,
+  Maximize2
 } from 'lucide-react';
 
 interface ChefWorkspaceProps {
   workspaceId: string;
 }
 
-type ViewType = 'list' | 'status' | 'progress' | 'outreach' | 'calendar';
+type ViewType = 'list' | 'status' | 'progress' | 'outreach' | 'calendar' | 'chatbot';
 
 export const ChefWorkspace: React.FC<ChefWorkspaceProps> = ({ workspaceId }) => {
   const [currentView, setCurrentView] = useState<ViewType>('list');
@@ -39,6 +44,13 @@ export const ChefWorkspace: React.FC<ChefWorkspaceProps> = ({ workspaceId }) => 
   const [exporting, setExporting] = useState(false);
   const [importResult, setImportResult] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Chatbot States
+  const [showChatbot, setShowChatbot] = useState(false);
+  const [chatbotMinimized, setChatbotMinimized] = useState(false);
+
+  // Get auth context for chatbot
+  const { user, session } = useAuth();
 
   // Get data from chef store
   const { chefs, outreachLogs, createChef } = useChefStore();
@@ -77,6 +89,12 @@ export const ChefWorkspace: React.FC<ChefWorkspaceProps> = ({ workspaceId }) => 
       name: 'Follow-up Calendar',
       icon: Calendar,
       description: 'Calendar view of scheduled follow-ups'
+    },
+    {
+      id: 'chatbot' as ViewType,
+      name: 'AI Assistant',
+      icon: Bot,
+      description: 'Chat with AI to manage chefs, log outreach, and get insights'
     }
   ];
 
@@ -274,6 +292,26 @@ export const ChefWorkspace: React.FC<ChefWorkspaceProps> = ({ workspaceId }) => 
         return <OutreachLogView workspaceId={workspaceId} />;
       case 'calendar':
         return <OutreachCalendarView workspaceId={workspaceId} />;
+      case 'chatbot':
+        return (
+          <div className="flex justify-center">
+            <div className="w-full max-w-4xl">
+              <div className="mb-6 text-center">
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">AI Chef Assistant</h2>
+                <p className="text-gray-600">
+                  Ask me to add chefs, log outreach attempts, analyze your recruitment pipeline, or get insights about your chef database.
+                </p>
+              </div>
+              {session?.access_token && user && (
+                <EnhancedChatbot 
+                  userAuthToken={session.access_token}
+                  userId={user.id}
+                  workspaceId={workspaceId}
+                />
+              )}
+            </div>
+          </div>
+        );
       default:
         return <ChefListView workspaceId={workspaceId} />;
     }
@@ -310,6 +348,19 @@ export const ChefWorkspace: React.FC<ChefWorkspaceProps> = ({ workspaceId }) => 
 
             {/* Settings/Actions */}
             <div className="flex items-center gap-2">
+              {/* Floating Chatbot Toggle (when not on chatbot tab) */}
+              {currentView !== 'chatbot' && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowChatbot(!showChatbot)}
+                  className="flex items-center gap-2"
+                >
+                  <Bot className="h-4 w-4" />
+                  AI Chat
+                </Button>
+              )}
+              
               <Button
                 variant="outline"
                 size="sm"
@@ -337,6 +388,52 @@ export const ChefWorkspace: React.FC<ChefWorkspaceProps> = ({ workspaceId }) => 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {renderCurrentView()}
       </div>
+
+      {/* Floating Chatbot */}
+      {showChatbot && currentView !== 'chatbot' && session?.access_token && user && (
+        <div className={`fixed bottom-4 right-4 z-50 transition-all duration-300 ${
+          chatbotMinimized ? 'w-80' : 'w-96'
+        }`}>
+          <div className="bg-white rounded-lg shadow-2xl border border-gray-200">
+            {/* Chatbot Header */}
+            <div className="flex items-center justify-between p-3 border-b border-gray-200 bg-blue-50 rounded-t-lg">
+              <div className="flex items-center gap-2">
+                <Bot className="h-4 w-4 text-blue-600" />
+                <span className="text-sm font-medium text-blue-900">AI Chef Assistant</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setChatbotMinimized(!chatbotMinimized)}
+                  className="h-6 w-6 p-0"
+                >
+                  {chatbotMinimized ? <Maximize2 className="h-3 w-3" /> : <Minimize2 className="h-3 w-3" />}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowChatbot(false)}
+                  className="h-6 w-6 p-0"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+            
+            {/* Chatbot Content */}
+            {!chatbotMinimized && (
+              <div className="h-80">
+                <EnhancedChatbot 
+                  userAuthToken={session.access_token}
+                  userId={user.id}
+                  workspaceId={workspaceId}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Settings Dialog with CSV Import/Export */}
       <Dialog open={showSettings} onOpenChange={setShowSettings}>
