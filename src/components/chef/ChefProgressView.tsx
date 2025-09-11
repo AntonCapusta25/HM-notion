@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useChefStore } from '@/hooks/useChefStore';
 import { Chef, ProgressSteps, PROGRESS_STEPS_CONFIG } from '@/types';
 import { Check, X, Clock, Plus } from 'lucide-react';
+import { ChefModal } from './ChefModal';
 
 interface ChefProgressViewProps {
   workspaceId: string;
