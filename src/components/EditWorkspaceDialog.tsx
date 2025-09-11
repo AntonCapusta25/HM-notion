@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Workspace } from '../types';
+import { CheckSquare, Users, AlertTriangle } from 'lucide-react';
 
 interface EditWorkspaceDialogProps {
   workspace: Workspace | null;
@@ -40,12 +41,29 @@ const DEPARTMENTS = [
   'Other'
 ];
 
+// NEW: Workspace type configurations
+const WORKSPACE_TYPES = [
+  {
+    id: 'task_management',
+    name: 'Task Management',
+    description: 'Manage tasks, projects, and team collaboration',
+    icon: CheckSquare
+  },
+  {
+    id: 'chef_outreach',
+    name: 'Chef Outreach',
+    description: 'Manage chef recruitment, outreach, and onboarding',
+    icon: Users
+  }
+];
+
 export const EditWorkspaceDialog = ({ workspace, open, onOpenChange }: EditWorkspaceDialogProps) => {
   const { user } = useAuth();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [department, setDepartment] = useState('');
   const [color, setColor] = useState(WORKSPACE_COLORS[0]);
+  const [type, setType] = useState('task_management'); // NEW: Workspace type state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,6 +74,7 @@ export const EditWorkspaceDialog = ({ workspace, open, onOpenChange }: EditWorks
       setDescription(workspace.description || '');
       setDepartment(workspace.department || '');
       setColor(workspace.color || WORKSPACE_COLORS[0]);
+      setType(workspace.type || 'task_management'); // NEW: Set workspace type
       setError(null);
     }
   }, [workspace, open]);
@@ -89,6 +108,7 @@ export const EditWorkspaceDialog = ({ workspace, open, onOpenChange }: EditWorks
           description: description.trim(),
           department,
           color,
+          type, // NEW: Include workspace type in update
           updated_at: new Date().toISOString(),
         })
         .eq('id', workspace.id);
@@ -113,7 +133,7 @@ export const EditWorkspaceDialog = ({ workspace, open, onOpenChange }: EditWorks
     if (!workspace || !user) return;
     
     const confirmed = window.confirm(
-      `Are you sure you want to delete "${workspace.name}"? This action cannot be undone and will remove the workspace from all associated tasks.`
+      `Are you sure you want to delete "${workspace.name}"? This action cannot be undone and will remove the workspace and all its data.`
     );
     
     if (!confirmed) return;
@@ -122,11 +142,25 @@ export const EditWorkspaceDialog = ({ workspace, open, onOpenChange }: EditWorks
     setError(null);
 
     try {
-      // First, update all tasks in this workspace to have no workspace
-      await supabase
-        .from('tasks')
-        .update({ workspace_id: null })
-        .eq('workspace_id', workspace.id);
+      // Handle deletion based on workspace type
+      if (workspace.type === 'chef_outreach') {
+        // Delete chef outreach data first
+        await supabase
+          .from('outreach_logs')
+          .delete()
+          .eq('workspace_id', workspace.id);
+        
+        await supabase
+          .from('chefs')
+          .delete()
+          .eq('workspace_id', workspace.id);
+      } else {
+        // Handle task management workspace deletion
+        await supabase
+          .from('tasks')
+          .update({ workspace_id: null })
+          .eq('workspace_id', workspace.id);
+      }
 
       // Then delete the workspace
       const { error: deleteError } = await supabase
@@ -153,6 +187,7 @@ export const EditWorkspaceDialog = ({ workspace, open, onOpenChange }: EditWorks
     setDescription('');
     setDepartment('');
     setColor(WORKSPACE_COLORS[0]);
+    setType('task_management'); // NEW: Reset type
     setError(null);
   };
 
@@ -164,6 +199,11 @@ export const EditWorkspaceDialog = ({ workspace, open, onOpenChange }: EditWorks
   if (!workspace) {
     return null;
   }
+
+  // NEW: Check if type is changing to show warning
+  const isTypeChanging = workspace.type !== type;
+  const currentTypeConfig = WORKSPACE_TYPES.find(t => t.id === workspace.type);
+  const newTypeConfig = WORKSPACE_TYPES.find(t => t.id === type);
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -177,8 +217,48 @@ export const EditWorkspaceDialog = ({ workspace, open, onOpenChange }: EditWorks
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
+
+        {/* NEW: Warning for type changes */}
+        {isTypeChanging && (
+          <Alert>
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              Changing workspace type from {currentTypeConfig?.name} to {newTypeConfig?.name} 
+              may affect how data is displayed and managed. Existing data will be preserved.
+            </AlertDescription>
+          </Alert>
+        )}
         
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* NEW: Workspace Type Selection */}
+          <div className="space-y-2">
+            <Label>Workspace Type</Label>
+            <div className="grid grid-cols-1 gap-3">
+              {WORKSPACE_TYPES.map((workspaceType) => {
+                const Icon = workspaceType.icon;
+                return (
+                  <button
+                    key={workspaceType.id}
+                    type="button"
+                    onClick={() => setType(workspaceType.id)}
+                    className={`flex items-start gap-3 p-4 border-2 rounded-lg text-left transition-colors ${
+                      type === workspaceType.id
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                    disabled={isSubmitting}
+                  >
+                    <Icon className="h-6 w-6 text-gray-600 mt-0.5" />
+                    <div>
+                      <div className="font-medium text-gray-900">{workspaceType.name}</div>
+                      <div className="text-sm text-gray-500">{workspaceType.description}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="name">Workspace Name</Label>
             <Input
@@ -269,7 +349,7 @@ export const EditWorkspaceDialog = ({ workspace, open, onOpenChange }: EditWorks
               {isSubmitting ? 'Deleting...' : 'Delete Workspace'}
             </Button>
             <p className="text-xs text-gray-500 mt-2 text-center">
-              This will remove the workspace from all associated tasks. This action cannot be undone.
+              This will permanently delete the workspace and all its data. This action cannot be undone.
             </p>
           </div>
         </form>
