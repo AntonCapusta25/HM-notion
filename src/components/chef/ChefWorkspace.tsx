@@ -6,7 +6,7 @@ import { OutreachLogView } from './OutreachLogView';
 import { OutreachCalendarView } from './OutreachCalendarView';
 import { ChefModal } from './ChefModal';
 import { OutreachLogModal } from './OutreachLogModal';
-import { EnhancedChatbot } from './EnhancedChatbot';
+import { EnhancedChatbot } from '@/components/EnhancedChatbot';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -47,7 +47,7 @@ export const ChefWorkspace: React.FC<ChefWorkspaceProps> = ({ workspaceId }) => 
 
   // Enhanced chatbot integration states - EXACT SAME AS DASHBOARD
   const [showChatbot, setShowChatbot] = useState(false);
-  const [isChatbotzed, setIsChatbotzed] = useState(false);
+  const [isChatbotMinimized, setIsChatbotMinimized] = useState(false);
 
   // Get auth and profile - EXACT SAME AS DASHBOARD
   const { user } = useAuth();
