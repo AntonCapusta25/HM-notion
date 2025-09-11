@@ -389,51 +389,60 @@ export const ChefWorkspace: React.FC<ChefWorkspaceProps> = ({ workspaceId }) => 
         {renderCurrentView()}
       </div>
 
-      {/* Floating Chatbot */}
-      {showChatbot && currentView !== 'chatbot' && session?.access_token && user && (
-        <div className={`fixed bottom-4 right-4 z-50 transition-all duration-300 ${
-          chatbotMinimized ? 'w-80' : 'w-96'
-        }`}>
-          <div className="bg-white rounded-lg shadow-2xl border border-gray-200">
-            {/* Chatbot Header */}
-            <div className="flex items-center justify-between p-3 border-b border-gray-200 bg-blue-50 rounded-t-lg">
-              <div className="flex items-center gap-2">
-                <Bot className="h-4 w-4 text-blue-600" />
-                <span className="text-sm font-medium text-blue-900">AI Chef Assistant</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setChatbotMinimized(!chatbotMinimized)}
-                  className="h-6 w-6 p-0"
-                >
-                  {chatbotMinimized ? <Maximize2 className="h-3 w-3" /> : <Minimize2 className="h-3 w-3" />}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowChatbot(false)}
-                  className="h-6 w-6 p-0"
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              </div>
+      {/* Floating Chatbot - Same Design as Dashboard */}
+      <div className="fixed bottom-6 right-6 z-50">
+        {!showChatbot ? (
+          /* Floating Chat Button - Always Visible */
+          <Button
+            onClick={() => setShowChatbot(true)}
+            className="bg-homemade-orange hover:bg-homemade-orange-dark rounded-full w-14 h-14 shadow-lg hover:shadow-xl transition-all duration-200"
+            title="Open AI Assistant"
+          >
+            <MessageCircle className="h-6 w-6" />
+          </Button>
+        ) : isChatbotMinimized ? (
+          /* Minimized State */
+          <Button
+            onClick={() => setIsChatbotMinimized(false)}
+            className="bg-homemade-orange hover:bg-homemade-orange-dark rounded-full w-14 h-14 shadow-lg"
+            title="Expand AI Assistant"
+          >
+            <MessageCircle className="h-6 w-6" />
+          </Button>
+        ) : (
+          /* Full Enhanced Chatbot with Controls */
+          <div className="relative">
+            <div className="absolute top-2 right-2 z-10 flex gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsChatbotMinimized(true)}
+                className="h-6 w-6 p-0 text-gray-500 hover:text-gray-700 bg-white/80 hover:bg-white rounded-full"
+                title="Minimize"
+              >
+                <Minimize2 className="h-3 w-3" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowChatbot(false)}
+                className="h-6 w-6 p-0 text-gray-500 hover:text-gray-700 bg-white/80 hover:bg-white rounded-full"
+                title="Close"
+              >
+                <X className="h-3 w-3" />
+              </Button>
             </div>
-            
-            {/* Chatbot Content */}
-            {!chatbotMinimized && (
-              <div className="h-80">
-                <EnhancedChatbot 
-                  userAuthToken={session.access_token}
-                  userId={user.id}
-                  workspaceId={workspaceId}
-                />
-              </div>
+            {/* Enhanced Chatbot Component */}
+            {authToken && user && (
+              <EnhancedChatbot 
+                userAuthToken={authToken}
+                userId={user.id}
+                workspaceId={workspaceId}
+              />
             )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Settings Dialog with CSV Import/Export */}
       <Dialog open={showSettings} onOpenChange={setShowSettings}>
