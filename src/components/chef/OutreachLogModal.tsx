@@ -8,7 +8,7 @@ import {
   UpdateOutreachLogData,
   CONTACT_METHOD_CONFIG,
   RESPONSE_TYPE_CONFIG 
-} from '@/types/chef';
+} from '@/types';
 import { X } from 'lucide-react';
 
 interface OutreachLogModalProps {
