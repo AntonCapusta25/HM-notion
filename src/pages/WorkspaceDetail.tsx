@@ -53,8 +53,50 @@ const WorkspaceDetail = () => {
 
   const workspace = workspaces.find(w => w.id === workspaceId);
 
-  // NEW: Check workspace type and route accordingly
-  if (workspace?.type === 'chef_outreach') {
+  // FIXED: Handle loading state first
+  if (tasksLoading) {
+    return (
+      <Layout>
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Loading workspace...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // FIXED: Handle error state second
+  if (error) {
+    return (
+      <Layout>
+        <Alert variant="destructive" className="m-6">
+          <AlertDescription>
+            Error loading workspace: {error}
+          </AlertDescription>
+        </Alert>
+      </Layout>
+    );
+  }
+
+  // FIXED: Handle workspace not found third
+  if (!workspace) {
+    return (
+      <Layout>
+        <div className="p-6">
+          <Alert>
+            <AlertDescription>
+              Workspace not found. <Link to="/" className="text-homemade-orange hover:underline">Return to Dashboard</Link>
+            </AlertDescription>
+          </Alert>
+        </div>
+      </Layout>
+    );
+  }
+
+  // FIXED: NOW check workspace type and route accordingly (after we know workspace exists)
+  if (workspace.type === 'chef_outreach') {
     return (
       <Layout>
         <ChefWorkspace workspaceId={workspaceId!} />
@@ -229,45 +271,6 @@ const WorkspaceDetail = () => {
       throw err;
     }
   }, [toggleSubtask]);
-
-  if (tasksLoading) {
-    return (
-      <Layout>
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-4 text-muted-foreground">Loading workspace...</p>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
-
-  if (error) {
-    return (
-      <Layout>
-        <Alert variant="destructive" className="m-6">
-          <AlertDescription>
-            Error loading workspace: {error}
-          </AlertDescription>
-        </Alert>
-      </Layout>
-    );
-  }
-
-  if (!workspace) {
-    return (
-      <Layout>
-        <div className="p-6">
-          <Alert>
-            <AlertDescription>
-              Workspace not found. <Link to="/" className="text-homemade-orange hover:underline">Return to Dashboard</Link>
-            </AlertDescription>
-          </Alert>
-        </div>
-      </Layout>
-    );
-  }
 
   return (
     <Layout>
