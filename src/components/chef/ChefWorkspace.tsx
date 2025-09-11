@@ -416,7 +416,7 @@ export const ChefWorkspace: React.FC<ChefWorkspaceProps> = ({ workspaceId }) => 
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setIsChatbotMinimized(true)}
+                onClick={() => setChatbotMinimized(true)}
                 className="h-6 w-6 p-0 text-gray-500 hover:text-gray-700 bg-white/80 hover:bg-white rounded-full"
                 title="Minimize"
               >
