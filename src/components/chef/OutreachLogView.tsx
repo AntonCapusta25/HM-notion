@@ -1,3 +1,4 @@
+// components/chef/OutreachLogView.tsx
 
 import React, { useState, useEffect } from 'react';
 import { useChefStore } from '@/stores/useChefStore';
@@ -16,7 +17,7 @@ export const OutreachLogView: React.FC<OutreachLogViewProps> = ({ workspaceId })
     fetchOutreachLogs, 
     fetchChefs, 
     deleteOutreachLog 
-  } = useChefStore(};
+  } = useChefStore();
   
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingLog, setEditingLog] = useState<OutreachLog | null>(null);
