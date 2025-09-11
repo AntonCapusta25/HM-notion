@@ -10,6 +10,8 @@ interface Message {
   timestamp: string;
   metadata?: {
     task_created?: string;
+    chef_created?: string;
+    outreach_logged?: string;
     query_executed?: string;
     intent?: string;
   };
@@ -39,12 +41,21 @@ interface TaskCreationContext {
 // --- Enhanced API Functions ---
 const chatbotAPI = {
   // Send message to intelligent backend
-  sendMessage: async (message: string, sessionId: string, userAuthToken: string): Promise<{
+  sendMessage: async (
+    message: string, 
+    sessionId: string, 
+    userAuthToken: string,
+    workspaceId?: string
+  ): Promise<{
     response: string;
     intent?: string;
     task_created?: any;
+    chef_created?: any;
+    outreach_logged?: any;
     query_result?: any;
   }> => {
+    console.log('📤 Sending message to chatbot:', { message, sessionId, workspaceId });
+    
     const response = await fetch('https://wqpmhnsxqcsplfdyxrih.supabase.co/functions/v1/chatbot', {
       method: 'POST',
       headers: {
@@ -54,15 +65,20 @@ const chatbotAPI = {
       body: JSON.stringify({
         message,
         session_id: sessionId,
+        workspace_id: workspaceId,
         timestamp: new Date().toISOString()
       })
     });
 
     if (!response.ok) {
-      throw new Error('Failed to get response from chatbot');
+      const errorText = await response.text();
+      console.error('❌ Chatbot API error:', response.status, errorText);
+      throw new Error(`Failed to get response from chatbot: ${response.status}`);
     }
 
-    return response.json();
+    const result = await response.json();
+    console.log('✅ Chatbot response received:', result);
+    return result;
   },
 
   // Load conversation history
@@ -110,7 +126,7 @@ const chatbotAPI = {
 
   // Delete session
   deleteSession: async (sessionId: string, userAuthToken: string): Promise<void> => {
-    const response = await fetch(`/api/chatbot/sessions/${sessionId}`, {
+    const response = await fetch(`https://wqpmhnsxqcsplfdyxrih.supabase.co/functions/v1/chatbot/sessions/${sessionId}`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${userAuthToken}`
@@ -122,7 +138,15 @@ const chatbotAPI = {
 };
 
 // --- Enhanced Chatbot Component ---
-export const EnhancedChatbot = ({ userAuthToken, userId }: { userAuthToken: string; userId: string }) => {
+export const EnhancedChatbot = ({ 
+  userAuthToken, 
+  userId, 
+  workspaceId 
+}: { 
+  userAuthToken: string; 
+  userId: string; 
+  workspaceId?: string;
+}) => {
   const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -177,7 +201,7 @@ export const EnhancedChatbot = ({ userAuthToken, userId }: { userAuthToken: stri
       setMessages([{
         id: 'init-1',
         role: 'assistant',
-        content: "Hi! I'm your intelligent assistant. I can help you:\n\n• Create and manage tasks\n• Find information from your workspace\n• Calculate productivity metrics\n• Answer questions about your work\n\nWhat would you like to do today?",
+        content: "Hi! I'm your intelligent assistant. I can help you:\n\n• Create and manage tasks\n• Add and track chefs in your recruitment pipeline\n• Log outreach attempts and follow-ups\n• Find information from your workspace\n• Calculate productivity and recruitment metrics\n• Answer questions about your work\n\nWhat would you like to do today?",
         timestamp: new Date().toISOString()
       }]);
     } catch (err) {
@@ -205,7 +229,8 @@ export const EnhancedChatbot = ({ userAuthToken, userId }: { userAuthToken: stri
       const result = await chatbotAPI.sendMessage(
         userMessage.content, 
         currentSession.id, 
-        userAuthToken
+        userAuthToken,
+        workspaceId
       );
       
       const assistantMessage: Message = {
@@ -216,20 +241,29 @@ export const EnhancedChatbot = ({ userAuthToken, userId }: { userAuthToken: stri
         metadata: {
           intent: result.intent,
           task_created: result.task_created,
+          chef_created: result.chef_created,
+          outreach_logged: result.outreach_logged,
           query_executed: result.query_result ? 'executed' : undefined
         }
       };
 
       setMessages(prev => [...prev, assistantMessage]);
 
-      // Handle task creation context
-      if (result.intent === 'task_creation_in_progress') {
-        // Backend will maintain the task creation state
+      // Handle success indicators
+      if (result.chef_created) {
+        console.log('✅ Chef created successfully:', result.chef_created);
+      }
+      if (result.outreach_logged) {
+        console.log('✅ Outreach logged successfully:', result.outreach_logged);
+      }
+      if (result.task_created) {
+        console.log('✅ Task created successfully:', result.task_created);
       }
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred.';
       setError(errorMessage);
+      console.error('❌ Chatbot error:', err);
     } finally {
       setIsLoading(false);
     }
@@ -276,15 +310,63 @@ export const EnhancedChatbot = ({ userAuthToken, userId }: { userAuthToken: stri
     if (messages.length <= 1) {
       return [
         "Create a task for Alex to do outreach",
+        "Add chef Mario from Amsterdam",
+        "How many chefs do we have in the system?",
+        "Show me chefs by city",
+        "Which chefs need follow-up this week?",
+        "I called chef Anna, she's interested",
         "What tasks did the team complete last week?",
-        "Show team productivity metrics",
-        "Who has the most overdue tasks?",
-        "What is Sarah working on this week?",
-        "Show all high priority tasks across the team"
+        "Show team productivity metrics"
       ];
     }
     return [];
   };
+
+  const renderMessage = (msg: Message) => (
+    <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+      {msg.role === 'assistant' && (
+        <div className="w-8 h-8 bg-homemade-orange text-white rounded-full flex items-center justify-center flex-shrink-0">
+          <Bot size={20} />
+        </div>
+      )}
+      <div 
+        className={`max-w-xs md:max-w-md p-3 rounded-lg text-sm whitespace-pre-wrap ${
+          msg.role === 'user' 
+            ? 'bg-blue-500 text-white rounded-br-none' 
+            : 'bg-gray-200 text-gray-800 rounded-bl-none'
+        }`}
+      >
+        {msg.content}
+        
+        {/* Success indicators */}
+        {msg.metadata?.task_created && (
+          <div className="mt-2 text-xs text-green-600 bg-green-50 p-2 rounded">
+            ✓ Task created successfully
+          </div>
+        )}
+        {msg.metadata?.chef_created && (
+          <div className="mt-2 text-xs text-green-600 bg-green-50 p-2 rounded">
+            ✓ Chef added successfully
+          </div>
+        )}
+        {msg.metadata?.outreach_logged && (
+          <div className="mt-2 text-xs text-green-600 bg-green-50 p-2 rounded">
+            ✓ Outreach logged successfully
+          </div>
+        )}
+        {msg.metadata?.query_executed && (
+          <div className="mt-2 text-xs text-blue-600 bg-blue-50 p-2 rounded">
+            📊 Data query executed
+          </div>
+        )}
+      </div>
+      {msg.role === 'user' && (
+        <div className="w-8 h-8 bg-gray-600 text-white rounded-full flex items-center justify-center flex-shrink-0">
+          <User size={20} />
+        </div>
+      )}
+    </div>
+  );
 
   if (!currentSession) {
     return (
@@ -304,6 +386,11 @@ export const EnhancedChatbot = ({ userAuthToken, userId }: { userAuthToken: stri
         <div className="flex items-center gap-3">
           <h2 className="text-lg font-semibold text-gray-800">AI Assistant</h2>
           <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" title="Online"></div>
+          {workspaceId && (
+            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+              Workspace Mode
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -360,34 +447,7 @@ export const EnhancedChatbot = ({ userAuthToken, userId }: { userAuthToken: stri
       {/* Message Display Area */}
       <div className="flex-1 p-6 overflow-y-auto bg-gray-50">
         <div className="space-y-6">
-          {messages.map((msg) => (
-            <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              {msg.role === 'assistant' && (
-                <div className="w-8 h-8 bg-homemade-orange text-white rounded-full flex items-center justify-center flex-shrink-0">
-                  <Bot size={20} />
-                </div>
-              )}
-              <div 
-                className={`max-w-xs md:max-w-md p-3 rounded-lg text-sm whitespace-pre-wrap ${
-                  msg.role === 'user' 
-                    ? 'bg-blue-500 text-white rounded-br-none' 
-                    : 'bg-gray-200 text-gray-800 rounded-bl-none'
-                }`}
-              >
-                {msg.content}
-                {msg.metadata?.task_created && (
-                  <div className="mt-2 text-xs text-green-600 bg-green-50 p-2 rounded">
-                    ✓ Task created successfully
-                  </div>
-                )}
-              </div>
-              {msg.role === 'user' && (
-                <div className="w-8 h-8 bg-gray-600 text-white rounded-full flex items-center justify-center flex-shrink-0">
-                  <User size={20} />
-                </div>
-              )}
-            </div>
-          ))}
+          {messages.map(renderMessage)}
           {isLoading && (
             <div className="flex gap-3 justify-start">
                <div className="w-8 h-8 bg-homemade-orange text-white rounded-full flex items-center justify-center flex-shrink-0">
@@ -435,7 +495,7 @@ export const EnhancedChatbot = ({ userAuthToken, userId }: { userAuthToken: stri
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask me anything about your work..."
+            placeholder={workspaceId ? "Ask about tasks, chefs, or workspace data..." : "Ask me anything about your work..."}
             className="flex-1 px-4 py-2 text-sm bg-gray-100 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-homemade-orange-dark"
             disabled={isLoading}
           />
@@ -452,7 +512,7 @@ export const EnhancedChatbot = ({ userAuthToken, userId }: { userAuthToken: stri
   );
 };
 
-// CSS variables (same as before)
+// CSS variables for Homebase orange theme
 const style = document.createElement('style');
 style.innerHTML = `
   :root {
