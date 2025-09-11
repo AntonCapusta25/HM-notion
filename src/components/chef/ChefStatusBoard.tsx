@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useChefStore } from '@/stores/useChefStore';
+import { useChefStore } from '@/hooks/useChefStore';
 import { Chef, ChefStatus, CHEF_STATUS_CONFIG } from '@/types/chef';
 import { Phone, Mail, MapPin, MessageCircle, Plus } from 'lucide-react';
 
