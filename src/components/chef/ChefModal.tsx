@@ -8,9 +8,10 @@ interface ChefModalProps {
   workspaceId: string;
   onClose: () => void;
   onSave: () => void;
+  quickAddMode?: boolean; // NEW: Optional prop for quick add mode
 }
 
-export const ChefModal: React.FC<ChefModalProps> = ({ chef, workspaceId, onClose, onSave }) => {
+export const ChefModal: React.FC<ChefModalProps> = ({ chef, workspaceId, onClose, onSave, quickAddMode = false }) => {
   const { createChef, updateChef, createChefWithInitialOutreach, loading, error, clearError } = useChefStore();
   
   const [formData, setFormData] = useState({
@@ -22,8 +23,7 @@ export const ChefModal: React.FC<ChefModalProps> = ({ chef, workspaceId, onClose
     notes: ''
   });
 
-  // NEW: Initial outreach option
-  const [logInitialOutreach, setLogInitialOutreach] = useState(false);
+  // Initial outreach for quick add mode
   const [initialOutreach, setInitialOutreach] = useState({
     contact_method: 'phonecall' as const,
     notes: ''
@@ -39,11 +39,8 @@ export const ChefModal: React.FC<ChefModalProps> = ({ chef, workspaceId, onClose
         status: chef.status,
         notes: chef.notes || ''
       });
-      // Disable initial outreach for existing chefs
-      setLogInitialOutreach(false);
     } else {
       // Reset for new chef
-      setLogInitialOutreach(false);
       setInitialOutreach({
         contact_method: 'phonecall',
         notes: ''
@@ -70,17 +67,17 @@ export const ChefModal: React.FC<ChefModalProps> = ({ chef, workspaceId, onClose
       } else {
         // Create new chef
         const createData: CreateChefData = {
-          name: formData.name,
-          city: formData.city || undefined,
-          phone: formData.phone || undefined,
-          email: formData.email || undefined,
+          name: formData.name.trim(),
+          city: formData.city.trim() || undefined,
+          phone: formData.phone.trim() || undefined,
+          email: formData.email.trim() || undefined,
           status: formData.status,
           notes: formData.notes || undefined,
           workspace_id: workspaceId
         };
 
-        // NEW: Use enhanced creation with optional initial outreach
-        if (logInitialOutreach) {
+        // NEW: If in quick add mode, automatically create with initial outreach
+        if (quickAddMode) {
           await createChefWithInitialOutreach(createData, {
             contact_method: initialOutreach.contact_method,
             notes: initialOutreach.notes || `Initial contact with ${formData.name}`
@@ -108,7 +105,7 @@ export const ChefModal: React.FC<ChefModalProps> = ({ chef, workspaceId, onClose
       <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold">
-            {chef ? 'Edit Chef' : 'Add New Chef'}
+            {chef ? 'Edit Chef' : quickAddMode ? 'Quick Add Chef' : 'Add New Chef'}
           </h2>
           <button
             onClick={onClose}
@@ -137,36 +134,72 @@ export const ChefModal: React.FC<ChefModalProps> = ({ chef, workspaceId, onClose
               onChange={(e) => handleInputChange('name', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="Chef's full name"
+              autoFocus={quickAddMode}
             />
           </div>
 
-          <div>
-            <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
-              City
-            </label>
-            <input
-              id="city"
-              type="text"
-              value={formData.city}
-              onChange={(e) => handleInputChange('city', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Amsterdam"
-            />
-          </div>
+          {/* Conditional layout for quick add mode */}
+          {quickAddMode ? (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
+                  City
+                </label>
+                <input
+                  id="city"
+                  type="text"
+                  value={formData.city}
+                  onChange={(e) => handleInputChange('city', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Amsterdam"
+                />
+              </div>
 
-          <div>
-            <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
-              Phone
-            </label>
-            <input
-              id="phone"
-              type="tel"
-              value={formData.phone}
-              onChange={(e) => handleInputChange('phone', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="+31123456789"
-            />
-          </div>
+              <div>
+                <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
+                  Phone
+                </label>
+                <input
+                  id="phone"
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) => handleInputChange('phone', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="+31123456789"
+                />
+              </div>
+            </div>
+          ) : (
+            <>
+              <div>
+                <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
+                  City
+                </label>
+                <input
+                  id="city"
+                  type="text"
+                  value={formData.city}
+                  onChange={(e) => handleInputChange('city', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Amsterdam"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
+                  Phone
+                </label>
+                <input
+                  id="phone"
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) => handleInputChange('phone', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="+31123456789"
+                />
+              </div>
+            </>
+          )}
 
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
@@ -182,23 +215,47 @@ export const ChefModal: React.FC<ChefModalProps> = ({ chef, workspaceId, onClose
             />
           </div>
 
-          <div>
-            <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-1">
-              Status
-            </label>
-            <select
-              id="status"
-              value={formData.status}
-              onChange={(e) => handleInputChange('status', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              {Object.entries(CHEF_STATUS_CONFIG).map(([value, config]) => (
-                <option key={value} value={value}>
-                  {config.label}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Only show status field in normal mode */}
+          {!quickAddMode && (
+            <div>
+              <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-1">
+                Status
+              </label>
+              <select
+                id="status"
+                value={formData.status}
+                onChange={(e) => handleInputChange('status', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                {Object.entries(CHEF_STATUS_CONFIG).map(([value, config]) => (
+                  <option key={value} value={value}>
+                    {config.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Quick add mode: Contact method */}
+          {quickAddMode && (
+            <div>
+              <label htmlFor="contact_method" className="block text-sm font-medium text-gray-700 mb-1">
+                How did you contact them?
+              </label>
+              <select
+                id="contact_method"
+                value={initialOutreach.contact_method}
+                onChange={(e) => handleOutreachChange('contact_method', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                {Object.entries(CONTACT_METHOD_CONFIG).map(([method, config]) => (
+                  <option key={method} value={method}>
+                    {config.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div>
             <label htmlFor="notes" className="block text-sm font-medium text-gray-700 mb-1">
@@ -206,65 +263,20 @@ export const ChefModal: React.FC<ChefModalProps> = ({ chef, workspaceId, onClose
             </label>
             <textarea
               id="notes"
-              rows={3}
-              value={formData.notes}
-              onChange={(e) => handleInputChange('notes', e.target.value)}
+              rows={quickAddMode ? 2 : 3}
+              value={quickAddMode ? initialOutreach.notes : formData.notes}
+              onChange={(e) => quickAddMode ? handleOutreachChange('notes', e.target.value) : handleInputChange('notes', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Any additional notes about this chef..."
+              placeholder={quickAddMode ? "Notes about the initial contact..." : "Any additional notes about this chef..."}
             />
           </div>
 
-          {/* NEW: Initial Outreach Option (only for new chefs) */}
-          {!chef && (
-            <div className="border-t pt-4">
-              <div className="flex items-center mb-3">
-                <input
-                  id="log_initial_outreach"
-                  type="checkbox"
-                  checked={logInitialOutreach}
-                  onChange={(e) => setLogInitialOutreach(e.target.checked)}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                />
-                <label htmlFor="log_initial_outreach" className="ml-2 text-sm font-medium text-gray-700">
-                  Log initial outreach attempt
-                </label>
+          {/* Quick add mode notification */}
+          {quickAddMode && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <div className="text-sm text-blue-800">
+                This will create the chef and automatically log the initial outreach attempt.
               </div>
-
-              {logInitialOutreach && (
-                <div className="space-y-3 bg-blue-50 p-3 rounded-lg">
-                  <div>
-                    <label htmlFor="contact_method" className="block text-sm font-medium text-gray-700 mb-1">
-                      Contact Method
-                    </label>
-                    <select
-                      id="contact_method"
-                      value={initialOutreach.contact_method}
-                      onChange={(e) => handleOutreachChange('contact_method', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      {Object.entries(CONTACT_METHOD_CONFIG).map(([method, config]) => (
-                        <option key={method} value={method}>
-                          {config.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label htmlFor="outreach_notes" className="block text-sm font-medium text-gray-700 mb-1">
-                      Outreach Notes
-                    </label>
-                    <textarea
-                      id="outreach_notes"
-                      rows={2}
-                      value={initialOutreach.notes}
-                      onChange={(e) => handleOutreachChange('notes', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="Notes about the initial contact..."
-                    />
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
@@ -278,10 +290,10 @@ export const ChefModal: React.FC<ChefModalProps> = ({ chef, workspaceId, onClose
             </button>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !formData.name.trim()}
               className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50"
             >
-              {loading ? 'Saving...' : chef ? 'Update' : 'Create'}
+              {loading ? 'Saving...' : chef ? 'Update' : quickAddMode ? 'Add Chef' : 'Create'}
             </button>
           </div>
         </form>
