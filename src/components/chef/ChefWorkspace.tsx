@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { ChefListView } from './ChefListView';
 import { ChefStatusBoard } from './ChefStatusBoard';
 import { ChefProgressView } from './ChefProgressView';
@@ -6,12 +6,14 @@ import { OutreachLogView } from './OutreachLogView';
 import { OutreachCalendarView } from './OutreachCalendarView';
 import { ChefModal } from './ChefModal';
 import { OutreachLogModal } from './OutreachLogModal';
-import { EnhancedChatbot } from '@/components/EnhancedChatbot';
+import { EnhancedChatbot } from './EnhancedChatbot';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useChefStore } from '@/hooks/useChefStore';
 import { useAuth } from '@/contexts/AuthContext';
+import { useProfile } from '@/hooks/useProfile';
+import { supabase } from '@/lib/supabase';
 import { 
   Users, 
   Layout, 
@@ -24,16 +26,14 @@ import {
   CheckCircle,
   AlertTriangle,
   X,
-  Bot,
-  Minimize2,
-  Maximize2
+  Minimize2
 } from 'lucide-react';
 
 interface ChefWorkspaceProps {
   workspaceId: string;
 }
 
-type ViewType = 'list' | 'status' | 'progress' | 'outreach' | 'calendar' | 'chatbot';
+type ViewType = 'list' | 'status' | 'progress' | 'outreach' | 'calendar';
 
 export const ChefWorkspace: React.FC<ChefWorkspaceProps> = ({ workspaceId }) => {
   const [currentView, setCurrentView] = useState<ViewType>('list');
@@ -45,12 +45,13 @@ export const ChefWorkspace: React.FC<ChefWorkspaceProps> = ({ workspaceId }) => 
   const [importResult, setImportResult] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Chatbot States
+  // Enhanced chatbot integration states - EXACT SAME AS DASHBOARD
   const [showChatbot, setShowChatbot] = useState(false);
-  const [chatbotMinimized, setChatbotMinimized] = useState(false);
+  const [isChatbotzed, setIsChatbotzed] = useState(false);
 
-  // Get auth context for chatbot
-  const { user, session } = useAuth();
+  // Get auth and profile - EXACT SAME AS DASHBOARD
+  const { user } = useAuth();
+  const { profile: userProfile } = useProfile();
 
   // Get data from chef store
   const { chefs, outreachLogs, createChef } = useChefStore();
@@ -58,6 +59,33 @@ export const ChefWorkspace: React.FC<ChefWorkspaceProps> = ({ workspaceId }) => 
   // Filter data for current workspace
   const workspaceChefs = chefs.filter(chef => chef.workspace_id === workspaceId);
   const workspaceOutreachLogs = outreachLogs.filter(log => log.workspace_id === workspaceId);
+
+  // Get auth token for chatbot - EXACT SAME AS DASHBOARD
+  const getAuthToken = useCallback(async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.access_token || '';
+  }, []);
+
+  const [authToken, setAuthToken] = useState<string>('');
+
+  useEffect(() => {
+    getAuthToken().then(setAuthToken);
+  }, [getAuthToken]);
+
+  // Chatbot toggle functions - EXACT SAME AS DASHBOARD
+  const toggleChatbot = () => {
+    setShowChatbot(!showChatbot);
+    setIsChatbotMinimized(false);
+  };
+
+  const minimizeChatbot = () => {
+    setIsChatbotMinimized(true);
+  };
+
+  const closeChatbot = () => {
+    setShowChatbot(false);
+    setIsChatbotMinimized(false);
+  };
 
   const views = [
     {
@@ -89,12 +117,6 @@ export const ChefWorkspace: React.FC<ChefWorkspaceProps> = ({ workspaceId }) => 
       name: 'Follow-up Calendar',
       icon: Calendar,
       description: 'Calendar view of scheduled follow-ups'
-    },
-    {
-      id: 'chatbot' as ViewType,
-      name: 'AI Assistant',
-      icon: Bot,
-      description: 'Chat with AI to manage chefs, log outreach, and get insights'
     }
   ];
 
@@ -292,26 +314,6 @@ export const ChefWorkspace: React.FC<ChefWorkspaceProps> = ({ workspaceId }) => 
         return <OutreachLogView workspaceId={workspaceId} />;
       case 'calendar':
         return <OutreachCalendarView workspaceId={workspaceId} />;
-      case 'chatbot':
-        return (
-          <div className="flex justify-center">
-            <div className="w-full max-w-4xl">
-              <div className="mb-6 text-center">
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">AI Chef Assistant</h2>
-                <p className="text-gray-600">
-                  Ask me to add chefs, log outreach attempts, analyze your recruitment pipeline, or get insights about your chef database.
-                </p>
-              </div>
-              {session?.access_token && user && (
-                <EnhancedChatbot 
-                  userAuthToken={session.access_token}
-                  userId={user.id}
-                  workspaceId={workspaceId}
-                />
-              )}
-            </div>
-          </div>
-        );
       default:
         return <ChefListView workspaceId={workspaceId} />;
     }
@@ -348,19 +350,6 @@ export const ChefWorkspace: React.FC<ChefWorkspaceProps> = ({ workspaceId }) => 
 
             {/* Settings/Actions */}
             <div className="flex items-center gap-2">
-              {/* Floating Chatbot Toggle (when not on chatbot tab) */}
-              {currentView !== 'chatbot' && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowChatbot(!showChatbot)}
-                  className="flex items-center gap-2"
-                >
-                  <Bot className="h-4 w-4" />
-                  AI Chat
-                </Button>
-              )}
-              
               <Button
                 variant="outline"
                 size="sm"
@@ -389,12 +378,12 @@ export const ChefWorkspace: React.FC<ChefWorkspaceProps> = ({ workspaceId }) => 
         {renderCurrentView()}
       </div>
 
-      {/* Floating Chatbot - Same Design as Dashboard */}
+      {/* Enhanced Floating Chatbot - EXACT SAME AS DASHBOARD */}
       <div className="fixed bottom-6 right-6 z-50">
         {!showChatbot ? (
           /* Floating Chat Button - Always Visible */
           <Button
-            onClick={() => setShowChatbot(true)}
+            onClick={toggleChatbot}
             className="bg-homemade-orange hover:bg-homemade-orange-dark rounded-full w-14 h-14 shadow-lg hover:shadow-xl transition-all duration-200"
             title="Open AI Assistant"
           >
@@ -416,7 +405,7 @@ export const ChefWorkspace: React.FC<ChefWorkspaceProps> = ({ workspaceId }) => 
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setChatbotMinimized(true)}
+                onClick={minimizeChatbot}
                 className="h-6 w-6 p-0 text-gray-500 hover:text-gray-700 bg-white/80 hover:bg-white rounded-full"
                 title="Minimize"
               >
@@ -425,7 +414,7 @@ export const ChefWorkspace: React.FC<ChefWorkspaceProps> = ({ workspaceId }) => 
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setShowChatbot(false)}
+                onClick={closeChatbot}
                 className="h-6 w-6 p-0 text-gray-500 hover:text-gray-700 bg-white/80 hover:bg-white rounded-full"
                 title="Close"
               >
@@ -433,10 +422,10 @@ export const ChefWorkspace: React.FC<ChefWorkspaceProps> = ({ workspaceId }) => 
               </Button>
             </div>
             {/* Enhanced Chatbot Component */}
-            {authToken && user && (
+            {authToken && userProfile && (
               <EnhancedChatbot 
                 userAuthToken={authToken}
-                userId={user.id}
+                userId={userProfile.id}
                 workspaceId={workspaceId}
               />
             )}
