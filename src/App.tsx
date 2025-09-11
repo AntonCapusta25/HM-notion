@@ -78,6 +78,13 @@ const App = () => (
                </ProtectedRoute>
               } />
               
+              {/* Test route - can be removed in production */}
+              <Route path="/test" element={
+                <ProtectedRoute>
+                  <TestPage />
+                </ProtectedRoute>
+              } />
+              
               {/* Catch-all route */}
               <Route path="*" element={<NotFound />} />
             </Routes>
