@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useChefStore } from '@/hooks/useChefStore';
-import { Chef, CHEF_STATUS_CONFIG } from '@/types/chef';
+import { Chef, CHEF_STATUS_CONFIG } from '@/types';
 import { 
   Plus, 
   Phone, 
