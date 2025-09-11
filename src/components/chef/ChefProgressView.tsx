@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useChefStore } from '@/stores/useChefStore';
+import { useChefStore } from '@/hooks/useChefStore';
 import { Chef, ProgressSteps, PROGRESS_STEPS_CONFIG } from '@/types/chef';
 import { Check, X, Clock, Plus } from 'lucide-react';
 
