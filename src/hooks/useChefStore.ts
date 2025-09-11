@@ -1,3 +1,4 @@
+// hooks/useChefStore.ts - Enhanced with cross-view synchronization
 
 import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
@@ -8,8 +9,10 @@ import {
   UpdateChefData, 
   CreateOutreachLogData, 
   UpdateOutreachLogData, 
-  ChefStats 
-} from '@/types/chef';
+  ChefStats,
+  ChefStatus,
+  ResponseType 
+} from '@/types';
 
 interface ChefStore {
   // State
@@ -31,6 +34,10 @@ interface ChefStore {
   updateOutreachLog: (id: string, data: UpdateOutreachLogData) => Promise<OutreachLog>;
   deleteOutreachLog: (id: string) => Promise<void>;
   getOutreachLogsForChef: (chefId: string) => OutreachLog[];
+  
+  // NEW: Enhanced cross-view actions
+  createChefWithInitialOutreach: (chefData: CreateChefData, initialOutreach?: Partial<CreateOutreachLogData>) => Promise<{ chef: Chef; outreachLog?: OutreachLog }>;
+  updateChefStatusFromOutreach: (chefId: string, responseType: ResponseType) => Promise<void>;
   
   // Utility actions
   clearError: () => void;
@@ -198,6 +205,11 @@ export const useChefStore = create<ChefStore>((set, get) => ({
         outreachLogs: [log, ...state.outreachLogs],
         loading: false 
       }));
+
+      // NEW: Auto-update chef status based on response type
+      if (data.response_type) {
+        await get().updateChefStatusFromOutreach(data.chef_id, data.response_type);
+      }
       
       return log;
     } catch (error: any) {
@@ -225,6 +237,11 @@ export const useChefStore = create<ChefStore>((set, get) => ({
         outreachLogs: state.outreachLogs.map(l => l.id === id ? log : l),
         loading: false
       }));
+
+      // NEW: Auto-update chef status if response type changed
+      if (data.response_type && log.chef_id) {
+        await get().updateChefStatusFromOutreach(log.chef_id, data.response_type);
+      }
       
       return log;
     } catch (error: any) {
@@ -255,6 +272,65 @@ export const useChefStore = create<ChefStore>((set, get) => ({
   getOutreachLogsForChef: (chefId: string) => {
     const { outreachLogs } = get();
     return outreachLogs.filter(log => log.chef_id === chefId);
+  },
+
+  // NEW: Enhanced cross-view actions
+  createChefWithInitialOutreach: async (chefData: CreateChefData, initialOutreach?: Partial<CreateOutreachLogData>) => {
+    try {
+      // Create the chef first
+      const chef = await get().createChef(chefData);
+      
+      let outreachLog = undefined;
+      
+      // If initial outreach data provided, create the first outreach log
+      if (initialOutreach) {
+        const outreachData: CreateOutreachLogData = {
+          chef_id: chef.id,
+          outreach_date: new Date().toISOString().split('T')[0],
+          contact_method: initialOutreach.contact_method || 'phonecall',
+          response_type: initialOutreach.response_type,
+          follow_up_date: initialOutreach.follow_up_date,
+          notes: initialOutreach.notes || `Initial contact with ${chef.name}`,
+          workspace_id: chefData.workspace_id
+        };
+        
+        outreachLog = await get().createOutreachLog(outreachData);
+      }
+      
+      return { chef, outreachLog };
+    } catch (error: any) {
+      throw error;
+    }
+  },
+
+  updateChefStatusFromOutreach: async (chefId: string, responseType: ResponseType) => {
+    try {
+      let newStatus: ChefStatus;
+      
+      // Auto-map response types to chef status
+      switch (responseType) {
+        case 'interested':
+          newStatus = 'in_progress';
+          break;
+        case 'not_interested':
+          newStatus = 'not_interested';
+          break;
+        case 'asked_to_contact_later':
+          newStatus = 'interested_not_now';
+          break;
+        case 'no_response':
+          // Don't change status for no response, just log the attempt
+          return;
+        default:
+          return;
+      }
+      
+      // Update chef status in database and local state
+      await get().updateChef(chefId, { status: newStatus });
+      
+    } catch (error: any) {
+      console.error('Error updating chef status from outreach:', error);
+    }
   },
 
   // Utility actions
