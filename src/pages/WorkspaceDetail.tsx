@@ -5,6 +5,7 @@ import { TaskCard } from '../components/TaskCard';
 import { CreateTaskDialog } from '../components/CreateTaskDialog';
 import { TaskDetailDialog } from '../components/TaskDetailDialog';
 import { EditWorkspaceDialog } from '../components/EditWorkspaceDialog';
+import { ChefWorkspace } from '../components/chef/ChefWorkspace'; // NEW: Import chef workspace
 import { useTaskContext } from '../contexts/TaskContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -51,7 +52,17 @@ const WorkspaceDetail = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const workspace = workspaces.find(w => w.id === workspaceId);
-  
+
+  // NEW: Check workspace type and route accordingly
+  if (workspace?.type === 'chef_outreach') {
+    return (
+      <Layout>
+        <ChefWorkspace workspaceId={workspaceId!} />
+      </Layout>
+    );
+  }
+
+  // Rest of your existing task management code...
   const workspaceTasks = useMemo(() => {
     if (!workspaceId) return [];
     return tasks.filter(task => task.workspace_id === workspaceId);
