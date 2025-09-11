@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useChefStore } from '@/hooks/useChefStore';
 import { Chef, ChefStatus, CHEF_STATUS_CONFIG } from '@/types';
 import { Phone, Mail, MapPin, MessageCircle, Plus } from 'lucide-react';
+import { ChefModal } from './ChefModal';
 
 interface ChefStatusBoardProps {
   workspaceId: string;
