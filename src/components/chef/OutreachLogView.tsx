@@ -5,7 +5,7 @@ import { useChefStore } from '@/hooks/useChefStore';
 import { OutreachLog, CONTACT_METHOD_CONFIG, RESPONSE_TYPE_CONFIG, CHEF_STATUS_CONFIG, ChefStatus } from '@/types';
 import { Plus, Calendar, MessageCircle, Filter, Edit, Trash2, Users, UserPlus } from 'lucide-react';
 import { OutreachLogModal } from './OutreachLogModal';
-import { QuickChefModal } from './ChefModal';
+import { ChefModal } from './ChefModal';
 
 interface OutreachLogViewProps {
   workspaceId: string;
