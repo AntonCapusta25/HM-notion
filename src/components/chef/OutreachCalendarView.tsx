@@ -1,8 +1,10 @@
+// components/chef/OutreachCalendarView.tsx
 
 import React, { useState, useEffect } from 'react';
-import { useChefStore } from '@/stores/useChefStore';
-import { OutreachLog, RESPONSE_TYPE_CONFIG } from '@/types/chef';
+import { useChefStore } from '@/hooks/useChefStore';
+import { OutreachLog, RESPONSE_TYPE_CONFIG } from '@/types';
 import { ChevronLeft, ChevronRight, Calendar, Plus } from 'lucide-react';
+import { OutreachLogModal } from './OutreachLogModal';
 
 interface OutreachCalendarViewProps {
   workspaceId: string;
@@ -128,3 +130,202 @@ export const OutreachCalendarView: React.FC<OutreachCalendarViewProps> = ({ work
                   className={`text-xs p-1 rounded truncate ${
                     responseConfig?.color || 'bg-gray-100 text-gray-800'
                   }`}
+                  title={`${chef?.name} - ${responseConfig?.label || 'Follow-up'}`}
+                >
+                  {chef?.name}
+                </div>
+              );
+            })}
+            {followUpLogs.length > 3 && (
+              <div className="text-xs text-gray-500 text-center">
+                +{followUpLogs.length - 3} more
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    days.push(
+      <div key="calendar" className="grid grid-cols-7 gap-1">
+        {calendarDays}
+      </div>
+    );
+
+    return days;
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  const selectedDateLogs = selectedDate ? getFollowUpLogsForDate(selectedDate) : [];
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold text-gray-900">Follow-up Calendar</h1>
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+        >
+          <Plus className="h-5 w-5" />
+          Log Outreach
+        </button>
+      </div>
+
+      {/* Calendar Navigation */}
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-6">
+          <button
+            onClick={() => navigateMonth('prev')}
+            className="p-2 hover:bg-gray-100 rounded-lg"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          
+          <h2 className="text-xl font-semibold text-gray-900">
+            {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+          </h2>
+          
+          <button
+            onClick={() => navigateMonth('next')}
+            className="p-2 hover:bg-gray-100 rounded-lg"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Calendar Grid */}
+        <div>
+          {renderCalendarGrid()}
+        </div>
+
+        {/* Legend */}
+        <div className="mt-4 flex items-center gap-4 text-sm text-gray-600">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 bg-blue-50 border border-blue-200 rounded"></div>
+            <span>Today</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+            <span>Follow-ups scheduled</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Selected Date Details */}
+      {selectedDate && (
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            Follow-ups for {new Date(selectedDate).toLocaleDateString()}
+          </h3>
+          
+          {selectedDateLogs.length > 0 ? (
+            <div className="space-y-4">
+              {selectedDateLogs.map(log => {
+                const chef = chefs.find(c => c.id === log.chef_id);
+                const responseConfig = log.response_type ? RESPONSE_TYPE_CONFIG[log.response_type] : null;
+                
+                return (
+                  <div key={log.id} className="border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="font-medium text-gray-900">{chef?.name}</div>
+                        <div className="text-sm text-gray-600">
+                          Last outreach: {new Date(log.outreach_date).toLocaleDateString()}
+                        </div>
+                        {log.notes && (
+                          <div className="text-sm text-gray-600 mt-1">
+                            <strong>Notes:</strong> {log.notes}
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="flex flex-col items-end gap-2">
+                        {responseConfig && (
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${responseConfig.color}`}>
+                            {responseConfig.label}
+                          </span>
+                        )}
+                        
+                        <div className="text-xs text-gray-500">
+                          {chef?.city && `${chef.city} • `}
+                          {chef?.phone}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center text-gray-500 py-8">
+              No follow-ups scheduled for this date
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Today's Follow-ups Summary */}
+      {(() => {
+        const today = new Date().toISOString().split('T')[0];
+        const todayLogs = getFollowUpLogsForDate(today);
+        
+        if (todayLogs.length > 0) {
+          return (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <h3 className="text-lg font-semibold text-yellow-800 mb-3">
+                Today's Follow-ups ({todayLogs.length})
+              </h3>
+              <div className="space-y-2">
+                {todayLogs.map(log => {
+                  const chef = chefs.find(c => c.id === log.chef_id);
+                  const responseConfig = log.response_type ? RESPONSE_TYPE_CONFIG[log.response_type] : null;
+                  
+                  return (
+                    <div key={log.id} className="flex items-center justify-between bg-white p-3 rounded">
+                      <span className="text-yellow-800 font-medium">{chef?.name}</span>
+                      {responseConfig && (
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${responseConfig.color}`}>
+                          {responseConfig.label}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        }
+        return null;
+      })()}
+
+      {/* Instructions */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="text-sm text-blue-800">
+          💡 <strong>Tip:</strong> Click on any date to see detailed follow-up information. Red badges indicate the number of follow-ups scheduled for that day.
+        </div>
+      </div>
+
+      {/* Create Modal */}
+      {showCreateModal && (
+        <OutreachLogModal
+          workspaceId={workspaceId}
+          chefs={chefs}
+          onClose={() => setShowCreateModal(false)}
+          onSave={() => {
+            setShowCreateModal(false);
+            fetchOutreachLogs(workspaceId);
+          }}
+        />
+      )}
+    </div>
+  );
+};
