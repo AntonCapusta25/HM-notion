@@ -426,7 +426,7 @@ export const ChefWorkspace: React.FC<ChefWorkspaceProps> = ({ workspaceId }) => 
               <EnhancedChatbot 
                 userAuthToken={authToken}
                 userId={userProfile.id}
-                workspaceId={workspaceId}
+                workspaceId="a603b10e-4a05-466c-bdf4-cbf7eb443249"
               />
             )}
           </div>
