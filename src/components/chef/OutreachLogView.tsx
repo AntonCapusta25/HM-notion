@@ -1,10 +1,11 @@
-// components/chef/OutreachLogView.tsx
+// components/chef/OutreachLogView.tsx - Enhanced with direct chef addition and status management
 
 import React, { useState, useEffect } from 'react';
 import { useChefStore } from '@/hooks/useChefStore';
-import { OutreachLog, CONTACT_METHOD_CONFIG, RESPONSE_TYPE_CONFIG } from '@/types';
-import { Plus, Calendar, MessageCircle, Filter, Edit, Trash2 } from 'lucide-react';
+import { OutreachLog, CONTACT_METHOD_CONFIG, RESPONSE_TYPE_CONFIG, CHEF_STATUS_CONFIG, ChefStatus } from '@/types';
+import { Plus, Calendar, MessageCircle, Filter, Edit, Trash2, Users, UserPlus } from 'lucide-react';
 import { OutreachLogModal } from './OutreachLogModal';
+import { QuickChefModal } from './ChefModal';
 
 interface OutreachLogViewProps {
   workspaceId: string;
@@ -17,10 +18,12 @@ export const OutreachLogView: React.FC<OutreachLogViewProps> = ({ workspaceId })
     loading, 
     fetchOutreachLogs, 
     fetchChefs, 
-    deleteOutreachLog 
+    deleteOutreachLog,
+    updateChef
   } = useChefStore();
   
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showQuickChefModal, setShowQuickChefModal] = useState(false);
   const [editingLog, setEditingLog] = useState<OutreachLog | null>(null);
   const [filterContactMethod, setFilterContactMethod] = useState<string>('all');
   const [filterResponseType, setFilterResponseType] = useState<string>('all');
@@ -53,6 +56,19 @@ export const OutreachLogView: React.FC<OutreachLogViewProps> = ({ workspaceId })
     }
   };
 
+  // NEW: Handle direct status changes
+  const handleStatusChange = async (chefId: string, newStatus: ChefStatus) => {
+    await updateChef(chefId, { status: newStatus });
+  };
+
+  // NEW: Handle quick chef addition
+  const handleQuickChefAdded = (chefId: string) => {
+    setShowQuickChefModal(false);
+    // Refresh data to show the new chef and outreach log
+    fetchChefs(workspaceId);
+    fetchOutreachLogs(workspaceId);
+  };
+
   const getUpcomingFollowUps = () => {
     const today = new Date().toISOString().split('T')[0];
     return outreachLogs.filter(log => 
@@ -76,13 +92,23 @@ export const OutreachLogView: React.FC<OutreachLogViewProps> = ({ workspaceId })
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-gray-900">Outreach Log</h1>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
-        >
-          <Plus className="h-5 w-5" />
-          Log Outreach
-        </button>
+        <div className="flex items-center gap-2">
+          {/* NEW: Add Chef button */}
+          <button
+            onClick={() => setShowQuickChefModal(true)}
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+          >
+            <UserPlus className="h-5 w-5" />
+            Add Chef
+          </button>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+          >
+            <Plus className="h-5 w-5" />
+            Log Outreach
+          </button>
+        </div>
       </div>
 
       {/* Upcoming Follow-ups */}
@@ -183,7 +209,7 @@ export const OutreachLogView: React.FC<OutreachLogViewProps> = ({ workspaceId })
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Chef
+                  Chef & Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Outreach Date
@@ -210,16 +236,36 @@ export const OutreachLogView: React.FC<OutreachLogViewProps> = ({ workspaceId })
                 const chef = chefs.find(c => c.id === log.chef_id);
                 const contactMethodConfig = CONTACT_METHOD_CONFIG[log.contact_method];
                 const responseTypeConfig = log.response_type ? RESPONSE_TYPE_CONFIG[log.response_type] : null;
+                const statusConfig = chef ? CHEF_STATUS_CONFIG[chef.status] : null;
                 
                 return (
                   <tr key={log.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        {chef?.name || 'Unknown Chef'}
+                      <div className="space-y-2">
+                        <div className="text-sm font-medium text-gray-900">
+                          {chef?.name || 'Unknown Chef'}
+                        </div>
+                        {chef?.city && (
+                          <div className="text-sm text-gray-500">{chef.city}</div>
+                        )}
+                        
+                        {/* NEW: Direct status management */}
+                        {chef && statusConfig && (
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={chef.status}
+                              onChange={(e) => handleStatusChange(chef.id, e.target.value as ChefStatus)}
+                              className={`text-xs px-2 py-1 rounded-full border-0 ${statusConfig.bgColor} ${statusConfig.color} font-semibold focus:ring-2 focus:ring-blue-500`}
+                            >
+                              {Object.entries(CHEF_STATUS_CONFIG).map(([value, config]) => (
+                                <option key={value} value={value}>
+                                  {config.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
                       </div>
-                      {chef?.city && (
-                        <div className="text-sm text-gray-500">{chef.city}</div>
-                      )}
                     </td>
                     
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -289,7 +335,7 @@ export const OutreachLogView: React.FC<OutreachLogViewProps> = ({ workspaceId })
             <div className="text-gray-500">
               {searchTerm || filterContactMethod !== 'all' || filterResponseType !== 'all'
                 ? 'No outreach logs match your filters' 
-                : 'No outreach logs yet. Add your first log to get started.'}
+                : 'No outreach logs yet. Add your first chef and log outreach to get started.'}
             </div>
           </div>
         )}
@@ -310,6 +356,16 @@ export const OutreachLogView: React.FC<OutreachLogViewProps> = ({ workspaceId })
             setEditingLog(null);
             fetchOutreachLogs(workspaceId);
           }}
+        />
+      )}
+
+      {/* NEW: Quick Chef Addition Modal */}
+      {showQuickChefModal && (
+        <ChefModal
+          workspaceId={workspaceId}
+          quickAddMode={true}
+          onClose={() => setShowQuickChefModal(false)}
+          onSave={handleQuickChefAdded}
         />
       )}
     </div>
