@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useChefStore } from '@/hooks/useChefStore';
-import { Chef, CreateChefData, UpdateChefData, CHEF_STATUS_CONFIG } from '@/types/chef';
+import { Chef, CreateChefData, UpdateChefData, CHEF_STATUS_CONFIG } from '@/types';
 import { X } from 'lucide-react';
 
 interface ChefModalProps {
