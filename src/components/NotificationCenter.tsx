@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format, isToday, isTomorrow, isPast } from 'date-fns';
+import { cn } from '@/lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { useProfile } from '../hooks/useProfile';
 import { useTaskContext } from '../contexts/TaskContext';
@@ -38,43 +39,19 @@ export const NotificationCenter = () => {
   const [userTasks, setUserTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
-  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
-    email: true,
-    desktop: true,
-    taskAssigned: true,
-    taskUpdated: true,  
-    comments: true,
-    dueSoon: true
-  });
 
-  // Load notification settings from localStorage
-  useEffect(() => {
-    const loadSettings = () => {
-      try {
-        const savedPreferences = localStorage.getItem('userPreferences');
-        if (savedPreferences) {
-          const prefs = JSON.parse(savedPreferences);
-          if (prefs.notifications) {
-            setNotificationSettings(prefs.notifications);
-          }
-        }
-      } catch (error) {
-        console.error('Failed to load notification settings:', error);
-      }
+  // Set notification settings from the profile data
+  const notificationSettings: NotificationSettings = useMemo(() => {
+    return profile?.notification_preferences || {
+      email: true,
+      desktop: true,
+      taskAssigned: true,
+      taskUpdated: true,
+      comments: true,
+      dueSoon: true
     };
-
-    loadSettings();
-
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'userPreferences') {
-        loadSettings();
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
-
+  }, [profile]);
+  
   // Load user's tasks with assignees from the actual schema
   useEffect(() => {
     if (!user) return;
@@ -326,6 +303,7 @@ export const NotificationCenter = () => {
         case 'task_assigned':
           return notificationSettings.taskAssigned;
         case 'task_updated':
+        case 'completed': // Added 'completed' to taskUpdated
           return notificationSettings.taskUpdated;
         case 'comment_added':
           return notificationSettings.comments;
@@ -334,8 +312,6 @@ export const NotificationCenter = () => {
         case 'overdue':
         case 'task_overdue':
           return notificationSettings.dueSoon;
-        case 'completed':
-          return notificationSettings.taskUpdated;
         default:
           return true;
       }
@@ -569,7 +545,7 @@ export const NotificationCenter = () => {
                           {notification.message}
                         </p>
                         <div className="flex items-center justify-between">
-                          <Badge variant="outline" className={`text-xs ${getNotificationColor(notification.type)}`}>
+                          <Badge variant="outline" className={cn("text-xs", getNotificationColor(notification.type))}>
                             {notification.type.replace('_', ' ')}
                           </Badge>
                           <p className="text-xs text-gray-500">
