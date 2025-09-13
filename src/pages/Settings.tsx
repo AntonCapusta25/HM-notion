@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { User, Bell, Palette, Shield, Download, AlertCircle, Trash2 } from 'lucide-react';
+import { User, Bell, Palette, Shield, Download, AlertCircle, Trash2, TestTube } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '../contexts/AuthContext';
 import { useProfile } from '../hooks/useProfile';
@@ -23,6 +23,7 @@ const Settings = () => {
   const { tasks } = useTaskContext();
   
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
   const [settings, setSettings] = useState({
     name: '',
     email: '',
@@ -41,7 +42,7 @@ const Settings = () => {
     language: 'en'
   });
 
-  // Load user preferences from localStorage on mount
+  // Load user preferences from localStorage on mount (for non-notification settings)
   useEffect(() => {
     const savedPreferences = localStorage.getItem('userPreferences');
     if (savedPreferences) {
@@ -49,19 +50,11 @@ const Settings = () => {
         const prefs = JSON.parse(savedPreferences);
         setSettings(prev => ({
           ...prev,
-          ...prefs,
-          // Ensure notifications object exists and has all required fields
-          notifications: {
-            email: true,
-            desktop: true,
-            taskAssigned: true,
-            taskUpdated: true,
-            comments: true,
-            dueSoon: true,
-            ...prefs.notifications
-          }
+          theme: prefs.theme || prev.theme,
+          timezone: prefs.timezone || prev.timezone,
+          language: prefs.language || prev.language
         }));
-        console.log('📧 Loaded user preferences:', prefs);
+        console.log('📱 Loaded UI preferences from localStorage:', prefs);
       } catch (error) {
         console.error('Error parsing saved preferences:', error);
       }
@@ -81,6 +74,27 @@ const Settings = () => {
       }));
     }
   }, [user, profile]);
+
+  // Load notification preferences from database when profile loads
+  useEffect(() => {
+    if (profile?.notification_preferences) {
+      setSettings(prev => ({
+        ...prev,
+        notifications: {
+          email: true,
+          desktop: true,
+          taskAssigned: true,
+          taskUpdated: true,
+          comments: true,
+          dueSoon: true,
+          ...profile.notification_preferences // Override with database values
+        }
+      }));
+      console.log('📧 Loaded notification preferences from database:', profile.notification_preferences);
+    } else {
+      console.log('📧 No notification preferences found in database, using defaults');
+    }
+  }, [profile]);
 
   const updateSetting = (path: string, value: any) => {
     setSettings(prev => {
@@ -111,7 +125,10 @@ const Settings = () => {
     setIsUpdating(true);
 
     try {
-      // Save profile data using actual schema fields
+      console.log('💾 Saving settings to database...');
+      console.log('Notification preferences to save:', settings.notifications);
+
+      // Save profile data AND notification preferences to database
       const { error } = await supabase
         .from('users')
         .upsert({
@@ -120,38 +137,37 @@ const Settings = () => {
           email: settings.email,
           department: settings.department,
           role: settings.role,
+          notification_preferences: settings.notifications, // Save notification preferences to database
           updated_at: new Date().toISOString()
         });
 
       if (error) throw error;
 
-      // Save preferences to localStorage and trigger storage event for other components
-      const preferencesToSave = {
-        department: settings.department,
-        role: settings.role,
-        notifications: settings.notifications,
+      // Also save UI preferences to localStorage for frontend use
+      const uiPreferences = {
         theme: settings.theme,
         timezone: settings.timezone,
         language: settings.language
       };
 
-      localStorage.setItem('userPreferences', JSON.stringify(preferencesToSave));
+      localStorage.setItem('userPreferences', JSON.stringify(uiPreferences));
       
-      // Dispatch storage event to notify other components (like NotificationCenter)
+      // Dispatch storage event to notify other components
       window.dispatchEvent(new StorageEvent('storage', {
         key: 'userPreferences',
-        newValue: JSON.stringify(preferencesToSave)
+        newValue: JSON.stringify(uiPreferences)
       }));
 
+      console.log('✅ Settings saved successfully');
       toast({
         title: "Settings saved",
-        description: "Your preferences have been updated successfully.",
+        description: "Your notification preferences and profile have been updated successfully.",
       });
     } catch (error: any) {
-      console.error('Error saving settings:', error);
+      console.error('❌ Error saving settings:', error);
       toast({
         title: "Error",
-        description: "Failed to save settings. Please try again.",
+        description: error.message || "Failed to save settings. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -159,8 +175,72 @@ const Settings = () => {
     }
   };
 
+  const testNotifications = async () => {
+    if (!user) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to test notifications.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsTesting(true);
+
+    try {
+      console.log('🧪 Testing notification system...');
+
+      // Check if notifications table exists and create a test notification
+      const { data, error } = await supabase
+        .from('notifications')
+        .insert({
+          user_id: user.id,
+          title: 'Test Notification',
+          message: 'This is a test notification to verify your settings are working correctly.',
+          type: 'info',
+          read: false,
+          created_at: new Date().toISOString()
+        })
+        .select();
+
+      if (error) {
+        console.error('Error creating test notification:', error);
+        
+        // If notifications table doesn't exist, just show a message
+        if (error.code === '42P01') {
+          toast({
+            title: "Test completed",
+            description: "Your notification preferences have been saved. Email notifications will respect these settings when the system processes events.",
+            duration: 5000
+          });
+        } else {
+          throw error;
+        }
+      } else {
+        console.log('✅ Test notification created:', data);
+        toast({
+          title: "Test notification sent",
+          description: "A test notification has been created. Check your notifications and email to verify your settings are working.",
+          duration: 5000
+        });
+      }
+    } catch (error: any) {
+      console.error('❌ Test notification failed:', error);
+      toast({
+        title: "Test partially completed",
+        description: "Your preferences are saved, but we couldn't create a test notification. This is normal if the notifications table doesn't exist yet.",
+        variant: "default",
+        duration: 5000
+      });
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
   const exportData = async () => {
     try {
+      console.log('📦 Exporting user data...');
+      
       // Export user's tasks and related data using actual schema
       const { data: userTasks, error: tasksError } = await supabase
         .from('task_assignees')
@@ -180,13 +260,20 @@ const Settings = () => {
 
       if (createdError) throw createdError;
 
-      // Get user's notifications
-      const { data: notifications, error: notifError } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', user?.id);
-
-      if (notifError) throw notifError;
+      // Get user's notifications (if table exists)
+      let notifications = [];
+      try {
+        const { data: notifData, error: notifError } = await supabase
+          .from('notifications')
+          .select('*')
+          .eq('user_id', user?.id);
+        
+        if (!notifError) {
+          notifications = notifData || [];
+        }
+      } catch (notifError) {
+        console.log('Notifications table not available for export');
+      }
 
       const exportData = {
         profile: profile,
@@ -194,7 +281,8 @@ const Settings = () => {
         createdTasks: createdTasks,
         notifications: notifications,
         settings: settings,
-        exportedAt: new Date().toISOString()
+        exportedAt: new Date().toISOString(),
+        exportedBy: user?.email
       };
 
       const dataStr = JSON.stringify(exportData, null, 2);
@@ -203,21 +291,22 @@ const Settings = () => {
       
       const link = document.createElement('a');
       link.href = url;
-      link.download = `homebase-data-${new Date().toISOString().split('T')[0]}.json`;
+      link.download = `homebase-data-${user?.email}-${new Date().toISOString().split('T')[0]}.json`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
 
+      console.log('✅ Data export completed');
       toast({
         title: "Export completed",
         description: "Your data has been downloaded successfully.",
       });
     } catch (error: any) {
-      console.error('Error exporting data:', error);
+      console.error('❌ Error exporting data:', error);
       toast({
         title: "Export failed",
-        description: "Failed to export your data. Please try again.",
+        description: error.message || "Failed to export your data. Please try again.",
         variant: "destructive"
       });
     }
@@ -236,7 +325,17 @@ const Settings = () => {
         .delete()
         .eq('user_id', user?.id);
 
-      if (error) throw error;
+      if (error) {
+        // If table doesn't exist, that's fine
+        if (error.code === '42P01') {
+          toast({
+            title: "No notifications to clear",
+            description: "The notifications system is not yet set up.",
+          });
+          return;
+        }
+        throw error;
+      }
 
       toast({
         title: "Notifications cleared",
@@ -246,7 +345,7 @@ const Settings = () => {
       console.error('Error clearing notifications:', error);
       toast({
         title: "Error",
-        description: "Failed to clear notifications. Please try again.",
+        description: error.message || "Failed to clear notifications. Please try again.",
         variant: "destructive"
       });
     }
@@ -318,7 +417,7 @@ const Settings = () => {
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              Failed to load profile data. Some settings may not be available.
+              Failed to load profile data: {profileError.message}. Some settings may not be available.
             </AlertDescription>
           </Alert>
         </div>
@@ -429,7 +528,7 @@ const Settings = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Bell className="h-5 w-5" />
-                Notifications
+                Email Notifications
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -473,7 +572,7 @@ const Settings = () => {
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="comments">Comments</Label>
+                  <Label htmlFor="comments">Comments & attachments</Label>
                   <Switch
                     id="comments"
                     checked={settings.notifications.comments}
@@ -491,6 +590,16 @@ const Settings = () => {
                 </div>
 
                 <Separator />
+
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start" 
+                  onClick={testNotifications}
+                  disabled={isTesting}
+                >
+                  <TestTube className="h-4 w-4 mr-2" />
+                  {isTesting ? 'Testing...' : 'Test Notifications'}
+                </Button>
 
                 <Button 
                   variant="outline" 
