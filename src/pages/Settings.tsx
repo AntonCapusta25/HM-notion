@@ -138,7 +138,6 @@ const Settings = () => {
           department: settings.department,
           role: settings.role,
           notification_preferences: settings.notifications, // Save notification preferences to database
-          updated_at: new Date().toISOString()
         });
 
       if (error) throw error;
