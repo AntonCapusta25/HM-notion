@@ -81,7 +81,7 @@ export default function LeadsView({ workspaceId }: LeadsViewProps) {
     bulkUpdateLeads
   } = useOutreachStore()
   
-  const { user } = useAuthStore()
+  const { user } = useAuth()
   const { toast } = useToast()
 
   useEffect(() => {
