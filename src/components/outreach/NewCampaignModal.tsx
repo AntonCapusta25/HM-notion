@@ -44,7 +44,7 @@ interface NewCampaignModalProps {
 }
 
 const EMAIL_TEMPLATES = {
-  cold_outreach: `Hi {{first_name}},
+  cold_outreach: `Hi {{name}},
 
 I hope this email finds you well. I came across {{company}} and was impressed by your work in {{industry}}.
 
@@ -55,7 +55,7 @@ I'd love to learn more about your current challenges and see if we can help.
 Best regards,
 {{sender_name}}`,
 
-  follow_up: `Hi {{first_name}},
+  follow_up: `Hi {{name}},
 
 I wanted to follow up on my previous email about {{subject}}.
 
@@ -66,7 +66,7 @@ Would you be available for a brief call this week to discuss further?
 Best regards,
 {{sender_name}}`,
 
-  partnership: `Hi {{first_name}},
+  partnership: `Hi {{name}},
 
 I'm reaching out because I believe there could be great synergy between {{company}} and our company.
 
@@ -77,7 +77,7 @@ I'd love to explore potential partnership opportunities with you.
 Best regards,
 {{sender_name}}`,
 
-  press_release: `Hi {{first_name}},
+  press_release: `Hi {{name}},
 
 I hope you're doing well. I wanted to share some exciting news from our company that I think would be of interest to {{company}}.
 
@@ -114,7 +114,6 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
   const [attachments, setAttachments] = useState<File[]>([])
   const [previewData, setPreviewData] = useState({
     name: 'John Doe',
-    first_name: 'John',
     company: 'Acme Corp',
     industry: 'Technology',
     sender_name: 'Your Name'
@@ -365,7 +364,7 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
                 placeholder="e.g., Partnership opportunity with {{company}}"
               />
               <p className="text-sm text-gray-600">
-                Use variables like {{first_name}}, {{company}}, {{industry}} for personalization
+                Use variables like {{name}}, {{company}}, {{industry}} for personalization
               </p>
             </div>
 
@@ -423,7 +422,7 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
                   className="font-mono text-sm"
                 />
                 <p className="text-sm text-gray-600">
-                  Available variables: {{first_name}}, {{name}}, {{company}}, {{position}}, {{industry}}, {{location}}, {{sender_name}}
+                  Available variables: {{name}}, {{company}}, {{position}}, {{industry}}, {{location}}, {{sender_name}}
                 </p>
               </div>
 
