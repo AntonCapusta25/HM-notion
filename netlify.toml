@@ -1,0 +1,10 @@
+# This file configures your deployment settings for Netlify.
+
+[[headers]]
+  # This rule applies to all pages on your site.
+  for = "/*"
+  [headers.values]
+    # This is the Content Security Policy (CSP) header.
+    # It allows your site's own scripts ('self') and also allows the
+    # Supabase library to function correctly ('unsafe-eval').
+    Content-Security-Policy = "script-src 'self' 'unsafe-eval'; object-src 'self'"
