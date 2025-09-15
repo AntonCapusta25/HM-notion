@@ -18,7 +18,7 @@ import {
   Filter
 } from 'lucide-react'
 import { useOutreachStore } from '@/hooks/useOutreachStore'
-import { useAuthStore } from '@/hooks/useAuthStore'
+import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '@/hooks/use-toast'
 
 interface SegmentsViewProps {
