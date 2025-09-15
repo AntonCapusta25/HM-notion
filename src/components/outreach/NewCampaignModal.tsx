@@ -1,4 +1,3 @@
-// NewCampaignModal.tsx - Modal for creating and editing email campaigns
 import React, { useState, useEffect } from 'react'
 import {
   Dialog,
@@ -44,49 +43,27 @@ interface NewCampaignModalProps {
 }
 
 const EMAIL_TEMPLATES = {
-  cold_outreach: `Hi {{name}},
+  cold_outreach: `Hi {{name}},\n\nI hope this email finds you well. I came across {{company}} and was impressed by your work in {{industry}}.\n\n{{custom_message}}\n\nI'd love to learn more about your current challenges and see if we can help.\n\nBest regards,\n{{sender_name}}`,
+  follow_up: `Hi {{name}},\n\nI wanted to follow up on my previous email about {{subject}}.\n\n{{custom_message}}\n\nWould you be available for a brief call this week to discuss further?\n\nBest regards,\n{{sender_name}}`,
+  partnership: `Hi {{name}},\n\nI'm reaching out because I believe there could be great synergy between {{company}} and our company.\n\n{{custom_message}}\n\nI'd love to explore potential partnership opportunities with you.\n\nBest regards,\n{{sender_name}}`,
+  press_release: `Hi {{name}},\n\nI hope you're doing well. I wanted to share some exciting news from our company that I think would be of interest to {{company}}.\n\n{{custom_message}}\n\nI'd be happy to provide more details or arrange an interview if this interests you.\n\nBest regards,\n{{sender_name}}`
+}
 
-I hope this email finds you well. I came across {{company}} and was impressed by your work in {{industry}}.
-
-{{custom_message}}
-
-I'd love to learn more about your current challenges and see if we can help.
-
-Best regards,
-{{sender_name}}`,
-
-  follow_up: `Hi {{name}},
-
-I wanted to follow up on my previous email about {{subject}}.
-
-{{custom_message}}
-
-Would you be available for a brief call this week to discuss further?
-
-Best regards,
-{{sender_name}}`,
-
-  partnership: `Hi {{name}},
-
-I'm reaching out because I believe there could be great synergy between {{company}} and our company.
-
-{{custom_message}}
-
-I'd love to explore potential partnership opportunities with you.
-
-Best regards,
-{{sender_name}}`,
-
-  press_release: `Hi {{name}},
-
-I hope you're doing well. I wanted to share some exciting news from our company that I think would be of interest to {{company}}.
-
-{{custom_message}}
-
-I'd be happy to provide more details or arrange an interview if this interests you.
-
-Best regards,
-{{sender_name}}`
+// --- FIX #1: THE SAFE TEMPLATE FUNCTION ---
+/**
+ * Safely fills a template string with data from an object.
+ * If a key is missing in the data object, it leaves the placeholder untouched.
+ * @param {string} templateString The template with {{placeholders}}.
+ * @param {object} data The object containing the data.
+ * @returns {string} The filled-in template string.
+ */
+function fillTemplateSafely(templateString, data) {
+  if (!templateString || !data) {
+    return templateString || '';
+  }
+  return templateString.replace(/{{(\w+)}}/g, (placeholder, key) => {
+    return data.hasOwnProperty(key) ? data[key] : placeholder;
+  });
 }
 
 export default function NewCampaignModal({ open, onClose, workspaceId, editingCampaign }: NewCampaignModalProps) {
@@ -112,19 +89,16 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
     }
   })
   const [attachments, setAttachments] = useState<File[]>([])
-  const [previewData, setPreviewData] = useState({
-    name: 'John Doe',
-    company: 'Acme Corp',
-    industry: 'Technology',
-    sender_name: 'Your Name'
-  })
 
+  // --- ZUSTAND STORE AND OTHER HOOKS ---
   const { 
+    leads, // <-- FIX #2: Get leads from the store
     segments, 
     outreachTypes,
     loading,
     createCampaign,
     updateCampaign,
+    fetchLeads, // <-- FIX #2: Get the action to fetch leads
     fetchSegments,
     fetchOutreachTypes
   } = useOutreachStore()
@@ -132,10 +106,12 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
   const { user } = useAuth()
   const { toast } = useToast()
 
+  // --- DATA FETCHING ---
   useEffect(() => {
     if (workspaceId && open) {
-      fetchSegments(workspaceId)
-      fetchOutreachTypes(workspaceId)
+      fetchLeads(workspaceId); // <-- FIX #2: Fetch leads for a realistic preview
+      fetchSegments(workspaceId);
+      fetchOutreachTypes(workspaceId);
     }
   }, [workspaceId, open])
 
@@ -196,17 +172,34 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
     setAttachments(prev => prev.filter((_, i) => i !== index))
   }
 
-const generatePreview = () => {
-  // Combine all your data sources into one object.
-  const allData = {
-    ...previewData,
-    subject: campaignForm.subject_line,
-    custom_message: '[Your personalized message will appear here]'
+  // --- ✅ FIX #3: THE SAFE PREVIEW GENERATION LOGIC ---
+  const generatePreview = () => {
+    // Use the first lead from your database for a realistic preview.
+    const previewLead = leads.length > 0 ? leads[0] : null;
+
+    // Define a default fallback object for when there are no leads yet.
+    const defaultPreviewData = {
+      name: 'Jane Doe',
+      company: 'Example Corp',
+      industry: 'Business',
+      position: 'Decision Maker'
+    };
+
+    // Use the real lead if available, otherwise use the fallback.
+    const dataSource = previewLead || defaultPreviewData;
+    
+    // Combine all data sources into one object for the template.
+    const allData = {
+      ...dataSource,
+      sender_name: user?.user_metadata?.full_name || user?.email || 'Your Name',
+      subject: campaignForm.subject_line,
+      custom_message: '[Your personalized message will appear here.]'
+    };
+
+    // Use the SAFE function to generate the preview. This will not crash.
+    return fillTemplateSafely(campaignForm.email_template, allData);
   };
 
-  // Use the new, safe function to fill the template.
-  return fillTemplateSafely(campaignForm.email_template, allData);
-};
 
   const validateForm = () => {
     if (!campaignForm.name.trim()) {
@@ -309,7 +302,7 @@ const generatePreview = () => {
             <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="basic" className="space-y-4">
+          <TabsContent value="basic" className="space-y-4 pt-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="campaign_name">Campaign Name</Label>
@@ -389,7 +382,7 @@ const generatePreview = () => {
             </div>
           </TabsContent>
 
-          <TabsContent value="content" className="space-y-4">
+          <TabsContent value="content" className="space-y-4 pt-4">
             <div className="space-y-4">
               <div>
                 <Label className="mb-3 block">Email Template</Label>
@@ -468,7 +461,7 @@ const generatePreview = () => {
             </div>
           </TabsContent>
 
-          <TabsContent value="targeting" className="space-y-4">
+          <TabsContent value="targeting" className="space-y-4 pt-4">
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="segment">Target Segment</Label>
@@ -543,7 +536,7 @@ const generatePreview = () => {
             </div>
           </TabsContent>
 
-          <TabsContent value="settings" className="space-y-4">
+          <TabsContent value="settings" className="space-y-4 pt-4">
             <div className="space-y-6">
               <div className="space-y-4">
                 <h4 className="font-medium">Sending Settings</h4>
@@ -742,7 +735,7 @@ const generatePreview = () => {
         )}
 
         {/* Action Buttons */}
-        <div className="flex justify-between pt-6">
+        <div className="flex justify-between items-center pt-6">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
