@@ -1,4 +1,4 @@
-// OutreachMain.tsx - Main outreach system component
+// OutreachMain.tsx - Main outreach system component with corrected imports
 import React, { useState, useEffect } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -7,15 +7,17 @@ import { Badge } from '@/components/ui/badge'
 import { Plus, Users, Mail, Settings, Search, Upload, Brain, BarChart3, Download } from 'lucide-react'
 import { useAuthStore } from '@/hooks/useAuthStore'
 import { useOutreachStore } from '@/hooks/useOutreachStore'
-import LeadsView from './components/LeadsView'
-import CampaignsView from './components/CampaignsView'
-import DeepResearchView from './components/DeepResearchView'
-import SegmentsView from './components/SegmentsView'
-import OutreachSettings from './components/OutreachSettings'
-import AnalyticsView from './components/AnalyticsView'
-import CSVImportModal from './components/CSVImportModal'
-import NewCampaignModal from './components/NewCampaignModal'
-import NewResearchJobModal from './components/NewResearchJobModal'
+
+// Fixed import paths - components are in the same directory, not in a subfolder
+import LeadsView from './LeadsView'
+import CampaignsView from './CampaignsView'
+import DeepResearchView from './DeepResearchView'
+import SegmentsView from './SegmentsView'
+import OutreachSettings from './OutreachSettings'
+import AnalyticsView from './AnalyticsView'
+import CSVImportModal from './CSVImportModal'
+import NewCampaignModal from './NewCampaignModal'
+import NewResearchJobModal from './NewResearchJobModal'
 
 interface OutreachMainProps {
   workspaceId: string
