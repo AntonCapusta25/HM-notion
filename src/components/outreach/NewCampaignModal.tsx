@@ -180,8 +180,6 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
     // Define a default fallback object for when there are no leads yet.
     const defaultPreviewData = {
       name: 'Jane Doe',
-      industry: 'Business',
-      position: 'Decision Maker'
     };
 
     // Use the real lead if available, otherwise use the fallback.
@@ -411,7 +409,7 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
                   className="font-mono text-sm"
                 />
                 <p className="text-sm text-gray-600">
-                  Available variables: {{name}}, {{position}}, {{industry}}, {{location}}, {{sender_name}}
+                  Available variables: {{name}}, position, indutry, location, sender name
                 </p>
               </div>
 
