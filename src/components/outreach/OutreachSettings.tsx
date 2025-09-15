@@ -88,7 +88,7 @@ export default function OutreachSettings({ workspaceId }: OutreachSettingsProps)
     sendTestEmail
   } = useOutreachStore()
   
-  const { user } = useAuthStore()
+  const { user } = useAuth()
   const { toast } = useToast()
 
   useEffect(() => {
