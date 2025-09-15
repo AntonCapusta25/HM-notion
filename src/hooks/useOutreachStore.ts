@@ -1,14 +1,13 @@
-// useOutreachStore.ts - Complete Zustand store for outreach system state management
+// useOutreachStore.ts - Simplified version without deep research functionality
 import { create } from 'zustand'
 import { createClient } from '@supabase/supabase-js'
 
-// Change this in your useOutreachStore.ts
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL!,
   import.meta.env.VITE_SUPABASE_ANON_KEY!
 )
 
-// Types
+// Types (Deep Research types removed)
 interface Lead {
   id: string
   name: string
@@ -28,7 +27,6 @@ interface Lead {
   status: 'new' | 'contacted' | 'responded' | 'qualified' | 'converted' | 'dead'
   source: string
   notes?: string
-  research_data?: any
   custom_fields?: any
   segment_id?: string
   created_by: string
@@ -114,27 +112,6 @@ interface OutreachEmail {
   updated_at: string
 }
 
-interface DeepResearchJob {
-  id: string
-  name: string
-  search_criteria: any
-  research_prompt?: string
-  status: 'pending' | 'running' | 'completed' | 'failed'
-  openai_response_id?: string
-  total_leads_found: number
-  leads_imported: number
-  target_segment_id?: string
-  research_output?: string
-  leads_data?: any[]
-  error_message?: string
-  created_by: string
-  workspace_id: string
-  created_at: string
-  updated_at: string
-  completed_at?: string
-  settings: any
-}
-
 interface CSVImport {
   id: string
   file_name: string
@@ -159,10 +136,6 @@ interface OutreachSettings {
   reply_to_email?: string
   apps_script_url?: string
   apps_script_api_key?: string
-  openai_api_key?: string
-  preferred_research_model: string
-  max_research_cost_per_job: number
-  default_research_settings: any
   created_by: string
   created_at: string
   updated_at: string
@@ -186,7 +159,7 @@ interface Analytics {
   }>
 }
 
-// Store interface
+// Store interface (Deep Research removed)
 interface OutreachStore {
   // State
   leads: Lead[]
@@ -194,7 +167,6 @@ interface OutreachStore {
   outreachTypes: OutreachType[]
   campaigns: OutreachCampaign[]
   emails: OutreachEmail[]
-  researchJobs: DeepResearchJob[]
   csvImports: CSVImport[]
   settings: OutreachSettings | null
   analytics: Analytics | null
@@ -236,11 +208,6 @@ interface OutreachStore {
   fetchEmails: (workspaceId: string, campaignId?: string) => Promise<void>
   sendTestEmail: (emailData: any) => Promise<void>
 
-  // Deep Research
-  fetchResearchJobs: (workspaceId: string) => Promise<void>
-  createResearchJob: (job: Partial<DeepResearchJob>) => Promise<DeepResearchJob>
-  getResearchJobStatus: (id: string) => Promise<DeepResearchJob>
-
   // CSV Import
   fetchCSVImports: (workspaceId: string) => Promise<void>
   uploadCSV: (file: File, workspaceId: string) => Promise<string>
@@ -260,13 +227,12 @@ interface OutreachStore {
 
 // Create store
 export const useOutreachStore = create<OutreachStore>((set, get) => ({
-  // Initial state
+  // Initial state (Deep Research removed)
   leads: [],
   segments: [],
   outreachTypes: [],
   campaigns: [],
   emails: [],
-  researchJobs: [],
   csvImports: [],
   settings: null,
   analytics: null,
@@ -277,20 +243,19 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
   clearError: () => set({ error: null }),
   setLoading: (loading: boolean) => set({ loading }),
 
-  // NEW: Initialize workspace data
+  // Initialize workspace data (Deep Research removed)
   initializeWorkspace: async (workspaceId: string) => {
     try {
       set({ loading: true, error: null })
       console.log('🔄 OutreachStore - Initializing workspace:', workspaceId)
       
-      // Load all essential data in parallel
+      // Load all essential data in parallel (removed deep research)
       const results = await Promise.allSettled([
         get().fetchLeads(workspaceId),
         get().fetchSegments(workspaceId),
         get().fetchOutreachTypes(workspaceId),
         get().fetchCampaigns(workspaceId),
         get().fetchEmails(workspaceId),
-        get().fetchResearchJobs(workspaceId),
         get().fetchCSVImports(workspaceId),
         get().fetchSettings(workspaceId)
       ])
@@ -325,7 +290,6 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
       if (error) throw error
       set({ leads: data || [] })
     } catch (error: any) {
-      // Don't set global error for individual fetch failures during initialization
       console.warn('Failed to fetch leads:', error.message)
       set({ leads: [] })
     }
@@ -737,70 +701,6 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
     }
   },
 
-  // Deep Research actions
-  fetchResearchJobs: async (workspaceId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('deep_research_jobs')
-        .select('*, lead_segments(name, color)')
-        .eq('workspace_id', workspaceId)
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-      set({ researchJobs: data || [] })
-    } catch (error: any) {
-      console.warn('Failed to fetch research jobs:', error.message)
-      set({ researchJobs: [] })
-    }
-  },
-
-  createResearchJob: async (job: Partial<DeepResearchJob>) => {
-    try {
-      set({ loading: true, error: null })
-      
-      // Call the edge function to start deep research
-      const response = await supabase.functions.invoke('deep-research-leads', {
-        body: job
-      })
-
-      if (response.error) throw response.error
-      
-      // Refresh research jobs
-      await get().fetchResearchJobs(job.workspace_id!)
-      
-      return response.data
-    } catch (error: any) {
-      set({ error: error.message })
-      throw error
-    } finally {
-      set({ loading: false })
-    }
-  },
-
-  getResearchJobStatus: async (id: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('deep_research_jobs')
-        .select('*')
-        .eq('id', id)
-        .single()
-
-      if (error) throw error
-      
-      // Update the job in state
-      set(state => ({
-        researchJobs: state.researchJobs.map(job => 
-          job.id === id ? data : job
-        )
-      }))
-      
-      return data
-    } catch (error: any) {
-      set({ error: error.message })
-      throw error
-    }
-  },
-
   // CSV Import actions
   fetchCSVImports: async (workspaceId: string) => {
     try {
@@ -865,7 +765,7 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
     }
   },
 
-  // Settings actions
+  // Settings actions (OpenAI removed)
   fetchSettings: async (workspaceId: string) => {
     try {
       const { data, error } = await supabase
@@ -904,8 +804,6 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
   // Analytics actions
   fetchAnalytics: async (workspaceId: string) => {
     try {
-      // This would typically call a database function or compute analytics
-      // For now, we'll compute basic analytics from existing data
       const { leads, campaigns, emails } = get()
       
       const analytics: Analytics = {
