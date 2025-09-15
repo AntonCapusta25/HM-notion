@@ -29,7 +29,7 @@ import {
 import { useDropzone } from 'react-dropzone'
 import Papa from 'papaparse'
 import { useOutreachStore } from '@/hooks/useOutreachStore'
-import { useAuthStore } from '@/hooks/useAuthStore'
+import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '@/hooks/use-toast'
 
 interface CSVImportModalProps {
