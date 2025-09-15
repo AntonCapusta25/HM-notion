@@ -6,7 +6,7 @@ import { CreateTaskDialog } from '../components/CreateTaskDialog';
 import { TaskDetailDialog } from '../components/TaskDetailDialog';
 import { EditWorkspaceDialog } from '../components/EditWorkspaceDialog';
 import { ChefWorkspace } from '../components/chef/ChefWorkspace';
-import { OutreachMain } from '../components/outreach/OutreachMain'; // NEW: Import outreach workspace
+import OutreachMain from '../components/outreach/OutreachMain.tsx';
 import { useTaskContext } from '../contexts/TaskContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '@/components/ui/button';
