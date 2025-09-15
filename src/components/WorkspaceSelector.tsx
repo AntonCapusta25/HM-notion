@@ -16,7 +16,6 @@ import {
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 
-// Assuming the Workspace type is defined in a types file
 export interface Workspace {
   id: string;
   name: string;
@@ -50,7 +49,6 @@ export const WorkspaceSelector = ({
     (w) => w.id === selectedWorkspace
   );
 
-  // ✅ SOLUTION: Determine the icon component before the return statement.
   const SelectedIcon = selectedWorkspaceData
     ? getWorkspaceTypeIcon(selectedWorkspaceData.type)
     : null;
@@ -71,7 +69,6 @@ export const WorkspaceSelector = ({
                   className="w-3 h-3 rounded-full"
                   style={{ backgroundColor: selectedWorkspaceData.color }}
                 />
-                {/* ✅ Render the pre-calculated component variable */}
                 <SelectedIcon className="w-3 h-3 text-gray-500" />
               </>
             )}
@@ -83,7 +80,7 @@ export const WorkspaceSelector = ({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-full p-0">
-        <Command>
+        <Command key={selectedWorkspace || 'all-workspaces-key'}>
           <CommandInput placeholder="Search workspaces..." />
           <CommandList>
             <CommandEmpty>No workspace found.</CommandEmpty>
