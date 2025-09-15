@@ -1,23 +1,21 @@
-// OutreachMain.tsx - Main outreach system component with corrected imports
+// OutreachMain.tsx - Simplified outreach system without deep research
 import React, { useState, useEffect } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Users, Mail, Settings, Search, Upload, Brain, BarChart3, Download } from 'lucide-react'
+import { Plus, Users, Mail, Settings, Search, Upload, BarChart3 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useOutreachStore } from '@/hooks/useOutreachStore'
 
-// Fixed import paths - components are in the same directory, not in a subfolder
+// Import components - Deep research components removed
 import LeadsView from './LeadsView'
 import CampaignsView from './CampaignsView'
-import DeepResearchView from './DeepResearchView'
 import SegmentsView from './SegmentsView'
 import OutreachSettings from './OutreachSettings'
 import AnalyticsView from './AnalyticsView'
 import CSVImportModal from './CSVImportModal'
 import NewCampaignModal from './NewCampaignModal'
-import NewResearchJobModal from './NewResearchJobModal'
 
 interface OutreachMainProps {
   workspaceId: string
@@ -27,32 +25,25 @@ export default function OutreachMain({ workspaceId }: OutreachMainProps) {
   const [activeTab, setActiveTab] = useState('leads')
   const [showCSVImport, setShowCSVImport] = useState(false)
   const [showNewCampaign, setShowNewCampaign] = useState(false)
-  const [showNewResearch, setShowNewResearch] = useState(false)
   
   const { user } = useAuth()
   const { 
     leads, 
     campaigns, 
     segments, 
-    researchJobs,
     analytics,
     loading,
-    fetchLeads,
-    fetchCampaigns,
-    fetchSegments,
-    fetchResearchJobs,
-    fetchAnalytics
+    error,
+    initializeWorkspace,
+    clearError
   } = useOutreachStore()
 
+  // Initialize workspace data on mount
   useEffect(() => {
     if (workspaceId) {
-      fetchLeads(workspaceId)
-      fetchCampaigns(workspaceId)
-      fetchSegments(workspaceId)
-      fetchResearchJobs(workspaceId)
-      fetchAnalytics(workspaceId)
+      initializeWorkspace(workspaceId)
     }
-  }, [workspaceId])
+  }, [workspaceId, initializeWorkspace])
 
   const stats = {
     totalLeads: leads.length,
@@ -63,10 +54,35 @@ export default function OutreachMain({ workspaceId }: OutreachMainProps) {
     responseRate: analytics?.overall_response_rate || 0
   }
 
+  // Handle loading state
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Loading outreach workspace...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Handle error state
+  if (error) {
+    return (
+      <div className="p-6">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <h3 className="text-red-800 font-medium">Error Loading Outreach Data</h3>
+          <p className="text-red-600 mt-1">{error}</p>
+          <button 
+            onClick={() => {
+              clearError()
+              initializeWorkspace(workspaceId)
+            }}
+            className="mt-3 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+          >
+            Retry
+          </button>
+        </div>
       </div>
     )
   }
@@ -76,8 +92,8 @@ export default function OutreachMain({ workspaceId }: OutreachMainProps) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Outreach System</h1>
-          <p className="text-gray-600">Manage leads, campaigns, and outreach automation</p>
+          <h1 className="text-3xl font-bold text-gray-900">Lead Outreach</h1>
+          <p className="text-gray-600">Manage leads, campaigns, and email outreach</p>
         </div>
         
         <div className="flex items-center gap-3">
@@ -88,15 +104,6 @@ export default function OutreachMain({ workspaceId }: OutreachMainProps) {
           >
             <Upload className="h-4 w-4" />
             Import CSV
-          </Button>
-          
-          <Button
-            variant="outline"
-            onClick={() => setShowNewResearch(true)}
-            className="flex items-center gap-2"
-          >
-            <Brain className="h-4 w-4" />
-            AI Research
           </Button>
           
           <Button
@@ -178,9 +185,9 @@ export default function OutreachMain({ workspaceId }: OutreachMainProps) {
         </Card>
       </div>
 
-      {/* Main Content Tabs */}
+      {/* Main Content Tabs - Removed Research Tab */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="leads" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             Leads
@@ -188,10 +195,6 @@ export default function OutreachMain({ workspaceId }: OutreachMainProps) {
           <TabsTrigger value="campaigns" className="flex items-center gap-2">
             <Mail className="h-4 w-4" />
             Campaigns
-          </TabsTrigger>
-          <TabsTrigger value="research" className="flex items-center gap-2">
-            <Brain className="h-4 w-4" />
-            AI Research
           </TabsTrigger>
           <TabsTrigger value="segments" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
@@ -215,10 +218,6 @@ export default function OutreachMain({ workspaceId }: OutreachMainProps) {
           <CampaignsView workspaceId={workspaceId} />
         </TabsContent>
 
-        <TabsContent value="research" className="mt-6">
-          <DeepResearchView workspaceId={workspaceId} />
-        </TabsContent>
-
         <TabsContent value="segments" className="mt-6">
           <SegmentsView workspaceId={workspaceId} />
         </TabsContent>
@@ -232,7 +231,7 @@ export default function OutreachMain({ workspaceId }: OutreachMainProps) {
         </TabsContent>
       </Tabs>
 
-      {/* Modals */}
+      {/* Modals - Removed NewResearchJobModal */}
       <CSVImportModal 
         open={showCSVImport}
         onClose={() => setShowCSVImport(false)}
@@ -242,12 +241,6 @@ export default function OutreachMain({ workspaceId }: OutreachMainProps) {
       <NewCampaignModal
         open={showNewCampaign}
         onClose={() => setShowNewCampaign(false)}
-        workspaceId={workspaceId}
-      />
-
-      <NewResearchJobModal
-        open={showNewResearch}
-        onClose={() => setShowNewResearch(false)}
         workspaceId={workspaceId}
       />
     </div>
