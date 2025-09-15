@@ -43,10 +43,10 @@ interface NewCampaignModalProps {
 }
 
 const EMAIL_TEMPLATES = {
-  cold_outreach: `Hi {{name}},\n\nI hope this email finds you well. I came across {{company}} and was impressed by your work in {{industry}}.\n\n{{custom_message}}\n\nI'd love to learn more about your current challenges and see if we can help.\n\nBest regards,\n{{sender_name}}`,
+  cold_outreach: `Hi {{name}},\n\nI hope this email finds you well. I came across your company and was impressed by your work in {{industry}}.\n\n{{custom_message}}\n\nI'd love to learn more about your current challenges and see if we can help.\n\nBest regards,\n{{sender_name}}`,
   follow_up: `Hi {{name}},\n\nI wanted to follow up on my previous email about {{subject}}.\n\n{{custom_message}}\n\nWould you be available for a brief call this week to discuss further?\n\nBest regards,\n{{sender_name}}`,
-  partnership: `Hi {{name}},\n\nI'm reaching out because I believe there could be great synergy between {{company}} and our company.\n\n{{custom_message}}\n\nI'd love to explore potential partnership opportunities with you.\n\nBest regards,\n{{sender_name}}`,
-  press_release: `Hi {{name}},\n\nI hope you're doing well. I wanted to share some exciting news from our company that I think would be of interest to {{company}}.\n\n{{custom_message}}\n\nI'd be happy to provide more details or arrange an interview if this interests you.\n\nBest regards,\n{{sender_name}}`
+  partnership: `Hi {{name}},\n\nI'm reaching out because I believe there could be great synergy between our organisations.\n\n{{custom_message}}\n\nI'd love to explore potential partnership opportunities with you.\n\nBest regards,\n{{sender_name}}`,
+  press_release: `Hi {{name}},\n\nI hope you're doing well. I wanted to share some exciting news from our company that I think would be of interest to you.\n\n{{custom_message}}\n\nI'd be happy to provide more details or arrange an interview if this interests you.\n\nBest regards,\n{{sender_name}}`
 }
 
 // --- FIX #1: THE SAFE TEMPLATE FUNCTION ---
@@ -180,7 +180,6 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
     // Define a default fallback object for when there are no leads yet.
     const defaultPreviewData = {
       name: 'Jane Doe',
-      company: 'Example Corp',
       industry: 'Business',
       position: 'Decision Maker'
     };
@@ -351,10 +350,10 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
                 id="subject_line"
                 value={campaignForm.subject_line}
                 onChange={(e) => setCampaignForm(prev => ({ ...prev, subject_line: e.target.value }))}
-                placeholder="e.g., Partnership opportunity with {{company}}"
+                placeholder="e.g., Partnership opportunity with org"
               />
               <p className="text-sm text-gray-600">
-                Use variables like {{name}}, {{company}}, {{industry}} for personalization
+                Use variables like {{name}}, company or industry for personalization
               </p>
             </div>
 
@@ -412,7 +411,7 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
                   className="font-mono text-sm"
                 />
                 <p className="text-sm text-gray-600">
-                  Available variables: {{name}}, {{company}}, {{position}}, {{industry}}, {{location}}, {{sender_name}}
+                  Available variables: {{name}}, {{position}}, {{industry}}, {{location}}, {{sender_name}}
                 </p>
               </div>
 
