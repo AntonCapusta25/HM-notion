@@ -1,4 +1,8 @@
-// types.ts - Updated with Chef Outreach functionality
+// types/index.ts - Complete Homebase types with Chef Outreach and Outreach System
+
+// ======================================
+// CORE USER & WORKSPACE TYPES
+// ======================================
 
 // From your `users` table
 export interface User {
@@ -11,7 +15,7 @@ export interface User {
   created_at: string;
 }
 
-// From your `workspaces` table - UPDATED to support workspace types
+// From your `workspaces` table - UPDATED to support all workspace types
 export interface Workspace {
   id: string;
   name: string;
@@ -20,9 +24,13 @@ export interface Workspace {
   description: string | null;
   created_by: string;
   color: string;
-  type?: 'task_management' | 'chef_outreach'; // NEW: Support for different workspace types
-  updated_at?: string; // NEW: Track workspace updates
+  type: 'task_management' | 'chef_outreach' | 'outreach'; // Support for all workspace types
+  updated_at: string;
 }
+
+// ======================================
+// TASK MANAGEMENT TYPES (EXISTING)
+// ======================================
 
 // From your `comments` table
 export interface Comment {
@@ -62,7 +70,7 @@ export interface Task {
   subtasks: Subtask[]; // From `subtasks`
   comments: Comment[]; // From `comments`
   
-  // ADDED: Raw assignment data for filtering (preserve original Supabase structure)
+  // Raw assignment data for filtering (preserve original Supabase structure)
   task_assignees?: Array<{ user_id: string }>; // Raw data from Supabase join
 }
 
@@ -80,7 +88,7 @@ export interface DashboardStats {
 }
 
 // ======================================
-// CHEF OUTREACH TYPES - NEW SECTION
+// CHEF OUTREACH TYPES
 // ======================================
 
 // From the `chefs` table
@@ -188,6 +196,208 @@ export interface UpdateOutreachLogData {
 }
 
 // ======================================
+// OUTREACH SYSTEM TYPES (NEW)
+// ======================================
+
+// Lead management
+export interface Lead {
+  id: string;
+  name: string;
+  email: string;
+  company?: string;
+  position?: string;
+  industry?: string;
+  phone?: string;
+  website?: string;
+  linkedin_url?: string;
+  twitter_url?: string;
+  instagram_url?: string;
+  location?: string;
+  company_size?: string;
+  revenue_range?: string;
+  lead_score: number;
+  status: 'new' | 'contacted' | 'responded' | 'qualified' | 'converted' | 'dead';
+  source: string;
+  notes?: string;
+  research_data?: any;
+  custom_fields?: any;
+  segment_id?: string;
+  created_by: string;
+  workspace_id: string;
+  created_at: string;
+  updated_at: string;
+  last_contacted_at?: string;
+}
+
+// Lead segmentation
+export interface LeadSegment {
+  id: string;
+  name: string;
+  description?: string;
+  color: string;
+  created_by: string;
+  workspace_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Outreach types for categorization
+export interface OutreachType {
+  id: string;
+  name: string;
+  description?: string;
+  color: string;
+  created_by: string;
+  workspace_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Email campaigns
+export interface OutreachCampaign {
+  id: string;
+  name: string;
+  description?: string;
+  outreach_type_id?: string;
+  segment_id?: string;
+  status: 'draft' | 'scheduled' | 'running' | 'paused' | 'completed';
+  subject_line: string;
+  email_template: string;
+  scheduled_at?: string;
+  send_immediately: boolean;
+  created_by: string;
+  workspace_id: string;
+  created_at: string;
+  updated_at: string;
+  settings: any;
+}
+
+// Campaign attachments
+export interface CampaignAttachment {
+  id: string;
+  campaign_id: string;
+  file_name: string;
+  file_url: string;
+  file_size: number;
+  file_type: string;
+  created_at: string;
+}
+
+// Email tracking
+export interface OutreachEmail {
+  id: string;
+  campaign_id: string;
+  lead_id: string;
+  subject: string;
+  content: string;
+  status: 'pending' | 'sent' | 'delivered' | 'bounced' | 'failed';
+  sent_at?: string;
+  delivered_at?: string;
+  opened_at?: string;
+  clicked_at?: string;
+  replied_at?: string;
+  bounced_at?: string;
+  unsubscribed_at?: string;
+  created_by: string;
+  workspace_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// AI Deep Research
+export interface DeepResearchJob {
+  id: string;
+  name: string;
+  search_criteria: any;
+  research_prompt?: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  openai_response_id?: string;
+  total_leads_found: number;
+  leads_imported: number;
+  target_segment_id?: string;
+  research_output?: string;
+  leads_data?: any[];
+  error_message?: string;
+  created_by: string;
+  workspace_id: string;
+  created_at: string;
+  updated_at: string;
+  completed_at?: string;
+  settings: any;
+}
+
+// Research templates
+export interface ResearchTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  industry: string;
+  prompt_template: string;
+  default_fields: string[];
+  created_by: string;
+  workspace_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// CSV Import tracking
+export interface CSVImport {
+  id: string;
+  file_name: string;
+  total_rows: number;
+  processed_rows: number;
+  successful_imports: number;
+  failed_imports: number;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  field_mapping: any;
+  error_log?: any;
+  target_segment_id?: string;
+  created_by: string;
+  workspace_id: string;
+  created_at: string;
+  updated_at: string;
+  completed_at?: string;
+}
+
+// Lead activities/history
+export interface LeadActivity {
+  id: string;
+  lead_id: string;
+  activity_type: 'created' | 'updated' | 'email_sent' | 'email_opened' | 'email_clicked' | 'email_replied' | 'note_added' | 'status_changed';
+  activity_data: any;
+  created_by: string;
+  workspace_id: string;
+  created_at: string;
+}
+
+// Outreach settings
+export interface OutreachSettings {
+  id: string;
+  workspace_id: string;
+  sender_name?: string;
+  sender_email?: string;
+  reply_to_email?: string;
+  apps_script_url?: string;
+  apps_script_api_key?: string;
+  openai_api_key?: string;
+  preferred_research_model?: string;
+  max_research_cost_per_job?: number;
+  default_research_settings?: any;
+  auto_follow_up?: boolean;
+  follow_up_delay_days?: number;
+  max_follow_ups?: number;
+  auto_pause_campaigns?: boolean;
+  daily_email_limit?: number;
+  webhook_url?: string;
+  custom_tracking_domain?: string;
+  enable_click_tracking?: boolean;
+  enable_open_tracking?: boolean;
+  timezone?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// ======================================
 // CONFIGURATION OBJECTS
 // ======================================
 
@@ -255,14 +465,39 @@ export const WORKSPACE_TYPE_CONFIG = {
     description: 'Manage chef recruitment, outreach, and onboarding',
     icon: 'Users',
     color: 'bg-orange-100 text-orange-700'
+  },
+  outreach: {
+    name: 'Lead Outreach',
+    description: 'AI-powered lead generation and email campaigns',
+    icon: 'Mail',
+    color: 'bg-green-100 text-green-700'
   }
 };
 
+// Lead status configurations
+export const LEAD_STATUS_CONFIG = {
+  new: { label: 'New', color: 'bg-blue-100 text-blue-800' },
+  contacted: { label: 'Contacted', color: 'bg-yellow-100 text-yellow-800' },
+  responded: { label: 'Responded', color: 'bg-purple-100 text-purple-800' },
+  qualified: { label: 'Qualified', color: 'bg-green-100 text-green-800' },
+  converted: { label: 'Converted', color: 'bg-emerald-100 text-emerald-800' },
+  dead: { label: 'Dead', color: 'bg-gray-100 text-gray-800' }
+};
+
+// Campaign status configurations
+export const CAMPAIGN_STATUS_CONFIG = {
+  draft: { label: 'Draft', color: 'bg-gray-100 text-gray-800' },
+  scheduled: { label: 'Scheduled', color: 'bg-blue-100 text-blue-800' },
+  running: { label: 'Running', color: 'bg-green-100 text-green-800' },
+  paused: { label: 'Paused', color: 'bg-yellow-100 text-yellow-800' },
+  completed: { label: 'Completed', color: 'bg-purple-100 text-purple-800' }
+};
+
 // ======================================
-// UTILITY FUNCTIONS - EXISTING
+// UTILITY FUNCTIONS
 // ======================================
 
-// Safe date parsing utilities for your existing schema
+// Safe date parsing utilities
 const safeParseDate = (dateValue: any): string => {
   if (!dateValue) return new Date().toISOString();
   if (typeof dateValue === 'string') {
@@ -295,10 +530,9 @@ const safeParseDueDate = (dateValue: any): string | null => {
   return null;
 };
 
-// Conversion function to ensure safe data handling
+// Task formatting function
 export const formatTaskFromSupabase = (supabaseTask: any): Task => {
   return {
-    // Keep your existing field names
     id: supabaseTask.id,
     title: supabaseTask.title || '',
     description: supabaseTask.description || null,
@@ -310,7 +544,6 @@ export const formatTaskFromSupabase = (supabaseTask: any): Task => {
     created_at: safeParseDate(supabaseTask.created_at),
     updated_at: safeParseDate(supabaseTask.updated_at),
     
-    // Many-to-many relationships - formatted for easy use
     assignees: (supabaseTask.task_assignees || []).map((ta: any) => ta.user_id),
     tags: (supabaseTask.task_tags || []).map((tt: any) => tt.tag),
     subtasks: supabaseTask.subtasks || [],
@@ -319,16 +552,11 @@ export const formatTaskFromSupabase = (supabaseTask: any): Task => {
       created_at: safeParseDate(comment.created_at)
     })),
     
-    // Raw assignment data will be added by useTaskStore - this ensures type safety
     task_assignees: undefined // Will be populated by useTaskStore.fetchTasks()
   };
 };
 
-// ======================================
-// NEW UTILITY FUNCTIONS - CHEF OUTREACH
-// ======================================
-
-// Format chef data from Supabase
+// Chef formatting function
 export const formatChefFromSupabase = (supabaseChef: any): Chef => {
   return {
     id: supabaseChef.id,
@@ -347,7 +575,7 @@ export const formatChefFromSupabase = (supabaseChef: any): Chef => {
   };
 };
 
-// Format outreach log data from Supabase
+// Outreach log formatting function
 export const formatOutreachLogFromSupabase = (supabaseLog: any): OutreachLog => {
   return {
     id: supabaseLog.id,
@@ -365,6 +593,38 @@ export const formatOutreachLogFromSupabase = (supabaseLog: any): OutreachLog => 
   };
 };
 
+// Lead formatting function
+export const formatLeadFromSupabase = (supabaseLead: any): Lead => {
+  return {
+    id: supabaseLead.id,
+    name: supabaseLead.name || '',
+    email: supabaseLead.email || '',
+    company: supabaseLead.company || undefined,
+    position: supabaseLead.position || undefined,
+    industry: supabaseLead.industry || undefined,
+    phone: supabaseLead.phone || undefined,
+    website: supabaseLead.website || undefined,
+    linkedin_url: supabaseLead.linkedin_url || undefined,
+    twitter_url: supabaseLead.twitter_url || undefined,
+    instagram_url: supabaseLead.instagram_url || undefined,
+    location: supabaseLead.location || undefined,
+    company_size: supabaseLead.company_size || undefined,
+    revenue_range: supabaseLead.revenue_range || undefined,
+    lead_score: supabaseLead.lead_score || 0,
+    status: supabaseLead.status || 'new',
+    source: supabaseLead.source || 'manual',
+    notes: supabaseLead.notes || undefined,
+    research_data: supabaseLead.research_data || undefined,
+    custom_fields: supabaseLead.custom_fields || undefined,
+    segment_id: supabaseLead.segment_id || undefined,
+    created_by: supabaseLead.created_by,
+    workspace_id: supabaseLead.workspace_id,
+    created_at: safeParseDate(supabaseLead.created_at),
+    updated_at: safeParseDate(supabaseLead.updated_at),
+    last_contacted_at: supabaseLead.last_contacted_at || undefined
+  };
+};
+
 // Calculate follow-up date based on response type
 export const calculateFollowUpDate = (responseType: ResponseType): string => {
   const today = new Date();
@@ -373,15 +633,12 @@ export const calculateFollowUpDate = (responseType: ResponseType): string => {
   switch (responseType) {
     case 'interested':
     case 'no_response':
-      // 1 week follow-up
       followUpDate.setDate(today.getDate() + 7);
       break;
     case 'asked_to_contact_later':
-      // Default to 2 weeks, but should be manually set
       followUpDate.setDate(today.getDate() + 14);
       break;
     case 'not_interested':
-      // No follow-up needed
       return '';
     default:
       followUpDate.setDate(today.getDate() + 7);
@@ -397,19 +654,17 @@ export const getChefProgressPercentage = (progressSteps: ProgressSteps): number 
   return Math.round((completedSteps / totalSteps) * 100);
 };
 
-// Check if a date is today
+// Date utility functions
 export const isToday = (dateString: string): boolean => {
   const today = new Date().toISOString().split('T')[0];
   return dateString === today;
 };
 
-// Check if a date is in the past
 export const isPastDate = (dateString: string): boolean => {
   const today = new Date().toISOString().split('T')[0];
   return dateString < today;
 };
 
-// Format date for display
 export const formatDisplayDate = (dateString: string): string => {
   return new Date(dateString).toLocaleDateString();
 };
