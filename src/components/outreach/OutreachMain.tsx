@@ -29,7 +29,7 @@ export default function OutreachMain({ workspaceId }: OutreachMainProps) {
   const [showNewCampaign, setShowNewCampaign] = useState(false)
   const [showNewResearch, setShowNewResearch] = useState(false)
   
-  const { user } = useAuthStore()
+  const { user } = useAuth()
   const { 
     leads, 
     campaigns, 
