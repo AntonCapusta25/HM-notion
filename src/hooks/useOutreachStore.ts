@@ -1,4 +1,4 @@
-// useOutreachStore.ts - Zustand store for outreach system state management
+// useOutreachStore.ts - Complete Zustand store for outreach system state management
 import { create } from 'zustand'
 import { createClient } from '@supabase/supabase-js'
 
@@ -202,6 +202,9 @@ interface OutreachStore {
   error: string | null
 
   // Actions
+  // Initialization
+  initializeWorkspace: (workspaceId: string) => Promise<void>
+
   // Leads
   fetchLeads: (workspaceId: string) => Promise<void>
   createLead: (lead: Partial<Lead>) => Promise<Lead>
@@ -274,11 +277,45 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
   clearError: () => set({ error: null }),
   setLoading: (loading: boolean) => set({ loading }),
 
+  // NEW: Initialize workspace data
+  initializeWorkspace: async (workspaceId: string) => {
+    try {
+      set({ loading: true, error: null })
+      console.log('🔄 OutreachStore - Initializing workspace:', workspaceId)
+      
+      // Load all essential data in parallel
+      const results = await Promise.allSettled([
+        get().fetchLeads(workspaceId),
+        get().fetchSegments(workspaceId),
+        get().fetchOutreachTypes(workspaceId),
+        get().fetchCampaigns(workspaceId),
+        get().fetchEmails(workspaceId),
+        get().fetchResearchJobs(workspaceId),
+        get().fetchCSVImports(workspaceId),
+        get().fetchSettings(workspaceId)
+      ])
+      
+      // Check for any failures
+      const failures = results.filter(result => result.status === 'rejected')
+      if (failures.length > 0) {
+        console.warn('⚠️ OutreachStore - Some data failed to load:', failures)
+      }
+      
+      // Generate analytics after data is loaded
+      await get().fetchAnalytics(workspaceId)
+      
+      console.log('✅ OutreachStore - Workspace initialization completed')
+    } catch (error: any) {
+      console.error('❌ OutreachStore - Initialization failed:', error)
+      set({ error: error.message })
+    } finally {
+      set({ loading: false })
+    }
+  },
+
   // Leads actions
   fetchLeads: async (workspaceId: string) => {
     try {
-      set({ loading: true, error: null })
-      
       const { data, error } = await supabase
         .from('leads')
         .select('*, lead_segments(name, color)')
@@ -288,9 +325,9 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
       if (error) throw error
       set({ leads: data || [] })
     } catch (error: any) {
-      set({ error: error.message })
-    } finally {
-      set({ loading: false })
+      // Don't set global error for individual fetch failures during initialization
+      console.warn('Failed to fetch leads:', error.message)
+      set({ leads: [] })
     }
   },
 
@@ -395,7 +432,8 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
       if (error) throw error
       set({ segments: data || [] })
     } catch (error: any) {
-      set({ error: error.message })
+      console.warn('Failed to fetch segments:', error.message)
+      set({ segments: [] })
     }
   },
 
@@ -465,7 +503,8 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
       if (error) throw error
       set({ outreachTypes: data || [] })
     } catch (error: any) {
-      set({ error: error.message })
+      console.warn('Failed to fetch outreach types:', error.message)
+      set({ outreachTypes: [] })
     }
   },
 
@@ -540,7 +579,8 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
       if (error) throw error
       set({ campaigns: data || [] })
     } catch (error: any) {
-      set({ error: error.message })
+      console.warn('Failed to fetch campaigns:', error.message)
+      set({ campaigns: [] })
     }
   },
 
@@ -660,7 +700,8 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
       if (error) throw error
       set({ emails: data || [] })
     } catch (error: any) {
-      set({ error: error.message })
+      console.warn('Failed to fetch emails:', error.message)
+      set({ emails: [] })
     }
   },
 
@@ -708,7 +749,8 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
       if (error) throw error
       set({ researchJobs: data || [] })
     } catch (error: any) {
-      set({ error: error.message })
+      console.warn('Failed to fetch research jobs:', error.message)
+      set({ researchJobs: [] })
     }
   },
 
@@ -724,7 +766,7 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
       if (response.error) throw response.error
       
       // Refresh research jobs
-      await get().fetchResearchJobs(job.workspaceId!)
+      await get().fetchResearchJobs(job.workspace_id!)
       
       return response.data
     } catch (error: any) {
@@ -771,7 +813,8 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
       if (error) throw error
       set({ csvImports: data || [] })
     } catch (error: any) {
-      set({ error: error.message })
+      console.warn('Failed to fetch CSV imports:', error.message)
+      set({ csvImports: [] })
     }
   },
 
@@ -834,7 +877,8 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
       if (error && error.code !== 'PGRST116') throw error
       set({ settings: data })
     } catch (error: any) {
-      set({ error: error.message })
+      console.warn('Failed to fetch settings:', error.message)
+      set({ settings: null })
     }
   },
 
@@ -890,7 +934,8 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
       
       set({ analytics })
     } catch (error: any) {
-      set({ error: error.message })
+      console.warn('Failed to fetch analytics:', error.message)
+      set({ analytics: null })
     }
   }
 }))
