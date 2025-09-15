@@ -81,7 +81,7 @@ export default function CSVImportModal({ open, onClose, workspaceId }: CSVImport
     errors: string[]
   } | null>(null)
 
-  const { user } = useAuthStore()
+  const { user } = useAuth()
   const { segments, uploadCSV, processCSVImport, createLead } = useOutreachStore()
   const { toast } = useToast()
 
