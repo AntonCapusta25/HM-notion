@@ -6,7 +6,7 @@ import { CreateTaskDialog } from '../components/CreateTaskDialog';
 import { TaskDetailDialog } from '../components/TaskDetailDialog';
 import { EditWorkspaceDialog } from '../components/EditWorkspaceDialog';
 import { ChefWorkspace } from '../components/chef/ChefWorkspace';
-import OutreachMain from '../components/outreach/OutreachMain.tsx';
+import OutreachMain from '../components/outreach/OutreachMain'; // Fixed: removed .tsx
 import { useTaskContext } from '../contexts/TaskContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -31,8 +31,8 @@ import {
 } from 'lucide-react';
 import { Task } from '../types';
 
-const WorkspaceDetail = () => {
-  const { id: workspaceId } = useParams<{ id: string }>();
+// Separate component for task management workspace to isolate useTaskContext
+const TaskManagementWorkspace = ({ workspaceId, workspace }: { workspaceId: string, workspace: any }) => {
   const { user } = useAuth();
   
   const { 
@@ -54,69 +54,29 @@ const WorkspaceDetail = () => {
   const [showEditWorkspace, setShowEditWorkspace] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const workspace = workspaces.find(w => w.id === workspaceId);
-
-  // Handle loading state first
+  // Handle loading state for tasks
   if (tasksLoading) {
     return (
-      <Layout>
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-4 text-muted-foreground">Loading workspace...</p>
-          </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Loading tasks...</p>
         </div>
-      </Layout>
+      </div>
     );
   }
 
-  // Handle error state second
+  // Handle error state for tasks
   if (error) {
     return (
-      <Layout>
-        <Alert variant="destructive" className="m-6">
-          <AlertDescription>
-            Error loading workspace: {error}
-          </AlertDescription>
-        </Alert>
-      </Layout>
+      <Alert variant="destructive" className="m-6">
+        <AlertDescription>
+          Error loading tasks: {error}
+        </AlertDescription>
+      </Alert>
     );
   }
 
-  // Handle workspace not found third
-  if (!workspace) {
-    return (
-      <Layout>
-        <div className="p-6">
-          <Alert>
-            <AlertDescription>
-              Workspace not found. <Link to="/" className="text-homemade-orange hover:underline">Return to Dashboard</Link>
-            </AlertDescription>
-          </Alert>
-        </div>
-      </Layout>
-    );
-  }
-
-  // Route to appropriate workspace type (after we know workspace exists)
-  if (workspace.type === 'chef_outreach') {
-    return (
-      <Layout>
-        <ChefWorkspace workspaceId={workspaceId!} />
-      </Layout>
-    );
-  }
-
-  // NEW: Route to outreach workspace
-  if (workspace.type === 'outreach') {
-    return (
-      <Layout>
-        <OutreachMain workspaceId={workspaceId!} />
-      </Layout>
-    );
-  }
-
-  // Rest of existing task management code for 'task_management' workspace type
   const workspaceTasks = useMemo(() => {
     if (!workspaceId) return [];
     return tasks.filter(task => task.workspace_id === workspaceId);
@@ -305,331 +265,407 @@ const WorkspaceDetail = () => {
   };
 
   return (
-    <Layout>
-      <div className="space-y-6">
-        {/* Workspace Header */}
-        <div className="flex items-start justify-between">
-          <div className="flex items-start gap-4">
-            <Link to="/">
-              <Button variant="outline" size="sm">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back
-              </Button>
-            </Link>
-            
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <div 
-                  className="w-6 h-6 rounded-lg flex-shrink-0 flex items-center justify-center text-white text-xs" 
-                  style={{ backgroundColor: workspace.color }}
-                >
-                  {getWorkspaceIcon()}
-                </div>
-                <h1 className="text-3xl font-bold text-gray-900">{workspace.name}</h1>
-                {workspace.department && <Badge variant="secondary">{workspace.department}</Badge>}
-                <Badge variant="outline" className="flex items-center gap-1">
-                  {getWorkspaceIcon()}
-                  {getWorkspaceTypeLabel()}
-                </Badge>
-              </div>
-              
-              {workspace.description && (
-                <p className="text-gray-600 max-w-2xl">{workspace.description}</p>
-              )}
-              
-              <div className="flex items-center gap-4 mt-3 text-sm text-gray-500">
-                <span className="flex items-center gap-1">
-                  <Users className="h-4 w-4" />
-                  {workspaceTeam.length} team members
-                </span>
-                <span className="flex items-center gap-1">
-                  <Activity className="h-4 w-4" />
-                  {stats.recentActivity} recent updates
-                </span>
-              </div>
-            </div>
-          </div>
+    <div className="space-y-6">
+      {/* Workspace Header */}
+      <div className="flex items-start justify-between">
+        <div className="flex items-start gap-4">
+          <Link to="/">
+            <Button variant="outline" size="sm">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
+          </Link>
           
-          <div className="flex items-center gap-2">
-            {refreshTasks && (
-              <Button 
-                onClick={handleManualRefresh} 
-                variant="outline" 
-                size="sm"
-                disabled={isRefreshing}
-                className="flex items-center gap-2"
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <div 
+                className="w-6 h-6 rounded-lg flex-shrink-0 flex items-center justify-center text-white text-xs" 
+                style={{ backgroundColor: workspace.color }}
               >
-                <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                {isRefreshing ? 'Refreshing...' : 'Refresh'}
-              </Button>
+                {getWorkspaceIcon()}
+              </div>
+              <h1 className="text-3xl font-bold text-gray-900">{workspace.name}</h1>
+              {workspace.department && <Badge variant="secondary">{workspace.department}</Badge>}
+              <Badge variant="outline" className="flex items-center gap-1">
+                {getWorkspaceIcon()}
+                {getWorkspaceTypeLabel()}
+              </Badge>
+            </div>
+            
+            {workspace.description && (
+              <p className="text-gray-600 max-w-2xl">{workspace.description}</p>
             )}
-            <Button
-              variant="outline"
-              onClick={() => setShowEditWorkspace(true)}
-            >
-              <Settings className="h-4 w-4 mr-2" />
-              Settings
-            </Button>
-            <Button 
-              onClick={() => setShowCreateTask(true)} 
-              className="bg-homemade-orange hover:bg-homemade-orange-dark"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              New Task
-            </Button>
-          </div>
-        </div>
-
-        {/* Workspace Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Total Tasks</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
-                </div>
-                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <CheckCircle className="h-6 w-6 text-blue-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">In Progress</p>
-                  <p className="text-2xl font-bold text-yellow-600">{stats.inProgress}</p>
-                </div>
-                <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                  <Clock className="h-6 w-6 text-yellow-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Completed</p>
-                  <p className="text-2xl font-bold text-green-600">{stats.completed}</p>
-                </div>
-                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                  <CheckCircle className="h-6 w-6 text-green-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Overdue</p>
-                  <p className="text-2xl font-bold text-red-600">{stats.overdue}</p>
-                </div>
-                <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-                  <AlertCircle className="h-6 w-6 text-red-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Progress</p>
-                  <p className="text-2xl font-bold text-purple-600">{stats.completionRate}%</p>
-                </div>
-                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                  <TrendingUp className="h-6 w-6 text-purple-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Progress Bar */}
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Workspace Progress</h3>
-              <span className="text-sm text-gray-500">
-                {stats.completed} of {stats.total} tasks completed
+            
+            <div className="flex items-center gap-4 mt-3 text-sm text-gray-500">
+              <span className="flex items-center gap-1">
+                <Users className="h-4 w-4" />
+                {workspaceTeam.length} team members
+              </span>
+              <span className="flex items-center gap-1">
+                <Activity className="h-4 w-4" />
+                {stats.recentActivity} recent updates
               </span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-4">
-              <div 
-                className="h-4 rounded-full transition-all duration-500"
-                style={{ 
-                  width: `${stats.completionRate}%`,
-                  backgroundColor: workspace.color 
-                }}
-              />
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          {refreshTasks && (
+            <Button 
+              onClick={handleManualRefresh} 
+              variant="outline" 
+              size="sm"
+              disabled={isRefreshing}
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              {isRefreshing ? 'Refreshing...' : 'Refresh'}
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            onClick={() => setShowEditWorkspace(true)}
+          >
+            <Settings className="h-4 w-4 mr-2" />
+            Settings
+          </Button>
+          <Button 
+            onClick={() => setShowCreateTask(true)} 
+            className="bg-homemade-orange hover:bg-homemade-orange-dark"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            New Task
+          </Button>
+        </div>
+      </div>
+
+      {/* Workspace Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Total Tasks</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+              </div>
+              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                <CheckCircle className="h-6 w-6 text-blue-600" />
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Team Members */}
-        {workspaceTeam.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                Team Members ({workspaceTeam.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-4">
-                {workspaceTeam.map(member => {
-                  const memberTasks = workspaceTasks.filter(t => 
-                    (t.assignees && t.assignees.includes(member.id)) || t.created_by === member.id
-                  );
-                  const memberCompleted = memberTasks.filter(t => t.status === 'done').length;
-                  
-                  return (
-                    <div key={member.id} className="flex items-center gap-3 p-3 border rounded-lg">
-                      <Avatar className="h-10 w-10">
-                        <AvatarFallback style={{ backgroundColor: workspace.color, color: 'white' }}>
-                          {member.avatar || (member.name ? member.name.charAt(0) : '?')}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium text-sm">{member.name}</p>
-                        <p className="text-xs text-gray-500">{member.department}</p>
-                        <p className="text-xs text-gray-500">
-                          {memberTasks.length} tasks • {memberCompleted} completed
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">In Progress</p>
+                <p className="text-2xl font-bold text-yellow-600">{stats.inProgress}</p>
               </div>
-            </CardContent>
-          </Card>
-        )}
+              <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+                <Clock className="h-6 w-6 text-yellow-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-        {/* Task Board */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center justify-between text-base">
-                <span className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-gray-400 rounded-full" />
-                  To Do
-                </span>
-                <Badge variant="secondary">{tasksByStatus.todo.length}</Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {tasksByStatus.todo.map(task => (
-                <TaskCard 
-                  key={task.id} 
-                  task={task} 
-                  onClick={() => setSelectedTask(task)}
-                />
-              ))}
-              {tasksByStatus.todo.length === 0 && (
-                <p className="text-gray-500 text-center py-8 text-sm">No tasks in this column</p>
-              )}
-            </CardContent>
-          </Card>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Completed</p>
+                <p className="text-2xl font-bold text-green-600">{stats.completed}</p>
+              </div>
+              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                <CheckCircle className="h-6 w-6 text-green-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center justify-between text-base">
-                <span className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-yellow-400 rounded-full" />
-                  In Progress
-                </span>
-                <Badge variant="secondary">{tasksByStatus.in_progress.length}</Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {tasksByStatus.in_progress.map(task => (
-                <TaskCard 
-                  key={task.id} 
-                  task={task}
-                  onClick={() => setSelectedTask(task)}
-                />
-              ))}
-              {tasksByStatus.in_progress.length === 0 && (
-                <p className="text-gray-500 text-center py-8 text-sm">No tasks in this column</p>
-              )}
-            </CardContent>
-          </Card>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Overdue</p>
+                <p className="text-2xl font-bold text-red-600">{stats.overdue}</p>
+              </div>
+              <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+                <AlertCircle className="h-6 w-6 text-red-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center justify-between text-base">
-                <span className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-green-400 rounded-full" />
-                  Done
-                </span>
-                <Badge variant="secondary">{tasksByStatus.done.length}</Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {tasksByStatus.done.map(task => (
-                <TaskCard 
-                  key={task.id} 
-                  task={task}
-                  onClick={() => setSelectedTask(task)}
-                />
-              ))}
-              {tasksByStatus.done.length === 0 && (
-                <p className="text-gray-500 text-center py-8 text-sm">No tasks in this column</p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {stats.total === 0 && (
-          <Card>
-            <CardContent className="text-center py-12">
-              <CheckCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">No tasks yet</h3>
-              <p className="text-gray-500 mb-4">Get started by creating the first task for this workspace.</p>
-              <Button 
-                onClick={() => setShowCreateTask(true)}
-                className="bg-homemade-orange hover:bg-homemade-orange-dark"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Create First Task
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Dialogs */}
-        <CreateTaskDialog 
-          open={showCreateTask} 
-          onOpenChange={setShowCreateTask}
-          onCreateTask={handleCreateTask}
-        />
-
-        <TaskDetailDialog
-          task={selectedTask}
-          users={users}
-          open={!!selectedTask}
-          onOpenChange={(open) => !open && setSelectedTask(null)}
-          onUpdateTask={handleUpdateTask}
-          onAddComment={handleAddComment}
-          onToggleSubtask={handleToggleSubtask}
-        />
-
-        {workspace && (
-          <EditWorkspaceDialog
-            workspace={workspace}
-            open={showEditWorkspace}
-            onOpenChange={setShowEditWorkspace}
-          />
-        )}
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Progress</p>
+                <p className="text-2xl font-bold text-purple-600">{stats.completionRate}%</p>
+              </div>
+              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                <TrendingUp className="h-6 w-6 text-purple-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Progress Bar */}
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold">Workspace Progress</h3>
+            <span className="text-sm text-gray-500">
+              {stats.completed} of {stats.total} tasks completed
+            </span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-4">
+            <div 
+              className="h-4 rounded-full transition-all duration-500"
+              style={{ 
+                width: `${stats.completionRate}%`,
+                backgroundColor: workspace.color 
+              }}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Team Members */}
+      {workspaceTeam.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Team Members ({workspaceTeam.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-4">
+              {workspaceTeam.map(member => {
+                const memberTasks = workspaceTasks.filter(t => 
+                  (t.assignees && t.assignees.includes(member.id)) || t.created_by === member.id
+                );
+                const memberCompleted = memberTasks.filter(t => t.status === 'done').length;
+                
+                return (
+                  <div key={member.id} className="flex items-center gap-3 p-3 border rounded-lg">
+                    <Avatar className="h-10 w-10">
+                      <AvatarFallback style={{ backgroundColor: workspace.color, color: 'white' }}>
+                        {member.avatar || (member.name ? member.name.charAt(0) : '?')}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-medium text-sm">{member.name}</p>
+                      <p className="text-xs text-gray-500">{member.department}</p>
+                      <p className="text-xs text-gray-500">
+                        {memberTasks.length} tasks • {memberCompleted} completed
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Task Board */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center justify-between text-base">
+              <span className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-gray-400 rounded-full" />
+                To Do
+              </span>
+              <Badge variant="secondary">{tasksByStatus.todo.length}</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {tasksByStatus.todo.map(task => (
+              <TaskCard 
+                key={task.id} 
+                task={task} 
+                onClick={() => setSelectedTask(task)}
+              />
+            ))}
+            {tasksByStatus.todo.length === 0 && (
+              <p className="text-gray-500 text-center py-8 text-sm">No tasks in this column</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center justify-between text-base">
+              <span className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-yellow-400 rounded-full" />
+                In Progress
+              </span>
+              <Badge variant="secondary">{tasksByStatus.in_progress.length}</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {tasksByStatus.in_progress.map(task => (
+              <TaskCard 
+                key={task.id} 
+                task={task}
+                onClick={() => setSelectedTask(task)}
+              />
+            ))}
+            {tasksByStatus.in_progress.length === 0 && (
+              <p className="text-gray-500 text-center py-8 text-sm">No tasks in this column</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center justify-between text-base">
+              <span className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-green-400 rounded-full" />
+                Done
+              </span>
+              <Badge variant="secondary">{tasksByStatus.done.length}</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {tasksByStatus.done.map(task => (
+              <TaskCard 
+                key={task.id} 
+                task={task}
+                onClick={() => setSelectedTask(task)}
+              />
+            ))}
+            {tasksByStatus.done.length === 0 && (
+              <p className="text-gray-500 text-center py-8 text-sm">No tasks in this column</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {stats.total === 0 && (
+        <Card>
+          <CardContent className="text-center py-12">
+            <CheckCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">No tasks yet</h3>
+            <p className="text-gray-500 mb-4">Get started by creating the first task for this workspace.</p>
+            <Button 
+              onClick={() => setShowCreateTask(true)}
+              className="bg-homemade-orange hover:bg-homemade-orange-dark"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Create First Task
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Dialogs */}
+      <CreateTaskDialog 
+        open={showCreateTask} 
+        onOpenChange={setShowCreateTask}
+        onCreateTask={handleCreateTask}
+      />
+
+      <TaskDetailDialog
+        task={selectedTask}
+        users={users}
+        open={!!selectedTask}
+        onOpenChange={(open) => !open && setSelectedTask(null)}
+        onUpdateTask={handleUpdateTask}
+        onAddComment={handleAddComment}
+        onToggleSubtask={handleToggleSubtask}
+      />
+
+      {workspace && (
+        <EditWorkspaceDialog
+          workspace={workspace}
+          open={showEditWorkspace}
+          onOpenChange={setShowEditWorkspace}
+        />
+      )}
+    </div>
+  );
+};
+
+// Main WorkspaceDetail component with proper workspace routing
+const WorkspaceDetail = () => {
+  const { id: workspaceId } = useParams<{ id: string }>();
+  const { user } = useAuth();
+  
+  // Only get workspaces for routing, not full task context
+  const { workspaces, loading: workspacesLoading, error: workspacesError } = useTaskContext();
+
+  // Handle loading state first
+  if (workspacesLoading) {
+    return (
+      <Layout>
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Loading workspace...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // Handle error state second
+  if (workspacesError) {
+    return (
+      <Layout>
+        <Alert variant="destructive" className="m-6">
+          <AlertDescription>
+            Error loading workspace: {workspacesError}
+          </AlertDescription>
+        </Alert>
+      </Layout>
+    );
+  }
+
+  const workspace = workspaces.find(w => w.id === workspaceId);
+
+  // Handle workspace not found third
+  if (!workspace) {
+    return (
+      <Layout>
+        <div className="p-6">
+          <Alert>
+            <AlertDescription>
+              Workspace not found. <Link to="/" className="text-homemade-orange hover:underline">Return to Dashboard</Link>
+            </AlertDescription>
+          </Alert>
+        </div>
+      </Layout>
+    );
+  }
+
+  // Route to appropriate workspace type (after we know workspace exists)
+  if (workspace.type === 'chef_outreach') {
+    return (
+      <Layout>
+        <ChefWorkspace workspaceId={workspaceId!} />
+      </Layout>
+    );
+  }
+
+  // Route to outreach workspace
+  if (workspace.type === 'outreach') {
+    return (
+      <Layout>
+        <OutreachMain workspaceId={workspaceId!} />
+      </Layout>
+    );
+  }
+
+  // Default to task management workspace
+  return (
+    <Layout>
+      <TaskManagementWorkspace workspaceId={workspaceId!} workspace={workspace} />
     </Layout>
   );
 };
