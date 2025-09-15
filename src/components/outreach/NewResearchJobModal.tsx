@@ -101,7 +101,7 @@ export default function NewResearchJobModal({ open, onClose, workspaceId }: NewR
     createResearchJob
   } = useOutreachStore()
   
-  const { user } = useAuthStore()
+  const { user } = useAuth()
   const { toast } = useToast()
 
   useEffect(() => {
