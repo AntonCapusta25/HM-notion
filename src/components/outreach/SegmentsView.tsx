@@ -66,7 +66,7 @@ export default function SegmentsView({ workspaceId }: SegmentsViewProps) {
     deleteSegment
   } = useOutreachStore()
   
-  const { user } = useAuthStore()
+  const { user } = useAuth()
   const { toast } = useToast()
 
   useEffect(() => {
