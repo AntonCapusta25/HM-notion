@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react'; // Import useEffect
 import { Check, ChevronsUpDown, CheckSquare, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 
+// Assuming the Workspace type is defined in a types file
 export interface Workspace {
   id: string;
   name: string;
@@ -45,9 +46,19 @@ export const WorkspaceSelector = ({
   onWorkspaceChange,
 }: WorkspaceSelectorProps) => {
   const [open, setOpen] = useState(false);
+  const [internalSelected, setInternalSelected] = useState(selectedWorkspace);
   const selectedWorkspaceData = workspaces.find(
     (w) => w.id === selectedWorkspace
   );
+
+  // ✅ SOLUTION: Use useEffect to safely close the popover after the selection has been processed.
+  useEffect(() => {
+    // When the external prop changes, update our internal state and close the popover.
+    if (selectedWorkspace !== internalSelected) {
+      setInternalSelected(selectedWorkspace);
+      setOpen(false);
+    }
+  }, [selectedWorkspace, internalSelected]);
 
   const SelectedIcon = selectedWorkspaceData
     ? getWorkspaceTypeIcon(selectedWorkspaceData.type)
@@ -80,16 +91,14 @@ export const WorkspaceSelector = ({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-full p-0">
-        <Command key={selectedWorkspace || 'all-workspaces-key'}>
+        <Command>
           <CommandInput placeholder="Search workspaces..." />
           <CommandList>
             <CommandEmpty>No workspace found.</CommandEmpty>
             <CommandGroup>
               <CommandItem
-                onSelect={() => {
-                  onWorkspaceChange(null);
-                  setOpen(false);
-                }}
+                // ✅ Remove the direct call to setOpen
+                onSelect={() => onWorkspaceChange(null)}
               >
                 <Check
                   className={cn(
@@ -104,10 +113,8 @@ export const WorkspaceSelector = ({
                 return (
                   <CommandItem
                     key={workspace.id}
-                    onSelect={() => {
-                      onWorkspaceChange(workspace.id);
-                      setOpen(false);
-                    }}
+                    // ✅ Remove the direct call to setOpen
+                    onSelect={() => onWorkspaceChange(workspace.id)}
                   >
                     <Check
                       className={cn(
