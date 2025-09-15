@@ -81,7 +81,7 @@ export default function CampaignsView({ workspaceId }: CampaignsViewProps) {
     pauseCampaign
   } = useOutreachStore()
   
-  const { user } = useAuthStore()
+  const { user } = useAuth()
   const { toast } = useToast()
 
   useEffect(() => {
