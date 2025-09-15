@@ -130,7 +130,7 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
     fetchOutreachTypes
   } = useOutreachStore()
   
-  const { user } = useAuthStore()
+  const { user } = useAuth()
   const { toast } = useToast()
 
   useEffect(() => {
