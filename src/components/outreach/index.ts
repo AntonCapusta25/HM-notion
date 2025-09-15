@@ -1,0 +1,11 @@
+// components/outreach/index.ts - Export all outreach components
+export { default as OutreachMain } from './OutreachMain'
+export { default as LeadsView } from './LeadsView'
+export { default as CampaignsView } from './CampaignsView'
+export { default as DeepResearchView } from './DeepResearchView'
+export { default as SegmentsView } from './SegmentsView'
+export { default as AnalyticsView } from './AnalyticsView'
+export { default as OutreachSettings } from './OutreachSettings'
+export { default as CSVImportModal } from './CSVImportModal'
+export { default as NewCampaignModal } from './NewCampaignModal'
+export { default as NewResearchJobModal } from './NewResearchJobModal'
