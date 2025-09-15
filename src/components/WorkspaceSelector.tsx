@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 
-// Assuming the Workspace type is defined in a types file
+// Define the Workspace type, assuming it comes from a types file
 export interface Workspace {
   id: string;
   name: string;
@@ -46,17 +46,20 @@ export const WorkspaceSelector = ({
   onWorkspaceChange,
 }: WorkspaceSelectorProps) => {
   const [open, setOpen] = useState(false);
+  
+  // This state helps track if the prop has changed
   const [internalSelected, setInternalSelected] = useState(selectedWorkspace);
+
   const selectedWorkspaceData = workspaces.find(
     (w) => w.id === selectedWorkspace
   );
 
-  // ✅ SOLUTION: Use useEffect to safely close the popover after the selection has been processed.
+  // ✅ This useEffect safely closes the popover *after* the parent state has updated and the component has re-rendered.
+  // This prevents the child Command component's hooks from breaking.
   useEffect(() => {
-    // When the external prop changes, update our internal state and close the popover.
     if (selectedWorkspace !== internalSelected) {
       setInternalSelected(selectedWorkspace);
-      setOpen(false);
+      setOpen(false); // Close the popover safely
     }
   }, [selectedWorkspace, internalSelected]);
 
@@ -97,7 +100,7 @@ export const WorkspaceSelector = ({
             <CommandEmpty>No workspace found.</CommandEmpty>
             <CommandGroup>
               <CommandItem
-                // ✅ Remove the direct call to setOpen
+                // ✅ onSelect now only notifies the parent component.
                 onSelect={() => onWorkspaceChange(null)}
               >
                 <Check
@@ -113,7 +116,7 @@ export const WorkspaceSelector = ({
                 return (
                   <CommandItem
                     key={workspace.id}
-                    // ✅ Remove the direct call to setOpen
+                    // ✅ onSelect only notifies the parent. useEffect handles the rest.
                     onSelect={() => onWorkspaceChange(workspace.id)}
                   >
                     <Check
