@@ -439,58 +439,7 @@ export default function OutreachSettings({ workspaceId }: OutreachSettingsProps)
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-3 h-3 rounded-full ${
-                      settingsForm.apps_script_url ? 'bg-green-500' : 'bg-gray-300'
-                    }`} />
-                    <div>
-                      <span className="font-medium">Google Apps Script</span>
-                      <p className="text-sm text-gray-600">Email sending service</p>
-                    </div>
-                  </div>
-                  <Badge variant={settingsForm.apps_script_url ? "default" : "secondary"}>
-                    {settingsForm.apps_script_url ? "Configured" : "Not Set"}
-                  </Badge>
-                </div>
-
-                <div className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-3 h-3 rounded-full ${
-                      settingsForm.openai_api_key ? 'bg-green-500' : 'bg-gray-300'
-                    }`} />
-                    <div>
-                      <span className="font-medium">OpenAI API</span>
-                      <p className="text-sm text-gray-600">AI research capabilities</p>
-                    </div>
-                  </div>
-                  <Badge variant={settingsForm.openai_api_key ? "default" : "secondary"}>
-                    {settingsForm.openai_api_key ? "Configured" : "Not Set"}
-                  </Badge>
-                </div>
-
-                <div className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-3 h-3 rounded-full ${
-                      settingsForm.webhook_url ? 'bg-green-500' : 'bg-gray-300'
-                    }`} />
-                    <div>
-                      <span className="font-medium">Webhook Integration</span>
-                      <p className="text-sm text-gray-600">Real-time event notifications</p>
-                    </div>
-                  </div>
-                  <Badge variant={settingsForm.webhook_url ? "default" : "secondary"}>
-                    {settingsForm.webhook_url ? "Configured" : "Optional"}
-                  </Badge>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-    </div>
-  )
-}">
+                    <div className="flex items-center justify-between">
                       <div>
                         <Label>Include Financial Data</Label>
                         <p className="text-sm text-gray-600">Revenue, funding, financial metrics</p>
@@ -855,7 +804,50 @@ export default function OutreachSettings({ workspaceId }: OutreachSettingsProps)
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                <div className="flex items-center justify-between
+                <div className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-3 h-3 rounded-full ${
+                      settingsForm.apps_script_url ? 'bg-green-500' : 'bg-gray-300'
+                    }`} />
+                    <div>
+                      <span className="font-medium">Google Apps Script</span>
+                      <p className="text-sm text-gray-600">Email sending service</p>
+                    </div>
+                  </div>
+                  <Badge variant={settingsForm.apps_script_url ? "default" : "secondary"}>
+                    {settingsForm.apps_script_url ? "Configured" : "Not Set"}
+                  </Badge>
+                </div>
+
+                <div className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-3 h-3 rounded-full ${
+                      settingsForm.openai_api_key ? 'bg-green-500' : 'bg-gray-300'
+                    }`} />
+                    <div>
+                      <span className="font-medium">OpenAI API</span>
+                      <p className="text-sm text-gray-600">AI research capabilities</p>
+                    </div>
+                  </div>
+                  <Badge variant={settingsForm.openai_api_key ? "default" : "secondary"}>
+                    {settingsForm.openai_api_key ? "Configured" : "Not Set"}
+                  </Badge>
+                </div>
+
+                <div className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-3 h-3 rounded-full ${
+                      settingsForm.webhook_url ? 'bg-green-500' : 'bg-gray-300'
+                    }`} />
+                    <div>
+                      <span className="font-medium">Webhook Integration</span>
+                      <p className="text-sm text-gray-600">Real-time event notifications</p>
+                    </div>
+                  </div>
+                  <Badge variant={settingsForm.webhook_url ? "default" : "secondary"}>
+                    {settingsForm.webhook_url ? "Configured" : "Optional"}
+                  </Badge>
+                </div>
               </div>
             </CardContent>
           </Card>
