@@ -196,20 +196,17 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
     setAttachments(prev => prev.filter((_, i) => i !== index))
   }
 
-  const generatePreview = () => {
-    let preview = campaignForm.email_template
-    
-    Object.entries(previewData).forEach(([key, value]) => {
-      const regex = new RegExp(`{{${key}}}`, 'g')
-      preview = preview.replace(regex, value)
-    })
-    
-    // Replace remaining placeholders
-    preview = preview.replace(/{{custom_message}}/g, '[Your personalized message will appear here]')
-    preview = preview.replace(/{{subject}}/g, campaignForm.subject_line)
-    
-    return preview
-  }
+const generatePreview = () => {
+  // Combine all your data sources into one object.
+  const allData = {
+    ...previewData,
+    subject: campaignForm.subject_line,
+    custom_message: '[Your personalized message will appear here]'
+  };
+
+  // Use the new, safe function to fill the template.
+  return fillTemplateSafely(campaignForm.email_template, allData);
+};
 
   const validateForm = () => {
     if (!campaignForm.name.trim()) {
