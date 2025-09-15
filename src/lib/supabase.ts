@@ -7,4 +7,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Supabase URL and/or Anon Key are missing from environment variables.')
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    multiTab: false, // <-- This is the fix
+  },
+})
