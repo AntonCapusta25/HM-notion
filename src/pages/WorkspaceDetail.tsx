@@ -5,7 +5,8 @@ import { TaskCard } from '../components/TaskCard';
 import { CreateTaskDialog } from '../components/CreateTaskDialog';
 import { TaskDetailDialog } from '../components/TaskDetailDialog';
 import { EditWorkspaceDialog } from '../components/EditWorkspaceDialog';
-import { ChefWorkspace } from '../components/chef/ChefWorkspace'; // NEW: Import chef workspace
+import { ChefWorkspace } from '../components/chef/ChefWorkspace';
+import { OutreachMain } from '../components/outreach/OutreachMain'; // NEW: Import outreach workspace
 import { useTaskContext } from '../contexts/TaskContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -24,7 +25,9 @@ import {
   CheckCircle,
   AlertCircle,
   Activity,
-  RefreshCw
+  RefreshCw,
+  Mail,
+  Brain
 } from 'lucide-react';
 import { Task } from '../types';
 
@@ -53,7 +56,7 @@ const WorkspaceDetail = () => {
 
   const workspace = workspaces.find(w => w.id === workspaceId);
 
-  // FIXED: Handle loading state first
+  // Handle loading state first
   if (tasksLoading) {
     return (
       <Layout>
@@ -67,7 +70,7 @@ const WorkspaceDetail = () => {
     );
   }
 
-  // FIXED: Handle error state second
+  // Handle error state second
   if (error) {
     return (
       <Layout>
@@ -80,7 +83,7 @@ const WorkspaceDetail = () => {
     );
   }
 
-  // FIXED: Handle workspace not found third
+  // Handle workspace not found third
   if (!workspace) {
     return (
       <Layout>
@@ -95,7 +98,7 @@ const WorkspaceDetail = () => {
     );
   }
 
-  // FIXED: NOW check workspace type and route accordingly (after we know workspace exists)
+  // Route to appropriate workspace type (after we know workspace exists)
   if (workspace.type === 'chef_outreach') {
     return (
       <Layout>
@@ -104,7 +107,16 @@ const WorkspaceDetail = () => {
     );
   }
 
-  // Rest of your existing task management code...
+  // NEW: Route to outreach workspace
+  if (workspace.type === 'outreach') {
+    return (
+      <Layout>
+        <OutreachMain workspaceId={workspaceId!} />
+      </Layout>
+    );
+  }
+
+  // Rest of existing task management code for 'task_management' workspace type
   const workspaceTasks = useMemo(() => {
     if (!workspaceId) return [];
     return tasks.filter(task => task.workspace_id === workspaceId);
@@ -113,7 +125,6 @@ const WorkspaceDetail = () => {
   const workspaceTeam = useMemo(() => {
     const teamIds = new Set<string>();
     workspaceTasks.forEach(task => {
-      // Fixed: Use correct field names
       if (task.assignees && task.assignees.length > 0) {
         task.assignees.forEach(assigneeId => teamIds.add(assigneeId));
       }
@@ -131,7 +142,6 @@ const WorkspaceDetail = () => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     
-    // Fixed: Use correct field name due_date
     const overdue = workspaceTasks.filter(t => 
       t.due_date && new Date(t.due_date) < today && t.status !== 'done'
     ).length;
@@ -143,7 +153,6 @@ const WorkspaceDetail = () => {
     }).length;
 
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    // Fixed: Use correct field name updated_at
     const recentActivity = workspaceTasks.filter(t => {
       const updatedAt = new Date(t.updated_at || t.created_at);
       return updatedAt > weekAgo;
@@ -214,16 +223,13 @@ const WorkspaceDetail = () => {
     }
   }, [updateTask]);
 
-  // Fixed: Updated to use correct assignees field structure
   const handleAssignTask = useCallback(async (taskId: string, userId: string) => {
     try {
       console.log('👤 WorkspaceDetail - Assigning task:', taskId, 'to user:', userId);
       
-      // Get current task to preserve existing assignees
       const currentTask = tasks.find(t => t.id === taskId);
       const currentAssignees = currentTask?.assignees || [];
       
-      // Add user if not already assigned, or replace if it's a single assignment
       const newAssignees = currentAssignees.includes(userId) 
         ? currentAssignees 
         : [...currentAssignees, userId];
@@ -272,6 +278,32 @@ const WorkspaceDetail = () => {
     }
   }, [toggleSubtask]);
 
+  // Get workspace type icon
+  const getWorkspaceIcon = () => {
+    switch (workspace.type) {
+      case 'chef_outreach':
+        return <Users className="h-5 w-5" />;
+      case 'outreach':
+        return <Mail className="h-5 w-5" />;
+      case 'task_management':
+      default:
+        return <CheckCircle className="h-5 w-5" />;
+    }
+  };
+
+  // Get workspace type label
+  const getWorkspaceTypeLabel = () => {
+    switch (workspace.type) {
+      case 'chef_outreach':
+        return 'Chef Outreach';
+      case 'outreach':
+        return 'Lead Outreach';
+      case 'task_management':
+      default:
+        return 'Task Management';
+    }
+  };
+
   return (
     <Layout>
       <div className="space-y-6">
@@ -288,11 +320,17 @@ const WorkspaceDetail = () => {
             <div>
               <div className="flex items-center gap-3 mb-2">
                 <div 
-                  className="w-6 h-6 rounded-lg flex-shrink-0" 
+                  className="w-6 h-6 rounded-lg flex-shrink-0 flex items-center justify-center text-white text-xs" 
                   style={{ backgroundColor: workspace.color }}
-                />
+                >
+                  {getWorkspaceIcon()}
+                </div>
                 <h1 className="text-3xl font-bold text-gray-900">{workspace.name}</h1>
                 {workspace.department && <Badge variant="secondary">{workspace.department}</Badge>}
+                <Badge variant="outline" className="flex items-center gap-1">
+                  {getWorkspaceIcon()}
+                  {getWorkspaceTypeLabel()}
+                </Badge>
               </div>
               
               {workspace.description && (
