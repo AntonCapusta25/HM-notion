@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Plus, Users, Mail, Settings, Search, Upload, Brain, BarChart3, Download } from 'lucide-react'
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../../contexts/AuthContext'
 import { useOutreachStore } from '@/hooks/useOutreachStore'
 
 // Fixed import paths - components are in the same directory, not in a subfolder
