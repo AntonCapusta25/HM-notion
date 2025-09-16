@@ -30,6 +30,7 @@ import {
 import { useOutreachStore } from '@/hooks/useOutreachStore'
 import { useAuth } from '../../contexts/AuthContext'
 import { useToast } from '@/hooks/use-toast'
+import NewCampaignModal from './NewCampaignModal'
 
 interface CampaignsViewProps {
   workspaceId: string
@@ -513,6 +514,17 @@ export default function CampaignsView({ workspaceId }: CampaignsViewProps) {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* New Campaign Modal */}
+      <NewCampaignModal
+        open={showCampaignModal}
+        onClose={() => {
+          setShowCampaignModal(false)
+          setEditingCampaign(null)
+        }}
+        workspaceId={workspaceId}
+        campaign={editingCampaign}
+      />
     </div>
   )
 }
