@@ -1,4 +1,4 @@
-// NewLeadModal.tsx - Modal for creating and editing leads
+// NewLeadModal.tsx - Fixed UUID validation
 import React, { useState, useEffect } from 'react'
 import {
   Dialog,
@@ -26,6 +26,7 @@ interface Lead {
   phone?: string
   website?: string
   linkedin_url?: string
+  twitter_url?: string
   location?: string
   company_size?: string
   revenue_range?: string
@@ -42,7 +43,7 @@ interface NewLeadModalProps {
   open: boolean
   onClose: () => void
   workspaceId: string
-  lead?: Lead | null // For editing existing leads
+  lead?: Lead | null
 }
 
 const LEAD_STATUSES = [
@@ -86,6 +87,7 @@ export default function NewLeadModal({ open, onClose, workspaceId, lead }: NewLe
     phone: '',
     website: '',
     linkedin_url: '',
+    twitter_url: '',
     location: '',
     company_size: '',
     revenue_range: '',
@@ -113,6 +115,7 @@ export default function NewLeadModal({ open, onClose, workspaceId, lead }: NewLe
         phone: '',
         website: '',
         linkedin_url: '',
+        twitter_url: '',
         location: '',
         company_size: '',
         revenue_range: '',
@@ -137,14 +140,45 @@ export default function NewLeadModal({ open, onClose, workspaceId, lead }: NewLe
       return
     }
 
+    if (!user?.id) {
+      toast({
+        title: "Authentication Error",
+        description: "You must be logged in to create leads.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    if (!workspaceId) {
+      toast({
+        title: "Workspace Error",
+        description: "Invalid workspace ID.",
+        variant: "destructive"
+      })
+      return
+    }
+
     setIsSubmitting(true)
 
     try {
       const leadData = {
         ...formData,
         workspace_id: workspaceId,
-        created_by: user?.id || '',
-        lead_score: Number(formData.lead_score)
+        created_by: user.id,
+        lead_score: Number(formData.lead_score),
+        // Fix UUID fields - convert empty strings to null
+        segment_id: formData.segment_id && formData.segment_id.trim() !== '' ? formData.segment_id : null,
+        company: formData.company?.trim() || null,
+        position: formData.position?.trim() || null,
+        industry: formData.industry?.trim() || null,
+        phone: formData.phone?.trim() || null,
+        website: formData.website?.trim() || null,
+        linkedin_url: formData.linkedin_url?.trim() || null,
+        twitter_url: formData.twitter_url?.trim() || null,
+        location: formData.location?.trim() || null,
+        company_size: formData.company_size?.trim() || null,
+        revenue_range: formData.revenue_range?.trim() || null,
+        notes: formData.notes?.trim() || null
       }
 
       if (lead) {
@@ -165,6 +199,7 @@ export default function NewLeadModal({ open, onClose, workspaceId, lead }: NewLe
 
       onClose()
     } catch (error: any) {
+      console.error('Lead save error:', error)
       toast({
         title: "Error",
         description: error.message || "Failed to save lead.",
@@ -283,14 +318,25 @@ export default function NewLeadModal({ open, onClose, workspaceId, lead }: NewLe
             </div>
           </div>
 
-          <div>
-            <Label htmlFor="linkedin">LinkedIn URL</Label>
-            <Input
-              id="linkedin"
-              value={formData.linkedin_url || ''}
-              onChange={(e) => handleInputChange('linkedin_url', e.target.value)}
-              placeholder="https://linkedin.com/in/johndoe"
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="linkedin">LinkedIn URL</Label>
+              <Input
+                id="linkedin"
+                value={formData.linkedin_url || ''}
+                onChange={(e) => handleInputChange('linkedin_url', e.target.value)}
+                placeholder="https://linkedin.com/in/johndoe"
+              />
+            </div>
+            <div>
+              <Label htmlFor="twitter">Twitter URL</Label>
+              <Input
+                id="twitter"
+                value={formData.twitter_url || ''}
+                onChange={(e) => handleInputChange('twitter_url', e.target.value)}
+                placeholder="https://twitter.com/johndoe"
+              />
+            </div>
           </div>
 
           {/* Company Details */}
@@ -305,6 +351,7 @@ export default function NewLeadModal({ open, onClose, workspaceId, lead }: NewLe
                   <SelectValue placeholder="Select size" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="">No selection</SelectItem>
                   {COMPANY_SIZES.map(size => (
                     <SelectItem key={size.value} value={size.value}>
                       {size.label}
@@ -323,6 +370,7 @@ export default function NewLeadModal({ open, onClose, workspaceId, lead }: NewLe
                   <SelectValue placeholder="Select range" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="">No selection</SelectItem>
                   {REVENUE_RANGES.map(range => (
                     <SelectItem key={range.value} value={range.value}>
                       {range.label}
@@ -357,7 +405,7 @@ export default function NewLeadModal({ open, onClose, workspaceId, lead }: NewLe
               <Label htmlFor="source">Source</Label>
               <Input
                 id="source"
-                value={formData.source || ''}
+                value={formData.source || 'manual'}
                 onChange={(e) => handleInputChange('source', e.target.value)}
                 placeholder="manual, website, referral"
               />
