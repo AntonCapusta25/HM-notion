@@ -49,20 +49,28 @@ const EMAIL_TEMPLATES = {
   press_release: `Hi {{name}},\n\nI hope you're doing well. I wanted to share some exciting news from our company that I think would be of interest to you.\n\n{{custom_message}}\n\nI'd be happy to provide more details or arrange an interview if this interests you.\n\nBest regards,\n{{sender_name}}`
 }
 
-// --- FIX #1: THE SAFE TEMPLATE FUNCTION ---
+// ✅ HELPER FUNCTIONS FOR SAFE RENDERING
+/**
+ * Safely extracts a string value from potentially nested objects
+ */
+const safeGetString = (value: any, fallback = 'Unknown'): string => {
+  if (typeof value === 'string') return value
+  if (value && typeof value === 'object' && value.name) return safeGetString(value.name, fallback)
+  if (value && typeof value === 'object') return JSON.stringify(value)
+  return fallback || 'Unknown'
+}
+
 /**
  * Safely fills a template string with data from an object.
  * If a key is missing in the data object, it leaves the placeholder untouched.
- * @param {string} templateString The template with {{placeholders}}.
- * @param {object} data The object containing the data.
- * @returns {string} The filled-in template string.
  */
 function fillTemplateSafely(templateString, data) {
   if (!templateString || !data) {
     return templateString || '';
   }
   return templateString.replace(/{{(\w+)}}/g, (placeholder, key) => {
-    return data.hasOwnProperty(key) ? data[key] : placeholder;
+    const value = data[key]
+    return value ? safeGetString(value, placeholder) : placeholder;
   });
 }
 
@@ -90,15 +98,15 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
   })
   const [attachments, setAttachments] = useState<File[]>([])
 
-  // --- ZUSTAND STORE AND OTHER HOOKS ---
+  // ZUSTAND STORE AND OTHER HOOKS
   const { 
-    leads, // <-- FIX #2: Get leads from the store
+    leads,
     segments, 
     outreachTypes,
     loading,
     createCampaign,
     updateCampaign,
-    fetchLeads, // <-- FIX #2: Get the action to fetch leads
+    fetchLeads,
     fetchSegments,
     fetchOutreachTypes
   } = useOutreachStore()
@@ -106,10 +114,30 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
   const { user } = useAuth()
   const { toast } = useToast()
 
-  // --- DATA FETCHING ---
+  // ✅ DEBUG LOGGING TO IDENTIFY OBJECT ISSUES
+  useEffect(() => {
+    if (open) {
+      console.log('🔍 DEBUG - Campaign Modal Data:')
+      console.log('Segments:', segments)
+      console.log('OutreachTypes:', outreachTypes)
+      console.log('Leads:', leads)
+      
+      if (segments.length > 0) {
+        console.log('First segment:', segments[0])
+        console.log('First segment name type:', typeof segments[0]?.name)
+      }
+      
+      if (outreachTypes.length > 0) {
+        console.log('First outreach type:', outreachTypes[0])
+        console.log('First type name type:', typeof outreachTypes[0]?.name)
+      }
+    }
+  }, [segments, outreachTypes, leads, open])
+
+  // DATA FETCHING
   useEffect(() => {
     if (workspaceId && open) {
-      fetchLeads(workspaceId); // <-- FIX #2: Fetch leads for a realistic preview
+      fetchLeads(workspaceId);
       fetchSegments(workspaceId);
       fetchOutreachTypes(workspaceId);
     }
@@ -118,14 +146,14 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
   useEffect(() => {
     if (editingCampaign) {
       setCampaignForm({
-        name: editingCampaign.name || '',
-        description: editingCampaign.description || '',
-        subject_line: editingCampaign.subject_line || '',
-        email_template: editingCampaign.email_template || EMAIL_TEMPLATES.cold_outreach,
-        outreach_type_id: editingCampaign.outreach_type_id || '',
-        segment_id: editingCampaign.segment_id || '',
+        name: safeGetString(editingCampaign.name, ''),
+        description: safeGetString(editingCampaign.description, ''),
+        subject_line: safeGetString(editingCampaign.subject_line, ''),
+        email_template: safeGetString(editingCampaign.email_template, EMAIL_TEMPLATES.cold_outreach),
+        outreach_type_id: safeGetString(editingCampaign.outreach_type_id, ''),
+        segment_id: safeGetString(editingCampaign.segment_id, ''),
         send_immediately: editingCampaign.send_immediately || false,
-        scheduled_at: editingCampaign.scheduled_at || '',
+        scheduled_at: safeGetString(editingCampaign.scheduled_at, ''),
         settings: {
           ...campaignForm.settings,
           ...editingCampaign.settings
@@ -172,31 +200,31 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
     setAttachments(prev => prev.filter((_, i) => i !== index))
   }
 
-  // --- ✅ FIX #3: THE SAFE PREVIEW GENERATION LOGIC ---
+  // ✅ SAFE PREVIEW GENERATION
   const generatePreview = () => {
-    // Use the first lead from your database for a realistic preview.
     const previewLead = leads.length > 0 ? leads[0] : null;
 
-    // Define a default fallback object for when there are no leads yet.
     const defaultPreviewData = {
       name: 'Jane Doe',
+      company: 'Example Corp',
+      position: 'Marketing Director',
+      industry: 'Technology'
     };
 
-    // Use the real lead if available, otherwise use the fallback.
     const dataSource = previewLead || defaultPreviewData;
     
-    // Combine all data sources into one object for the template.
     const allData = {
-      ...dataSource,
-      sender_name: user?.user_metadata?.full_name || user?.email || 'Your Name',
-      subject: campaignForm.subject_line,
+      name: safeGetString(dataSource.name, 'Jane Doe'),
+      company: safeGetString(dataSource.company, 'Example Corp'),
+      position: safeGetString(dataSource.position, 'Marketing Director'),
+      industry: safeGetString(dataSource.industry, 'Technology'),
+      sender_name: safeGetString(user?.user_metadata?.full_name || user?.email, 'Your Name'),
+      subject: safeGetString(campaignForm.subject_line, 'Your Subject'),
       custom_message: '[Your personalized message will appear here.]'
     };
 
-    // Use the SAFE function to generate the preview. This will not crash.
     return fillTemplateSafely(campaignForm.email_template, allData);
   };
-
 
   const validateForm = () => {
     if (!campaignForm.name.trim()) {
@@ -267,6 +295,7 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
 
       onClose()
     } catch (error) {
+      console.error('Campaign save error:', error)
       toast({
         title: "Error",
         description: "Failed to save campaign",
@@ -323,7 +352,8 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
                   <SelectContent>
                     {outreachTypes.map(type => (
                       <SelectItem key={type.id} value={type.id}>
-                        {type.name}
+                        {/* ✅ FIXED: Safe rendering of outreach type name */}
+                        {safeGetString(type.name, 'Unnamed Type')}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -348,10 +378,10 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
                 id="subject_line"
                 value={campaignForm.subject_line}
                 onChange={(e) => setCampaignForm(prev => ({ ...prev, subject_line: e.target.value }))}
-                placeholder="e.g., Partnership opportunity with org"
+                placeholder="e.g., Partnership opportunity with {{company}}"
               />
               <p className="text-sm text-gray-600">
-                Use variables like {{name}}, company or industry for personalization
+                Use variables like name, company or industry for personalization
               </p>
             </div>
 
@@ -392,7 +422,8 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
                       onClick={() => handleTemplateSelect(key)}
                       className="justify-start"
                     >
-                      {key.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                      {/* ✅ FIXED: Safe template key rendering */}
+                      {safeGetString(key, 'Template').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                     </Button>
                   ))}
                 </div>
@@ -409,7 +440,7 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
                   className="font-mono text-sm"
                 />
                 <p className="text-sm text-gray-600">
-                  Available variables: {{name}}, position, indutry, location, sender name
+                  Available variables: name, company, position, industry, sender_name
                 </p>
               </div>
 
@@ -440,7 +471,7 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
                       <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
                         <div className="flex items-center gap-2">
                           <FileText className="h-4 w-4 text-gray-600" />
-                          <span className="text-sm">{file.name}</span>
+                          <span className="text-sm">{safeGetString(file.name, 'Unnamed File')}</span>
                           <Badge variant="outline">{(file.size / 1024).toFixed(1)} KB</Badge>
                         </div>
                         <Button
@@ -475,9 +506,10 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
                         <div className="flex items-center gap-2">
                           <div 
                             className="w-3 h-3 rounded-full" 
-                            style={{ backgroundColor: segment.color }}
+                            style={{ backgroundColor: safeGetString(segment.color, '#gray') }}
                           />
-                          {segment.name}
+                          {/* ✅ FIXED: Safe segment name rendering */}
+                          {safeGetString(segment.name, 'Unnamed Segment')}
                         </div>
                       </SelectItem>
                     ))}
@@ -504,12 +536,13 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
                           <div className="flex items-center gap-3">
                             <div 
                               className="w-4 h-4 rounded-full" 
-                              style={{ backgroundColor: selectedSegment.color }}
+                              style={{ backgroundColor: safeGetString(selectedSegment.color, '#gray') }}
                             />
                             <div>
-                              <h4 className="font-medium">{selectedSegment.name}</h4>
+                              {/* ✅ FIXED: Safe selected segment rendering */}
+                              <h4 className="font-medium">{safeGetString(selectedSegment.name, 'Unnamed Segment')}</h4>
                               {selectedSegment.description && (
-                                <p className="text-sm text-gray-600">{selectedSegment.description}</p>
+                                <p className="text-sm text-gray-600">{safeGetString(selectedSegment.description, '')}</p>
                               )}
                             </div>
                           </div>
@@ -517,15 +550,17 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
                           <div className="grid grid-cols-2 gap-4 text-sm">
                             <div>
                               <span className="font-medium">Total Leads:</span> 
-                              <span className="ml-2">123</span>
+                              <span className="ml-2">{selectedSegment.lead_count || 0}</span>
                             </div>
                             <div>
-                              <span className="font-medium">New Leads:</span> 
-                              <span className="ml-2">45</span>
+                              <span className="font-medium">Active Leads:</span> 
+                              <span className="ml-2">{selectedSegment.active_count || 0}</span>
                             </div>
                           </div>
                         </div>
-                      ) : null
+                      ) : (
+                        <p className="text-gray-500">Segment not found</p>
+                      )
                     })()}
                   </CardContent>
                 </Card>
@@ -700,65 +735,3 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
                     </div>
                   )}
                 </div>
-              </div>
-            </div>
-          </TabsContent>
-        </Tabs>
-
-        {/* Preview Section */}
-        {activeTab === 'content' && (
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Eye className="h-4 w-4" />
-                Email Preview
-              </CardTitle>
-              <CardDescription>
-                How your email will look to recipients
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="border rounded-lg p-4 bg-white">
-                <div className="mb-4 pb-2 border-b">
-                  <div className="text-sm text-gray-600">Subject:</div>
-                  <div className="font-medium">{campaignForm.subject_line || 'Your subject line will appear here'}</div>
-                </div>
-                <div className="whitespace-pre-wrap text-sm">
-                  {generatePreview()}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Action Buttons */}
-        <div className="flex justify-between items-center pt-6">
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          
-          <div className="flex gap-3">
-            <Button 
-              variant="outline" 
-              onClick={() => handleSave(false)}
-              disabled={loading}
-              className="flex items-center gap-2"
-            >
-              <Save className="h-4 w-4" />
-              Save as Draft
-            </Button>
-            
-            <Button 
-              onClick={() => handleSave(true)}
-              disabled={loading}
-              className="flex items-center gap-2"
-            >
-              <Send className="h-4 w-4" />
-              {editingCampaign ? 'Update & Launch' : 'Create & Launch'}
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
-}
