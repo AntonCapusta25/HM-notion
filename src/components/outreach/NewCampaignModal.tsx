@@ -49,10 +49,7 @@ const EMAIL_TEMPLATES = {
   press_release: `Hi {{name}},\n\nI hope you're doing well. I wanted to share some exciting news from our company that I think would be of interest to you.\n\n{{custom_message}}\n\nI'd be happy to provide more details or arrange an interview if this interests you.\n\nBest regards,\n{{sender_name}}`
 }
 
-// ✅ HELPER FUNCTIONS FOR SAFE RENDERING
-/**
- * Safely extracts a string value from potentially nested objects
- */
+// HELPER FUNCTIONS FOR SAFE RENDERING
 const safeGetString = (value: any, fallback = 'Unknown'): string => {
   if (typeof value === 'string') return value
   if (value && typeof value === 'object' && value.name) return safeGetString(value.name, fallback)
@@ -60,11 +57,7 @@ const safeGetString = (value: any, fallback = 'Unknown'): string => {
   return fallback || 'Unknown'
 }
 
-/**
- * Safely fills a template string with data from an object.
- * If a key is missing in the data object, it leaves the placeholder untouched.
- */
-function fillTemplateSafely(templateString, data) {
+function fillTemplateSafely(templateString: string, data: any) {
   if (!templateString || !data) {
     return templateString || '';
   }
@@ -98,7 +91,6 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
   })
   const [attachments, setAttachments] = useState<File[]>([])
 
-  // ZUSTAND STORE AND OTHER HOOKS
   const { 
     leads,
     segments, 
@@ -114,23 +106,10 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
   const { user } = useAuth()
   const { toast } = useToast()
 
-  // ✅ DEBUG LOGGING TO IDENTIFY OBJECT ISSUES
+  // DEBUG LOGGING
   useEffect(() => {
     if (open) {
-      console.log('🔍 DEBUG - Campaign Modal Data:')
-      console.log('Segments:', segments)
-      console.log('OutreachTypes:', outreachTypes)
-      console.log('Leads:', leads)
-      
-      if (segments.length > 0) {
-        console.log('First segment:', segments[0])
-        console.log('First segment name type:', typeof segments[0]?.name)
-      }
-      
-      if (outreachTypes.length > 0) {
-        console.log('First outreach type:', outreachTypes[0])
-        console.log('First type name type:', typeof outreachTypes[0]?.name)
-      }
+      console.log('Campaign Modal Data:', { segments, outreachTypes, leads })
     }
   }, [segments, outreachTypes, leads, open])
 
@@ -200,10 +179,8 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
     setAttachments(prev => prev.filter((_, i) => i !== index))
   }
 
-  // ✅ SAFE PREVIEW GENERATION
   const generatePreview = () => {
     const previewLead = leads.length > 0 ? leads[0] : null;
-
     const defaultPreviewData = {
       name: 'Jane Doe',
       company: 'Example Corp',
@@ -352,7 +329,6 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
                   <SelectContent>
                     {outreachTypes.map(type => (
                       <SelectItem key={type.id} value={type.id}>
-                        {/* ✅ FIXED: Safe rendering of outreach type name */}
                         {safeGetString(type.name, 'Unnamed Type')}
                       </SelectItem>
                     ))}
@@ -422,7 +398,6 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
                       onClick={() => handleTemplateSelect(key)}
                       className="justify-start"
                     >
-                      {/* ✅ FIXED: Safe template key rendering */}
                       {safeGetString(key, 'Template').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                     </Button>
                   ))}
@@ -508,7 +483,6 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
                             className="w-3 h-3 rounded-full" 
                             style={{ backgroundColor: safeGetString(segment.color, '#gray') }}
                           />
-                          {/* ✅ FIXED: Safe segment name rendering */}
                           {safeGetString(segment.name, 'Unnamed Segment')}
                         </div>
                       </SelectItem>
@@ -539,7 +513,6 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
                               style={{ backgroundColor: safeGetString(selectedSegment.color, '#gray') }}
                             />
                             <div>
-                              {/* ✅ FIXED: Safe selected segment rendering */}
                               <h4 className="font-medium">{safeGetString(selectedSegment.name, 'Unnamed Segment')}</h4>
                               {selectedSegment.description && (
                                 <p className="text-sm text-gray-600">{safeGetString(selectedSegment.description, '')}</p>
@@ -735,3 +708,67 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
                     </div>
                   )}
                 </div>
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        {/* Preview Section */}
+        {activeTab === 'content' && (
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Eye className="h-4 w-4" />
+                Email Preview
+              </CardTitle>
+              <CardDescription>
+                How your email will look to recipients
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="border rounded-lg p-4 bg-white">
+                <div className="mb-4 pb-2 border-b">
+                  <div className="text-sm text-gray-600">Subject:</div>
+                  <div className="font-medium">
+                    {safeGetString(campaignForm.subject_line, 'Your subject line will appear here')}
+                  </div>
+                </div>
+                <div className="whitespace-pre-wrap text-sm">
+                  {generatePreview()}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Action Buttons */}
+        <div className="flex justify-between items-center pt-6">
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          
+          <div className="flex gap-3">
+            <Button 
+              variant="outline" 
+              onClick={() => handleSave(false)}
+              disabled={loading}
+              className="flex items-center gap-2"
+            >
+              <Save className="h-4 w-4" />
+              Save as Draft
+            </Button>
+            
+            <Button 
+              onClick={() => handleSave(true)}
+              disabled={loading}
+              className="flex items-center gap-2"
+            >
+              <Send className="h-4 w-4" />
+              {editingCampaign ? 'Update & Launch' : 'Create & Launch'}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
