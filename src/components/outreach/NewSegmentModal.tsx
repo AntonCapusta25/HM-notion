@@ -1,4 +1,4 @@
-// NewSegmentModal.tsx - Modal for creating and editing lead segments
+// NewSegmentModal.tsx - Fixed UUID validation
 import React, { useState, useEffect } from 'react'
 import {
   Dialog,
@@ -28,7 +28,7 @@ interface NewSegmentModalProps {
   open: boolean
   onClose: () => void
   workspaceId: string
-  segment?: LeadSegment | null // For editing existing segments
+  segment?: LeadSegment | null
 }
 
 const PREDEFINED_COLORS = [
@@ -88,14 +88,33 @@ export default function NewSegmentModal({ open, onClose, workspaceId, segment }:
       return
     }
 
+    if (!user?.id) {
+      toast({
+        title: "Authentication Error",
+        description: "You must be logged in to create segments.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    if (!workspaceId) {
+      toast({
+        title: "Workspace Error",
+        description: "Invalid workspace ID.",
+        variant: "destructive"
+      })
+      return
+    }
+
     setIsSubmitting(true)
 
     try {
       const segmentData = {
-        ...formData,
         name: formData.name!.trim(),
+        description: formData.description?.trim() || null, // Convert empty string to null
+        color: formData.color || PREDEFINED_COLORS[0],
         workspace_id: workspaceId,
-        created_by: user?.id || ''
+        created_by: user.id
       }
 
       if (segment) {
@@ -116,6 +135,7 @@ export default function NewSegmentModal({ open, onClose, workspaceId, segment }:
 
       onClose()
     } catch (error: any) {
+      console.error('Segment save error:', error)
       toast({
         title: "Error",
         description: error.message || "Failed to save segment.",
