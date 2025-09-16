@@ -29,6 +29,7 @@ import {
 import { useOutreachStore } from '@/hooks/useOutreachStore'
 import { useAuth } from '../../contexts/AuthContext'
 import { useToast } from '@/hooks/use-toast'
+import NewLeadModal from './NewLeadModal'
 
 interface LeadsViewProps {
   workspaceId: string
@@ -541,6 +542,17 @@ export default function LeadsView({ workspaceId }: LeadsViewProps) {
           )}
         </CardContent>
       </Card>
+
+      {/* New Lead Modal */}
+      <NewLeadModal
+        open={showLeadModal}
+        onClose={() => {
+          setShowLeadModal(false)
+          setEditingLead(null)
+        }}
+        workspaceId={workspaceId}
+        lead={editingLead}
+      />
     </div>
   )
 }
