@@ -1,4 +1,4 @@
-// Update the Dashboard component to use the EnhancedChatbot
+// Update the Dashboard component to include import/export functionality
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Plus, Calendar, BarChart3, Grid3X3, List, RefreshCw, MessageCircle, X, Minimize2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,8 @@ import { CreateTaskDialog } from './CreateTaskDialog';
 import { TaskDetailDialog } from './TaskDetailDialog';
 import { ListView } from './ListView';
 import { TaskFilters, TaskFiltersState } from './TaskFilters';
-import { EnhancedChatbot } from './EnhancedChatbot'; // Updated import
+import { EnhancedChatbot } from './EnhancedChatbot';
+import { TaskImportExport } from './TaskImportExport'; // New import
 import { useTaskContext } from '../contexts/TaskContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useProfile } from '../hooks/useProfile';
@@ -493,6 +494,17 @@ export const Dashboard = () => {
             <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             {isRefreshing ? 'Refreshing...' : 'Refresh'}
           </Button>
+          
+          {/* Import/Export Button */}
+          {userProfile && (
+            <TaskImportExport
+              tasks={filteredTasks}
+              users={users}
+              onCreateTask={handleCreateTask}
+              currentUserId={userProfile.id}
+            />
+          )}
+          
           <Button 
             onClick={toggleChatbot}
             variant="outline" 
