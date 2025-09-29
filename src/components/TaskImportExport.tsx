@@ -42,7 +42,7 @@ export const TaskImportExport = ({ tasks, users, onCreateTask, currentUserId }: 
         'Due Date',
         'Assignees (emails)',
         'Tags',
-        'Project',
+        'Workspace',
         'Created By',
         'Created At'
       ];
@@ -68,7 +68,7 @@ export const TaskImportExport = ({ tasks, users, onCreateTask, currentUserId }: 
           task.due_date || '',
           `"${assigneeEmails}"`,
           task.tags ? `"${task.tags.join(';')}"` : '',
-          `"${(task.project || '').replace(/"/g, '""')}"`,
+          task.workspace_id || '',
           createdByEmail,
           task.created_at || ''
         ].join(',');
@@ -114,7 +114,7 @@ export const TaskImportExport = ({ tasks, users, onCreateTask, currentUserId }: 
             return user?.email || id;
           }),
           tags: task.tags,
-          project: task.project,
+          workspace_id: task.workspace_id,
           created_by: users.find(u => u.id === task.created_by)?.email || task.created_by,
           created_at: task.created_at,
           subtasks: task.subtasks
@@ -299,9 +299,14 @@ export const TaskImportExport = ({ tasks, users, onCreateTask, currentUserId }: 
       description: rowData.Description || rowData.description || '',
       status: (rowData.Status || rowData.status || 'todo').toLowerCase(),
       priority: (rowData.Priority || rowData.priority || 'medium').toLowerCase(),
-      project: rowData.Project || rowData.project || '',
       created_by: currentUserId
     };
+
+    // Handle workspace_id
+    const workspaceId = rowData.Workspace || rowData.workspace || rowData.workspace_id || rowData.Workspace_Id;
+    if (workspaceId && workspaceId.trim()) {
+      taskData.workspace_id = workspaceId.trim();
+    }
 
     // Handle due date
     const dueDate = rowData['Due Date'] || rowData.due_date || rowData.dueDate;
@@ -498,7 +503,7 @@ export const TaskImportExport = ({ tasks, users, onCreateTask, currentUserId }: 
                   <Alert>
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>
-                      <strong>CSV Format:</strong> Must include 'Title' column. Optional: Description, Status, Priority, Due Date, Assignees (emails), Tags, Project.
+                      <strong>CSV Format:</strong> Must include 'Title' column. Optional: Description, Status, Priority, Due Date, Assignees (emails), Tags, Workspace.
                       <br />
                       <strong>JSON Format:</strong> Array of task objects or object with 'tasks' property.
                     </AlertDescription>
