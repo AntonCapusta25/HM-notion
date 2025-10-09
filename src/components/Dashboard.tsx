@@ -1,6 +1,6 @@
-// Update the Dashboard component to include import/export functionality
+// Updated Dashboard component with error toast notifications
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Plus, Calendar, BarChart3, Grid3X3, List, RefreshCw, MessageCircle, X, Minimize2 } from 'lucide-react';
+import { Plus, Calendar, BarChart3, Grid3X3, List, RefreshCw, MessageCircle, X, Minimize2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -11,7 +11,7 @@ import { TaskDetailDialog } from './TaskDetailDialog';
 import { ListView } from './ListView';
 import { TaskFilters, TaskFiltersState } from './TaskFilters';
 import { EnhancedChatbot } from './EnhancedChatbot';
-import { TaskImportExport } from './TaskImportExport'; // New import
+import { TaskImportExport } from './TaskImportExport';
 import { useTaskContext } from '../contexts/TaskContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useProfile } from '../hooks/useProfile';
@@ -172,10 +172,6 @@ export const Dashboard = () => {
       setShowCreateTask(false);
       console.log('✅ Dashboard - Task creation completed');
       
-      setTimeout(() => {
-        refreshDashboardStats();
-      }, 500);
-      
     } catch (err) {
       console.error('❌ Dashboard - Failed to create task:', err);
       throw err;
@@ -187,10 +183,6 @@ export const Dashboard = () => {
       console.log('📝 Dashboard - Updating task:', taskId, updates);
       await updateTask(taskId, updates);
       console.log('✅ Dashboard - Task update completed');
-      
-      setTimeout(() => {
-        refreshDashboardStats();
-      }, 300);
       
     } catch (err) {
       console.error('❌ Dashboard - Failed to update task:', err);
@@ -206,10 +198,6 @@ export const Dashboard = () => {
       console.log('🗑️ Dashboard - Deleting task:', taskId);
       await deleteTask(taskId);
       console.log('✅ Dashboard - Task deletion completed');
-      
-      setTimeout(() => {
-        refreshDashboardStats();
-      }, 300);
       
     } catch (err) {
       console.error('❌ Dashboard - Failed to delete task:', err);
@@ -388,7 +376,8 @@ export const Dashboard = () => {
     );
   }
 
-  if (error) {
+  // Only show error alert if still loading (not for optimistic update errors during normal operation)
+  if (error && tasksLoading) {
     return (
       <Alert variant="destructive" className="m-6">
         <AlertDescription>
@@ -472,6 +461,26 @@ export const Dashboard = () => {
 
   return (
     <div className="space-y-6 relative">
+      {/* Error Toast for Optimistic Update Failures */}
+      {error && !tasksLoading && (
+        <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-top-2 duration-300">
+          <Alert variant="destructive" className="max-w-md shadow-lg">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="flex items-center justify-between">
+              <span>{error}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {/* Error will auto-clear after 5s */}}
+                className="h-6 w-6 p-0 ml-2"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">
