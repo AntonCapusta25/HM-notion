@@ -370,28 +370,76 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
     }
   };
 
+  // 🚀 OPTIMISTIC UPDATE IMPLEMENTATION
   const updateTask = useCallback(async (taskId: string, updates: Partial<Task>) => {
-    console.log('📝 Updating task:', taskId, 'updates:', updates);
+    console.log('⚡ Optimistic update for task:', taskId, 'updates:', updates);
     const { assignees, tags, subtasks, ...restOfUpdates } = updates;
     
-    // Update main task fields
-    const { error } = await supabase.from('tasks').update(restOfUpdates).eq('id', taskId);
-    if (error) {
-      console.error('❌ Task update error:', error);
+    // Store original task for rollback if needed
+    const originalTask = tasks.find(t => t.id === taskId);
+    
+    // 🚀 STEP 1: IMMEDIATE UI UPDATE (Optimistic)
+    setTasks(prevTasks => {
+      return prevTasks.map(task => {
+        if (task.id === taskId) {
+          const updatedTask = { 
+            ...task, 
+            ...updates, 
+            updated_at: new Date().toISOString() 
+          };
+          console.log('✨ Optimistically updated task in UI:', updatedTask.title, updates);
+          return updatedTask;
+        }
+        return task;
+      });
+    });
+    
+    try {
+      // 📡 STEP 2: DATABASE UPDATE (Background)
+      const { error } = await supabase.from('tasks').update(restOfUpdates).eq('id', taskId);
+      if (error) {
+        console.error('❌ Task update error:', error);
+        throw error;
+      }
+      
+      // Update related data
+      if (assignees !== undefined) await updateAssignees(taskId, assignees);
+      if (tags !== undefined) await updateTags(taskId, tags);
+      
+      console.log('✅ Database update successful');
+      
+      // 🔄 STEP 3: SOFT BACKGROUND SYNC (Optional, ensures consistency)
+      setTimeout(() => {
+        console.log('🔄 Background sync after successful update...');
+        refreshTasks();
+      }, 500);
+      
+    } catch (error: any) {
+      console.error('❌ Database update failed, rolling back:', error);
+      
+      // 🔄 ROLLBACK: Revert to original state on error
+      if (originalTask) {
+        setTasks(prevTasks => {
+          return prevTasks.map(task => {
+            if (task.id === taskId) {
+              console.log('↩️ Rolled back task to original state');
+              return originalTask;
+            }
+            return task;
+          });
+        });
+      }
+      
+      // Show error notification to user
+      setError(`Failed to update task: ${error.message}`);
+      
+      // Clear error after 5 seconds
+      setTimeout(() => setError(null), 5000);
+      
       throw error;
     }
     
-    // Update related data
-    if (assignees !== undefined) await updateAssignees(taskId, assignees);
-    if (tags !== undefined) await updateTags(taskId, tags);
-    
-    // Force refresh after task update
-    setTimeout(() => {
-      console.log('🔄 Force refreshing tasks after update...');
-      refreshTasks();
-    }, 200);
-    
-  }, [updateAssignees, refreshTasks]);
+  }, [tasks, updateAssignees, refreshTasks]);
   
   const deleteTask = useCallback(async (taskId: string) => {
     console.log('🗑️ Deleting task:', taskId);
