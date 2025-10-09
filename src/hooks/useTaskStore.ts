@@ -157,6 +157,20 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
   useEffect(() => {
     let tasksSubscription: RealtimeChannel;
     let workspacesSubscription: RealtimeChannel;
+    let refreshDebounceTimer: NodeJS.Timeout;
+
+    // Debounced refresh function to prevent excessive updates
+    const debouncedRefresh = () => {
+      if (refreshDebounceTimer) {
+        clearTimeout(refreshDebounceTimer);
+      }
+      refreshDebounceTimer = setTimeout(() => {
+        console.log('🔄 Debounced real-time refresh triggered');
+        if (fetchTasksRef.current) {
+          fetchTasksRef.current();
+        }
+      }, 1000); // Wait 1 second after last change
+    };
 
     if (user?.id) {
       console.log('🔴 Setting up real-time subscriptions for user:', user.id);
@@ -175,14 +189,8 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
             new: payload.new,
             old: payload.old
           });
-          console.log('🔄 Triggering fetchTasks from real-time...');
-          
-          // Use a small delay to ensure database consistency
-          setTimeout(() => {
-            if (fetchTasksRef.current) {
-              fetchTasksRef.current();
-            }
-          }, 100);
+          // Debounce refresh to prevent excessive updates
+          debouncedRefresh();
         })
         .subscribe((status) => {
           console.log('📡 Tasks subscription status:', status);
@@ -197,11 +205,8 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
           table: 'task_assignees'
         }, (payload) => {
           console.log('🔥 REALTIME: Task assignees update!', payload);
-          setTimeout(() => {
-            if (fetchTasksRef.current) {
-              fetchTasksRef.current();
-            }
-          }, 100);
+          // Debounce to handle rapid assignee changes smoothly
+          debouncedRefresh();
         })
         .on('postgres_changes', {
           event: '*',
@@ -209,11 +214,7 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
           table: 'task_tags'
         }, (payload) => {
           console.log('🔥 REALTIME: Task tags update!', payload);
-          setTimeout(() => {
-            if (fetchTasksRef.current) {
-              fetchTasksRef.current();
-            }
-          }, 100);
+          debouncedRefresh();
         })
         .on('postgres_changes', {
           event: '*',
@@ -221,11 +222,7 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
           table: 'comments'
         }, (payload) => {
           console.log('🔥 REALTIME: Comments update!', payload);
-          setTimeout(() => {
-            if (fetchTasksRef.current) {
-              fetchTasksRef.current();
-            }
-          }, 100);
+          debouncedRefresh();
         })
         .subscribe((status) => {
           console.log('📡 Related tables subscription status:', status);
@@ -248,6 +245,9 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
     }
 
     return () => {
+      if (refreshDebounceTimer) {
+        clearTimeout(refreshDebounceTimer);
+      }
       if (tasksSubscription) {
         console.log('🧹 Cleaning up tasks subscription');
         tasksSubscription.unsubscribe();
@@ -387,16 +387,32 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
     });
     
     try {
-      // 📡 STEP 2: DATABASE UPDATE (Background)
-      const { error } = await supabase.from('tasks').update(restOfUpdates).eq('id', taskId);
-      if (error) {
-        console.error('❌ Task update error:', error);
-        throw error;
+      // 📡 STEP 2: DATABASE UPDATE (Background) - Fire all updates without waiting
+      
+      // Update main task fields (only if there are any)
+      if (Object.keys(restOfUpdates).length > 0) {
+        const { error } = await supabase.from('tasks').update(restOfUpdates).eq('id', taskId);
+        if (error) {
+          console.error('❌ Task update error:', error);
+          throw error;
+        }
       }
       
-      // Update related data
-      if (assignees !== undefined) await updateAssignees(taskId, assignees);
-      if (tags !== undefined) await updateTags(taskId, tags);
+      // Update assignees (non-blocking - fire and forget)
+      if (assignees !== undefined) {
+        updateAssignees(taskId, assignees).catch(err => {
+          console.error('❌ Assignee update failed:', err);
+          // Don't throw - let it fail silently and real-time will fix it
+        });
+      }
+      
+      // Update tags (non-blocking - fire and forget)
+      if (tags !== undefined) {
+        updateTags(taskId, tags).catch(err => {
+          console.error('❌ Tag update failed:', err);
+          // Don't throw - let it fail silently and real-time will fix it
+        });
+      }
       
       console.log('✅ Database update successful');
       
