@@ -1041,7 +1041,12 @@ export const TaskDetailDialog = ({
                           variant="ghost" 
                           size="sm" 
                           className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={() => handleRemoveAssignee(user.id)}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleRemoveAssignee(user.id);
+                          }}
+                          type="button"
                         >
                           <X className="h-3 w-3 text-red-500" />
                         </Button>
@@ -1064,7 +1069,11 @@ export const TaskDetailDialog = ({
                           <div 
                             key={user.id}
                             className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-md cursor-pointer"
-                            onClick={() => handleAddAssignee(user.id)}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleAddAssignee(user.id);
+                            }}
                           >
                             <Avatar className="h-6 w-6">
                               <AvatarFallback className="text-xs bg-blue-500 text-white">
