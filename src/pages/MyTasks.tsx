@@ -27,7 +27,6 @@ export const MyTasks = () => {
     updateTask,
     addComment,
     toggleSubtask,
-    updateAssignees,
     refreshTasks,
     loading: tasksLoading,
     error
@@ -89,7 +88,7 @@ export const MyTasks = () => {
     }
   }, [refreshTasks]);
 
-  // Enhanced task operations with proper error handling
+  // ⚡ OPTIMIZED: Non-blocking task operations
   const handleCreateTask = useCallback(async (taskData: any) => {
     try {
       console.log('📝 MyTasks - Creating task:', taskData.title);
@@ -102,15 +101,11 @@ export const MyTasks = () => {
     }
   }, [createTask]);
 
-  const handleUpdateTask = useCallback(async (taskId: string, updates: any) => {
-    try {
-      console.log('📝 MyTasks - Updating task:', taskId);
-      await updateTask(taskId, updates);
-      console.log('✅ MyTasks - Task update completed');
-    } catch (err) {
-      console.error('❌ MyTasks - Failed to update task:', err);
-      throw err;
-    }
+  // ⚡ OPTIMIZED: Instant updates - no await needed (optimistic update handles it)
+  const handleUpdateTask = useCallback((taskId: string, updates: any) => {
+    console.log('⚡ MyTasks - Instant update for task:', taskId);
+    // 🚀 Fire without waiting - optimistic update handles UI
+    updateTask(taskId, updates);
   }, [updateTask]);
 
   const handleDeleteTask = useCallback(async (taskId: string) => {
@@ -127,63 +122,19 @@ export const MyTasks = () => {
     }
   }, [deleteTask]);
 
-  const handleAddComment = useCallback(async (taskId: string, content: string) => {
-    try {
-      console.log('💬 MyTasks - Adding comment to task:', taskId);
-      await addComment(taskId, content);
-      console.log('✅ MyTasks - Comment added successfully');
-    } catch (err) {
-      console.error('❌ MyTasks - Failed to add comment:', err);
-      throw err;
-    }
+  // ⚡ OPTIMIZED: Instant comment addition
+  const handleAddComment = useCallback((taskId: string, content: string) => {
+    console.log('⚡ MyTasks - Instant comment add:', taskId);
+    // 🚀 Fire without waiting
+    addComment(taskId, content);
   }, [addComment]);
 
-  const handleToggleSubtask = useCallback(async (taskId: string, subtaskId: string) => {
-    try {
-      console.log('☑️ MyTasks - Toggling subtask:', subtaskId);
-      await toggleSubtask(taskId, subtaskId);
-      console.log('✅ MyTasks - Subtask toggled successfully');
-    } catch (err) {
-      console.error('❌ MyTasks - Failed to toggle subtask:', err);
-      throw err;
-    }
+  // ⚡ OPTIMIZED: Instant subtask toggle
+  const handleToggleSubtask = useCallback((taskId: string, subtaskId: string) => {
+    console.log('⚡ MyTasks - Instant subtask toggle:', subtaskId);
+    // 🚀 Fire without waiting
+    toggleSubtask(taskId, subtaskId);
   }, [toggleSubtask]);
-
-  // Handle task assignment updates
-  const handleAssignTask = useCallback(async (taskId: string, userIds: string[]) => {
-    try {
-      console.log('👥 MyTasks - Updating task assignments:', taskId, userIds);
-      
-      // Delete existing assignments for this task
-      const { error: deleteError } = await supabase
-        .from('task_assignees')
-        .delete()
-        .eq('task_id', taskId);
-      
-      if (deleteError) throw deleteError;
-      
-      // Insert new assignments if any
-      if (userIds.length > 0) {
-        const assignments = userIds.map(userId => ({
-          task_id: taskId,
-          user_id: userId
-        }));
-        
-        const { error: insertError } = await supabase
-          .from('task_assignees')
-          .insert(assignments);
-        
-        if (insertError) throw insertError;
-      }
-      
-      // Refresh tasks to get updated assignments
-      await refreshTasks();
-      console.log('✅ MyTasks - Task assignment completed');
-    } catch (err) {
-      console.error('❌ MyTasks - Failed to update task assignments:', err);
-      throw err;
-    }
-  }, [refreshTasks]);
 
   // FIXED: Properly filter tasks assigned TO the current user ONLY
   const myTasks = useMemo(() => {
@@ -298,7 +249,8 @@ export const MyTasks = () => {
     );
   }
 
-  if (error) {
+  // Only show error alert if still loading (not for optimistic update errors during normal operation)
+  if (error && tasksLoading) {
     return (
       <Layout>
         <Alert variant="destructive" className="m-6">
@@ -326,6 +278,26 @@ export const MyTasks = () => {
   return (
     <Layout>
       <div className="space-y-6">
+        {/* Error Toast for Optimistic Update Failures */}
+        {error && !tasksLoading && (
+          <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-top-2 duration-300">
+            <Alert variant="destructive" className="max-w-md shadow-lg">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="flex items-center justify-between">
+                <span>{error}</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {/* Error will auto-clear after 5s */}}
+                  className="h-6 w-6 p-0 ml-2"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
+
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">My Tasks</h1>
@@ -481,7 +453,6 @@ export const MyTasks = () => {
             onCreateTask={handleCreateTask}
             onUpdateTask={handleUpdateTask}
             onDeleteTask={handleDeleteTask}
-            onAssignTask={handleAssignTask}
           />
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -625,7 +596,7 @@ export const MyTasks = () => {
           task={selectedTask}
           users={users}
           open={!!selectedTask}
-          onOpenChange={(open) => !open && setSelectedTask(task)}
+          onOpenChange={(open) => !open && setSelectedTask(null)}
           onUpdateTask={handleUpdateTask}
           onAddComment={handleAddComment}
           onToggleSubtask={handleToggleSubtask}
