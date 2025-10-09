@@ -124,7 +124,15 @@ export const TaskCard = ({ task, onClick, onAssign, compact = false }: TaskCardP
   // ⚡ OPTIMIZED: Instant date update - no await, close popover immediately
   const updateDueDate = (date: Date | undefined) => {
     try {
-      const dueDateString = date ? date.toISOString().split('T')[0] : null;
+      let dueDateString: string | null = null;
+      
+      if (date) {
+        // 🔧 FIX: Use local date, not UTC (prevents timezone issues)
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        dueDateString = `${year}-${month}-${day}`;
+      }
       
       // 🚀 Fire update without waiting
       updateTask(task.id, { due_date: dueDateString });
