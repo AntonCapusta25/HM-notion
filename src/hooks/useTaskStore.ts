@@ -316,13 +316,9 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
 
     console.log('✅ Task creation completed successfully');
     
-    // Force refresh after task creation
-    setTimeout(() => {
-      console.log('🔄 Force refreshing tasks after creation...');
-      refreshTasks();
-    }, 200);
+    // ✅ No manual refresh needed - real-time subscription will update the UI
     
-  }, [user?.id, userProfile?.id, refreshTasks]);
+  }, [user?.id, userProfile?.id]);
 
   const updateAssignees = useCallback(async (taskId: string, assigneeIds: string[]) => {
     console.log('👥 updateAssignees called for task:', taskId, 'assignees:', assigneeIds);
@@ -353,13 +349,9 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
     
     console.log('✅ Task assignments updated successfully');
     
-    // Force refresh to get updated assignment data
-    setTimeout(() => {
-      console.log('🔄 Force refreshing tasks after assignment update...');
-      refreshTasks();
-    }, 200);
+    // ✅ No manual refresh needed - real-time subscription will update the UI
     
-  }, [refreshTasks]);
+  }, []);
 
   const updateTags = async (taskId: string, tags: string[]) => {
     console.log('🏷️ Updating tags for task:', taskId, 'tags:', tags);
@@ -408,11 +400,8 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
       
       console.log('✅ Database update successful');
       
-      // 🔄 STEP 3: SOFT BACKGROUND SYNC (Optional, ensures consistency)
-      setTimeout(() => {
-        console.log('🔄 Background sync after successful update...');
-        refreshTasks();
-      }, 500);
+      // ✅ No refresh needed - optimistic update already did the work!
+      // Real-time subscriptions will handle updates from other users
       
     } catch (error: any) {
       console.error('❌ Database update failed, rolling back:', error);
@@ -439,20 +428,16 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
       throw error;
     }
     
-  }, [tasks, updateAssignees, refreshTasks]);
+  }, [tasks, updateAssignees]);
   
   const deleteTask = useCallback(async (taskId: string) => {
     console.log('🗑️ Deleting task:', taskId);
     const { error } = await supabase.from('tasks').delete().eq('id', taskId);
     if (error) throw error;
     
-    // Force refresh after task deletion
-    setTimeout(() => {
-      console.log('🔄 Force refreshing tasks after deletion...');
-      refreshTasks();
-    }, 200);
+    // ✅ No manual refresh needed - real-time subscription will update the UI
     
-  }, [refreshTasks]);
+  }, []);
 
   const addComment = useCallback(async (taskId: string, content: string) => {
     if (!user) throw new Error("User not authenticated");
@@ -467,13 +452,9 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
     
     if (error) throw error;
     
-    // Force refresh after adding comment
-    setTimeout(() => {
-      console.log('🔄 Force refreshing tasks after comment...');
-      refreshTasks();
-    }, 200);
+    // ✅ No manual refresh needed - real-time subscription will update the UI
     
-  }, [user?.id, refreshTasks]);
+  }, [user?.id]);
   
   const toggleSubtask = useCallback(async (taskId: string, subtaskId: string) => {
     console.log('☑️ Toggling subtask:', subtaskId);
@@ -491,13 +472,9 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
         .eq('id', subtaskId);
     }
     
-    // Force refresh after toggling subtask
-    setTimeout(() => {
-      console.log('🔄 Force refreshing tasks after subtask toggle...');
-      refreshTasks();
-    }, 200);
+    // ✅ No manual refresh needed - real-time subscription will update the UI
     
-  }, [refreshTasks]);
+  }, []);
   
   return { 
     tasks, 
