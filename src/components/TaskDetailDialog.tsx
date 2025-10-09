@@ -139,8 +139,22 @@ export const TaskDetailDialog = ({
   const titleInputRef = useRef<HTMLInputElement>(null);
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
 
-  // Get current task data - prioritize direct fetch data, then context, then initial
-  const task = currentTaskData || (initialTask ? tasks.find(t => t.id === initialTask.id) : null) || initialTask;
+  // ⚡ CRITICAL: Use live task data from context for instant optimistic updates
+  // Priority: context (has optimistic updates) → direct fetch → initial
+  const task = (initialTask ? tasks.find(t => t.id === initialTask.id) : null) || currentTaskData || initialTask;
+  
+  // Debug: Log when task data changes
+  useEffect(() => {
+    if (task && initialTask) {
+      console.log('📊 TaskDetailDialog - Task data updated:', {
+        taskId: task.id,
+        status: task.status,
+        priority: task.priority,
+        title: task.title,
+        source: tasks.find(t => t.id === initialTask.id) ? 'context (optimistic)' : 'direct fetch'
+      });
+    }
+  }, [task?.status, task?.priority, task?.title, task?.description, task?.due_date, task?.assignees]);
 
   const assignedUsers = useMemo(() => {
     if (!task) return [];
@@ -330,18 +344,25 @@ export const TaskDetailDialog = ({
     }
   }, [open, initialTask?.id]);
 
-  // Update temp values when task data changes
+  // Update temp values when task data changes (from optimistic updates or direct fetch)
   useEffect(() => {
     if (task) {
       setTempTitle(task.title);
       setTempDescription(task.description || '');
+      
+      // If we have attachments from direct fetch, merge them
+      if (currentTaskData?.attachments) {
+        // Keep attachments from direct fetch
+      }
     }
-  }, [task]);
+  }, [task, currentTaskData?.attachments]);
 
   if (!task) return null;
 
   const createdByUser = users.find(u => u.id === task.created_by);
-  const attachments = (task as TaskWithAttachments).attachments || [];
+  
+  // ⚡ Merge attachments from both sources for complete data
+  const attachments = (currentTaskData?.attachments) || (task as TaskWithAttachments).attachments || [];
 
   const priorityConfig = {
     low: { color: 'bg-green-100 text-green-700 border-green-300', icon: '🟢', label: 'Low' },
