@@ -57,6 +57,7 @@ export const TaskCard = ({ task, onClick, onAssign, compact = false }: TaskCardP
   const [isEditing, setIsEditing] = useState(false);
   const [editingField, setEditingField] = useState<string | null>(null);
   const [tempTitle, setTempTitle] = useState(task.title);
+  const [datePickerOpen, setDatePickerOpen] = useState(false); // Track popover state
   const titleInputRef = useRef<HTMLInputElement>(null);
 
   const assignedUsers = users.filter(u => task.assignees?.includes(u.id));
@@ -120,26 +121,37 @@ export const TaskCard = ({ task, onClick, onAssign, compact = false }: TaskCardP
     }
   };
 
-  const updateDueDate = async (date: Date | undefined) => {
+  // ⚡ OPTIMIZED: Instant date update - no await, close popover immediately
+  const updateDueDate = (date: Date | undefined) => {
     try {
       const dueDateString = date ? date.toISOString().split('T')[0] : null;
-      await updateTask(task.id, { due_date: dueDateString });
+      
+      // 🚀 Fire update without waiting
+      updateTask(task.id, { due_date: dueDateString });
+      
+      // ✅ Close popover immediately (don't wait for database)
+      setDatePickerOpen(false);
+      
     } catch (error) {
       console.error('Failed to update due date:', error);
     }
   };
 
-  const updatePriority = async (priority: string) => {
+  // ⚡ OPTIMIZED: Instant priority update - no await
+  const updatePriority = (priority: string) => {
     try {
-      await updateTask(task.id, { priority: priority as 'low' | 'medium' | 'high' });
+      // 🚀 Fire update without waiting - optimistic update handles UI
+      updateTask(task.id, { priority: priority as 'low' | 'medium' | 'high' });
     } catch (error) {
       console.error('Failed to update priority:', error);
     }
   };
 
-  const updateStatus = async (status: string) => {
+  // ⚡ OPTIMIZED: Instant status update - no await
+  const updateStatus = (status: string) => {
     try {
-      await updateTask(task.id, { status: status as 'todo' | 'in_progress' | 'done' });
+      // 🚀 Fire update without waiting - optimistic update handles UI
+      updateTask(task.id, { status: status as 'todo' | 'in_progress' | 'done' });
     } catch (error) {
       console.error('Failed to update status:', error);
     }
@@ -271,8 +283,8 @@ export const TaskCard = ({ task, onClick, onAssign, compact = false }: TaskCardP
               </PopoverContent>
             </Popover>
 
-            {/* Due Date - Clickable */}
-            <Popover>
+            {/* Due Date - Clickable with instant close */}
+            <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
               <PopoverTrigger asChild>
                 <div className={`flex items-center gap-1 text-xs px-2 py-1 rounded-md cursor-pointer hover:bg-gray-100 transition-colors ${dueDateStatus?.color || 'text-gray-500'}`}>
                   <CalendarIcon className="h-3 w-3" />
@@ -293,7 +305,7 @@ export const TaskCard = ({ task, onClick, onAssign, compact = false }: TaskCardP
                   <Calendar
                     mode="single"
                     selected={task.due_date ? new Date(task.due_date) : undefined}
-                    onSelect={updateDueDate}
+                    onSelect={updateDueDate} // No await needed - instant!
                     initialFocus
                   />
                   {task.due_date && (
