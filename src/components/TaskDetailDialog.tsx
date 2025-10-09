@@ -129,6 +129,12 @@ export const TaskDetailDialog = ({
   const [isAddingSubtask, setIsAddingSubtask] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  
+  // ⚡ Track popover states for instant close
+  const [statusPopoverOpen, setStatusPopoverOpen] = useState(false);
+  const [priorityPopoverOpen, setPriorityPopoverOpen] = useState(false);
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
@@ -367,9 +373,11 @@ export const TaskDetailDialog = ({
     setTimeout(() => titleInputRef.current?.focus(), 0);
   };
 
-  const saveTitleEdit = async () => {
+  // ⚡ INSTANT: Save title without blocking UI
+  const saveTitleEdit = () => {
     if (tempTitle.trim() && tempTitle !== task.title) {
-      await onUpdateTask(task.id, { title: tempTitle.trim() });
+      // 🚀 Fire update without waiting
+      onUpdateTask(task.id, { title: tempTitle.trim() });
     }
     setEditingTitle(false);
   };
@@ -379,9 +387,11 @@ export const TaskDetailDialog = ({
     setTimeout(() => descriptionRef.current?.focus(), 0);
   };
 
-  const saveDescriptionEdit = async () => {
+  // ⚡ INSTANT: Save description without blocking UI
+  const saveDescriptionEdit = () => {
     if (tempDescription !== task.description) {
-      await onUpdateTask(task.id, { description: tempDescription });
+      // 🚀 Fire update without waiting
+      onUpdateTask(task.id, { description: tempDescription });
     }
     setEditingDescription(false);
   };
@@ -481,27 +491,43 @@ export const TaskDetailDialog = ({
     }
   };
 
+  // ⚡ INSTANT: Add assignee without blocking UI
   const handleAddAssignee = (userId: string) => {
     const newAssignees = [...(task.assignees || []), userId];
+    // 🚀 Fire update without waiting
     onUpdateTask(task.id, { assignees: newAssignees });
   };
   
+  // ⚡ INSTANT: Remove assignee without blocking UI
   const handleRemoveAssignee = (userId: string) => {
     const newAssignees = (task.assignees || []).filter(id => id !== userId);
+    // 🚀 Fire update without waiting
     onUpdateTask(task.id, { assignees: newAssignees });
   };
 
-  const updateDueDate = async (date: Date | undefined) => {
+  // ⚡ INSTANT: Update due date without blocking UI
+  const updateDueDate = (date: Date | undefined) => {
     const dueDateString = date ? date.toISOString().split('T')[0] : null;
-    await onUpdateTask(task.id, { due_date: dueDateString });
+    // 🚀 Fire update without waiting
+    onUpdateTask(task.id, { due_date: dueDateString });
+    // ✅ Close popover immediately
+    setDatePickerOpen(false);
   };
 
-  const updatePriority = async (priority: string) => {
-    await onUpdateTask(task.id, { priority: priority as 'low' | 'medium' | 'high' });
+  // ⚡ INSTANT: Update priority without blocking UI
+  const updatePriority = (priority: string) => {
+    // 🚀 Fire update without waiting
+    onUpdateTask(task.id, { priority: priority as 'low' | 'medium' | 'high' });
+    // ✅ Close popover immediately
+    setPriorityPopoverOpen(false);
   };
 
-  const updateStatus = async (status: string) => {
-    await onUpdateTask(task.id, { status: status as 'todo' | 'in_progress' | 'done' });
+  // ⚡ INSTANT: Update status without blocking UI
+  const updateStatus = (status: string) => {
+    // 🚀 Fire update without waiting
+    onUpdateTask(task.id, { status: status as 'todo' | 'in_progress' | 'done' });
+    // ✅ Close popover immediately
+    setStatusPopoverOpen(false);
   };
 
   const subtasks = task.subtasks || [];
@@ -870,7 +896,7 @@ export const TaskDetailDialog = ({
                   <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 block">
                     Status
                   </Label>
-                  <Popover>
+                  <Popover open={statusPopoverOpen} onOpenChange={setStatusPopoverOpen}>
                     <PopoverTrigger asChild>
                       <Button variant="outline" className="w-full justify-start">
                         <div className={`w-3 h-3 rounded-full mr-2 ${statusConfig[task.status].color.split(' ')[0]}`} />
@@ -899,7 +925,7 @@ export const TaskDetailDialog = ({
                   <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 block">
                     Priority
                   </Label>
-                  <Popover>
+                  <Popover open={priorityPopoverOpen} onOpenChange={setPriorityPopoverOpen}>
                     <PopoverTrigger asChild>
                       <Button variant="outline" className="w-full justify-start">
                         <Flag className={`h-4 w-4 mr-2 ${
@@ -931,7 +957,7 @@ export const TaskDetailDialog = ({
                   <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 block">
                     Due Date
                   </Label>
-                  <Popover>
+                  <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
                     <PopoverTrigger asChild>
                       <Button variant="outline" className="w-full justify-start">
                         <CalendarIcon className="h-4 w-4 mr-2" />
