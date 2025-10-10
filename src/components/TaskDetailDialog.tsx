@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -130,99 +130,99 @@ export const TaskDetailDialog = ({
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   
-  // ⚡ Track popover states for instant close
+  // ⚡ CRITICAL FIX: Controlled popover states for instant close
   const [statusPopoverOpen, setStatusPopoverOpen] = useState(false);
   const [priorityPopoverOpen, setPriorityPopoverOpen] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [assigneePopoverOpen, setAssigneePopoverOpen] = useState(false); // NEW: Control assignee popover
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
+  const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isRefreshingRef = useRef(false);
 
-  // ⚡ CRITICAL: Use live task data from context for instant optimistic updates
-  // Priority: context (has optimistic updates) → direct fetch → initial
-  const task = (initialTask ? tasks.find(t => t.id === initialTask.id) : null) || currentTaskData || initialTask;
-  
-  // Debug: Log when task data changes
-  useEffect(() => {
-    if (task && initialTask) {
-      console.log('📊 TaskDetailDialog - Task data updated:', {
-        taskId: task.id,
-        status: task.status,
-        priority: task.priority,
-        title: task.title,
-        source: tasks.find(t => t.id === initialTask.id) ? 'context (optimistic)' : 'direct fetch'
-      });
-    }
-  }, [task?.status, task?.priority, task?.title, task?.description, task?.due_date, task?.assignees]);
+  // ⚡ Use live task data from context (optimistic updates) but prevent excessive re-renders
+  const task = useMemo(() => {
+    return (initialTask ? tasks.find(t => t.id === initialTask.id) : null) || currentTaskData || initialTask;
+  }, [initialTask?.id, tasks, currentTaskData]);
 
+  // 🎯 Memoize assigned and unassigned users to prevent recalculation
   const assignedUsers = useMemo(() => {
     if (!task) return [];
     return users.filter(u => task.assignees?.includes(u.id));
-  }, [users, task]);
+  }, [users, task?.assignees]);
   
   const unassignedUsers = useMemo(() => {
     if (!task) return [];
     return users.filter(u => !task.assignees?.includes(u.id));
-  }, [users, task]);
+  }, [users, task?.assignees]);
 
-  // Direct database fetch to get fresh task data with attachments
-  const forceRefreshTaskData = async () => {
-    if (!initialTask?.id) return;
+  // 🔧 Debounced refresh to prevent multiple simultaneous refreshes
+  const debouncedRefresh = useCallback(async () => {
+    if (!initialTask?.id || isRefreshingRef.current) return;
     
-    setIsRefreshing(true);
-    console.log('🔄 TaskDetailDialog - Direct database fetch for task:', initialTask.id);
-    
-    try {
-      const { data, error } = await supabase
-        .from('tasks')
-        .select(`
-          *,
-          comments(*),
-          subtasks(*),
-          task_tags(tag),
-          task_assignees(user_id),
-          task_attachments(*)
-        `)
-        .eq('id', initialTask.id)
-        .single();
-        
-      if (error) {
-        console.error('❌ Direct fetch error:', error);
-        return;
-      }
-      
-      if (data) {
-        console.log('✅ Fresh task data fetched:', data);
-        
-        // Format the data to match your Task interface
-        const formattedTask: TaskWithAttachments = {
-          id: data.id,
-          title: data.title,
-          description: data.description,
-          status: data.status,
-          priority: data.priority,
-          due_date: data.due_date,
-          workspace_id: data.workspace_id,
-          created_by: data.created_by,
-          created_at: data.created_at,
-          updated_at: data.updated_at,
-          assignees: data.task_assignees?.map(ta => ta.user_id) || [],
-          tags: data.task_tags?.map(tt => tt.tag) || [],
-          comments: data.comments || [],
-          subtasks: data.subtasks || [],
-          attachments: data.task_attachments || []
-        };
-        
-        console.log('📝 Formatted fresh task:', formattedTask);
-        setCurrentTaskData(formattedTask);
-      }
-    } catch (err) {
-      console.error('❌ Direct fetch failed:', err);
-    } finally {
-      setIsRefreshing(false);
+    // Clear any pending refresh
+    if (refreshTimeoutRef.current) {
+      clearTimeout(refreshTimeoutRef.current);
     }
-  };
+    
+    // Schedule new refresh with debounce
+    refreshTimeoutRef.current = setTimeout(async () => {
+      if (isRefreshingRef.current) return;
+      
+      isRefreshingRef.current = true;
+      setIsRefreshing(true);
+      console.log('🔄 Debounced refresh for task:', initialTask.id);
+      
+      try {
+        const { data, error } = await supabase
+          .from('tasks')
+          .select(`
+            *,
+            comments(*),
+            subtasks(*),
+            task_tags(tag),
+            task_assignees(user_id),
+            task_attachments(*)
+          `)
+          .eq('id', initialTask.id)
+          .single();
+          
+        if (error) {
+          console.error('❌ Refresh error:', error);
+          return;
+        }
+        
+        if (data) {
+          const formattedTask: TaskWithAttachments = {
+            id: data.id,
+            title: data.title,
+            description: data.description,
+            status: data.status,
+            priority: data.priority,
+            due_date: data.due_date,
+            workspace_id: data.workspace_id,
+            created_by: data.created_by,
+            created_at: data.created_at,
+            updated_at: data.updated_at,
+            assignees: data.task_assignees?.map(ta => ta.user_id) || [],
+            tags: data.task_tags?.map(tt => tt.tag) || [],
+            comments: data.comments || [],
+            subtasks: data.subtasks || [],
+            attachments: data.task_attachments || []
+          };
+          
+          setCurrentTaskData(formattedTask);
+        }
+      } catch (err) {
+        console.error('❌ Refresh failed:', err);
+      } finally {
+        setIsRefreshing(false);
+        isRefreshingRef.current = false;
+      }
+    }, 300); // 300ms debounce
+  }, [initialTask?.id]);
 
   // File upload handler
   const handleFileUpload = async (files: FileList | null) => {
@@ -233,17 +233,14 @@ export const TaskDetailDialog = ({
 
     try {
       for (const file of Array.from(files)) {
-        // Validate file size (10MB limit)
         if (file.size > 10 * 1024 * 1024) {
           throw new Error(`File ${file.name} is too large. Maximum size is 10MB.`);
         }
 
-        // Generate unique file name
         const fileExt = file.name.split('.').pop();
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
         const filePath = `task-attachments/${task.id}/${fileName}`;
 
-        // Upload to Supabase Storage
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('attachments')
           .upload(filePath, file, {
@@ -253,12 +250,10 @@ export const TaskDetailDialog = ({
 
         if (uploadError) throw uploadError;
 
-        // Get public URL
         const { data: { publicUrl } } = supabase.storage
           .from('attachments')
           .getPublicUrl(filePath);
 
-        // Save attachment metadata to database
         const { error: dbError } = await supabase
           .from('task_attachments')
           .insert({
@@ -274,7 +269,7 @@ export const TaskDetailDialog = ({
       }
 
       console.log('✅ Files uploaded successfully');
-      await forceRefreshTaskData();
+      await debouncedRefresh();
       
     } catch (err: any) {
       console.error('❌ File upload failed:', err);
@@ -284,26 +279,19 @@ export const TaskDetailDialog = ({
     }
   };
 
-  // Delete attachment
   const handleDeleteAttachment = async (attachment: TaskAttachment) => {
     try {
-      console.log('🗑️ Deleting attachment:', attachment.id);
-
-      // Extract file path from URL
       const urlParts = attachment.file_url.split('/');
-      const filePath = urlParts.slice(-3).join('/'); // Get last 3 parts: task-attachments/task-id/filename
+      const filePath = urlParts.slice(-3).join('/');
 
-      // Delete from storage
       const { error: storageError } = await supabase.storage
         .from('attachments')
         .remove([filePath]);
 
       if (storageError) {
         console.warn('Storage deletion failed:', storageError);
-        // Continue with database deletion even if storage deletion fails
       }
 
-      // Delete from database
       const { error: dbError } = await supabase
         .from('task_attachments')
         .delete()
@@ -311,15 +299,13 @@ export const TaskDetailDialog = ({
 
       if (dbError) throw dbError;
 
-      console.log('✅ Attachment deleted successfully');
-      await forceRefreshTaskData();
+      await debouncedRefresh();
 
     } catch (err) {
       console.error('❌ Failed to delete attachment:', err);
     }
   };
 
-  // Download attachment
   const handleDownloadAttachment = (attachment: TaskAttachment) => {
     const link = document.createElement('a');
     link.href = attachment.file_url;
@@ -330,38 +316,34 @@ export const TaskDetailDialog = ({
     document.body.removeChild(link);
   };
 
-  // Manual refresh function for the dialog
   const handleRefreshDialog = async () => {
-    console.log('🔄 TaskDetailDialog - Manual refresh triggered');
-    await forceRefreshTaskData();
+    await debouncedRefresh();
   };
 
-  // Auto-refresh when dialog opens or task ID changes
+  // Auto-refresh when dialog opens
   useEffect(() => {
     if (open && initialTask?.id) {
-      console.log('🔄 Dialog opened - fetching fresh task data');
-      forceRefreshTaskData();
+      debouncedRefresh();
     }
-  }, [open, initialTask?.id]);
+    
+    return () => {
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current);
+      }
+    };
+  }, [open, initialTask?.id, debouncedRefresh]);
 
-  // Update temp values when task data changes (from optimistic updates or direct fetch)
+  // Update temp values when task changes
   useEffect(() => {
     if (task) {
       setTempTitle(task.title);
       setTempDescription(task.description || '');
-      
-      // If we have attachments from direct fetch, merge them
-      if (currentTaskData?.attachments) {
-        // Keep attachments from direct fetch
-      }
     }
-  }, [task, currentTaskData?.attachments]);
+  }, [task?.title, task?.description]);
 
   if (!task) return null;
 
   const createdByUser = users.find(u => u.id === task.created_by);
-  
-  // ⚡ Merge attachments from both sources for complete data
   const attachments = (currentTaskData?.attachments) || (task as TaskWithAttachments).attachments || [];
 
   const priorityConfig = {
@@ -394,10 +376,8 @@ export const TaskDetailDialog = ({
     setTimeout(() => titleInputRef.current?.focus(), 0);
   };
 
-  // ⚡ INSTANT: Save title without blocking UI
   const saveTitleEdit = () => {
     if (tempTitle.trim() && tempTitle !== task.title) {
-      // 🚀 Fire update without waiting
       onUpdateTask(task.id, { title: tempTitle.trim() });
     }
     setEditingTitle(false);
@@ -408,10 +388,8 @@ export const TaskDetailDialog = ({
     setTimeout(() => descriptionRef.current?.focus(), 0);
   };
 
-  // ⚡ INSTANT: Save description without blocking UI
   const saveDescriptionEdit = () => {
     if (tempDescription !== task.description) {
-      // 🚀 Fire update without waiting
       onUpdateTask(task.id, { description: tempDescription });
     }
     setEditingDescription(false);
@@ -424,12 +402,10 @@ export const TaskDetailDialog = ({
     }
   };
 
-  // Fixed: Add subtask directly to database instead of trying to update task
   const handleAddSubtask = async () => {
     if (!newSubtask.trim() || isAddingSubtask) return;
     
     setIsAddingSubtask(true);
-    console.log('➕ Adding subtask to database:', newSubtask.trim());
     
     try {
       const { error } = await supabase
@@ -441,16 +417,10 @@ export const TaskDetailDialog = ({
           created_at: new Date().toISOString()
         });
 
-      if (error) {
-        console.error('❌ Failed to add subtask:', error);
-        throw error;
-      }
+      if (error) throw error;
 
-      console.log('✅ Subtask added successfully');
       setNewSubtask('');
-      
-      // Refresh the task data to show the new subtask
-      await forceRefreshTaskData();
+      await debouncedRefresh();
       
     } catch (err) {
       console.error('❌ Error adding subtask:', err);
@@ -459,104 +429,75 @@ export const TaskDetailDialog = ({
     }
   };
 
-  // Fixed: Toggle subtask in database instead of local state
   const handleToggleSubtask = async (subtaskId: string) => {
     try {
       const subtask = task.subtasks?.find(st => st.id === subtaskId);
       if (!subtask) return;
-
-      console.log('🔄 Toggling subtask in database:', subtaskId);
       
       const { error } = await supabase
         .from('subtasks')
         .update({ completed: !subtask.completed })
         .eq('id', subtaskId);
 
-      if (error) {
-        console.error('❌ Failed to toggle subtask:', error);
-        throw error;
-      }
-
-      console.log('✅ Subtask toggled successfully');
+      if (error) throw error;
       
-      // Refresh the task data to show the updated subtask
-      await forceRefreshTaskData();
+      await debouncedRefresh();
       
     } catch (err) {
       console.error('❌ Error toggling subtask:', err);
     }
   };
 
-  // Fixed: Delete subtask from database
   const handleDeleteSubtask = async (subtaskId: string) => {
     try {
-      console.log('🗑️ Deleting subtask from database:', subtaskId);
-      
       const { error } = await supabase
         .from('subtasks')
         .delete()
         .eq('id', subtaskId);
 
-      if (error) {
-        console.error('❌ Failed to delete subtask:', error);
-        throw error;
-      }
-
-      console.log('✅ Subtask deleted successfully');
+      if (error) throw error;
       
-      // Refresh the task data to remove the deleted subtask
-      await forceRefreshTaskData();
+      await debouncedRefresh();
       
     } catch (err) {
       console.error('❌ Error deleting subtask:', err);
     }
   };
 
-  // ⚡ INSTANT: Add assignee without blocking UI
-  const handleAddAssignee = (userId: string) => {
+  // 🎯 CRITICAL FIX: Close popover immediately after assignment
+  const handleAddAssignee = useCallback((userId: string) => {
     const newAssignees = [...(task.assignees || []), userId];
-    // 🚀 Fire update without waiting
     onUpdateTask(task.id, { assignees: newAssignees });
-  };
+    // ✅ Force close popover immediately
+    setAssigneePopoverOpen(false);
+  }, [task?.id, task?.assignees, onUpdateTask]);
   
-  // ⚡ INSTANT: Remove assignee without blocking UI
-  const handleRemoveAssignee = (userId: string) => {
+  const handleRemoveAssignee = useCallback((userId: string) => {
     const newAssignees = (task.assignees || []).filter(id => id !== userId);
-    // 🚀 Fire update without waiting
     onUpdateTask(task.id, { assignees: newAssignees });
-  };
+  }, [task?.id, task?.assignees, onUpdateTask]);
 
-  // ⚡ INSTANT: Update due date without blocking UI
   const updateDueDate = (date: Date | undefined) => {
     let dueDateString: string | null = null;
     
     if (date) {
-      // 🔧 FIX: Use local date, not UTC (prevents timezone issues)
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const day = String(date.getDate()).padStart(2, '0');
       dueDateString = `${year}-${month}-${day}`;
     }
     
-    // 🚀 Fire update without waiting
     onUpdateTask(task.id, { due_date: dueDateString });
-    // ✅ Close popover immediately
     setDatePickerOpen(false);
   };
 
-  // ⚡ INSTANT: Update priority without blocking UI
   const updatePriority = (priority: string) => {
-    // 🚀 Fire update without waiting
     onUpdateTask(task.id, { priority: priority as 'low' | 'medium' | 'high' });
-    // ✅ Close popover immediately
     setPriorityPopoverOpen(false);
   };
 
-  // ⚡ INSTANT: Update status without blocking UI
   const updateStatus = (status: string) => {
-    // 🚀 Fire update without waiting
     onUpdateTask(task.id, { status: status as 'todo' | 'in_progress' | 'done' });
-    // ✅ Close popover immediately
     setStatusPopoverOpen(false);
   };
 
@@ -574,13 +515,11 @@ export const TaskDetailDialog = ({
           {/* Header */}
           <div className="px-6 py-4 border-b bg-gray-50">
             <div className="flex items-center gap-3">
-              {/* Status Indicator */}
               <div className={`w-3 h-3 rounded-full ${
                 task.status === 'todo' ? 'bg-gray-400' :
                 task.status === 'in_progress' ? 'bg-blue-500' : 'bg-green-500'
               }`} />
               
-              {/* Editable Title */}
               <div className="flex-1">
                 {editingTitle ? (
                   <input
@@ -605,7 +544,6 @@ export const TaskDetailDialog = ({
                 )}
               </div>
 
-              {/* Task ID and Refresh Button */}
               <div className="flex items-center gap-2">
                 <Button
                   variant="ghost"
@@ -793,7 +731,6 @@ export const TaskDetailDialog = ({
                     )}
                   </div>
                   
-                  {/* Progress Bar */}
                   {subtasks.length > 0 && (
                     <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
                       <div 
@@ -830,7 +767,6 @@ export const TaskDetailDialog = ({
                       </div>
                     ))}
                     
-                    {/* Add Subtask */}
                     <div className="flex gap-2 mt-3">
                       <Input
                         placeholder="Add a subtask..."
@@ -889,7 +825,6 @@ export const TaskDetailDialog = ({
                       );
                     })}
                     
-                    {/* Add Comment */}
                     <div className="flex gap-2">
                       <Avatar className="h-8 w-8 flex-shrink-0">
                         <AvatarFallback className="bg-gray-400 text-white text-xs">
@@ -1021,7 +956,7 @@ export const TaskDetailDialog = ({
                   </Popover>
                 </div>
 
-                {/* Assignees */}
+                {/* Assignees - FIXED SECTION */}
                 <div>
                   <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 block">
                     Assignees
@@ -1053,7 +988,8 @@ export const TaskDetailDialog = ({
                       </div>
                     ))}
                     
-                    <Popover>
+                    {/* 🎯 CRITICAL FIX: Controlled popover with forced close */}
+                    <Popover open={assigneePopoverOpen} onOpenChange={setAssigneePopoverOpen}>
                       <PopoverTrigger asChild>
                         <Button 
                           variant="outline" 
@@ -1146,7 +1082,6 @@ export const TaskDetailDialog = ({
   );
 };
 
-// Helper component for consistent labeling
 const Label = ({ children, className = '', ...props }: any) => (
   <label className={`text-sm font-medium ${className}`} {...props}>
     {children}
