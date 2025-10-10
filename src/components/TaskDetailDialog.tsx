@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -134,7 +134,7 @@ export const TaskDetailDialog = ({
   const [statusPopoverOpen, setStatusPopoverOpen] = useState(false);
   const [priorityPopoverOpen, setPriorityPopoverOpen] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
-  const [assigneePopoverOpen, setAssigneePopoverOpen] = useState(false); // NEW: Control assignee popover
+  const [assigneePopoverOpen, setAssigneePopoverOpen] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -159,7 +159,7 @@ export const TaskDetailDialog = ({
   }, [users, task?.assignees]);
 
   // 🔧 Debounced refresh to prevent multiple simultaneous refreshes
-  const debouncedRefresh = useCallback(async () => {
+  const debouncedRefresh = async () => {
     if (!initialTask?.id || isRefreshingRef.current) return;
     
     // Clear any pending refresh
@@ -213,6 +213,7 @@ export const TaskDetailDialog = ({
             attachments: data.task_attachments || []
           };
           
+          console.log('📝 Formatted fresh task:', formattedTask);
           setCurrentTaskData(formattedTask);
         }
       } catch (err) {
@@ -222,7 +223,7 @@ export const TaskDetailDialog = ({
         isRefreshingRef.current = false;
       }
     }, 300); // 300ms debounce
-  }, [initialTask?.id]);
+  };
 
   // File upload handler
   const handleFileUpload = async (files: FileList | null) => {
@@ -331,7 +332,7 @@ export const TaskDetailDialog = ({
         clearTimeout(refreshTimeoutRef.current);
       }
     };
-  }, [open, initialTask?.id, debouncedRefresh]);
+  }, [open, initialTask?.id]);
 
   // Update temp values when task changes
   useEffect(() => {
@@ -464,18 +465,18 @@ export const TaskDetailDialog = ({
     }
   };
 
-  // 🎯 CRITICAL FIX: Close popover immediately after assignment
-  const handleAddAssignee = useCallback((userId: string) => {
+  // 🎯 CRITICAL FIX: Simple assignee handlers without useCallback
+  const handleAddAssignee = (userId: string) => {
     const newAssignees = [...(task.assignees || []), userId];
     onUpdateTask(task.id, { assignees: newAssignees });
     // ✅ Force close popover immediately
     setAssigneePopoverOpen(false);
-  }, [task?.id, task?.assignees, onUpdateTask]);
+  };
   
-  const handleRemoveAssignee = useCallback((userId: string) => {
+  const handleRemoveAssignee = (userId: string) => {
     const newAssignees = (task.assignees || []).filter(id => id !== userId);
     onUpdateTask(task.id, { assignees: newAssignees });
-  }, [task?.id, task?.assignees, onUpdateTask]);
+  };
 
   const updateDueDate = (date: Date | undefined) => {
     let dueDateString: string | null = null;
