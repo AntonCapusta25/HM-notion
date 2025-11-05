@@ -358,11 +358,12 @@ useEffect(() => {
     }
   };
 
-  const updateTask = useCallback(async (taskId: string, updates: Partial<Task>) => {
-  console.log('⚡ Optimistic update for task:', taskId, 'updates:', updates);
+  // 🚀 FIRE-AND-FORGET OPTIMISTIC UPDATE
+const updateTask = useCallback(async (taskId: string, updates: Partial<Task>) => {
+  console.log('⚡ Fire-and-forget update for task:', taskId, 'updates:', updates);
   const { assignees, tags, subtasks, ...restOfUpdates } = updates;
   
-  // Store original task for rollback if needed
+  // Store original task for potential rollback
   const originalTask = tasks.find(t => t.id === taskId);
   
   // 🚀 STEP 1: IMMEDIATE UI UPDATE (Optimistic)
@@ -374,29 +375,49 @@ useEffect(() => {
           ...updates, 
           updated_at: new Date().toISOString() 
         };
-        console.log('✨ Optimistically updated task in UI:', updatedTask.title, updates);
+        console.log('✨ Optimistically updated task in UI:', updatedTask.title);
         return updatedTask;
       }
       return task;
     });
   });
   
-  try {
-    // 📡 STEP 2: DATABASE UPDATE (Background)
-    
-    // Update main task fields (only if there are any)
-    if (Object.keys(restOfUpdates).length > 0) {
-      const { error } = await supabase.from('tasks').update(restOfUpdates).eq('id', taskId);
-      if (error) {
-        console.error('❌ Task update error:', error);
-        throw error;
+  // 📡 STEP 2: DATABASE UPDATE (Background - fire and forget)
+  // Don't await anything - let it happen in the background
+  (async () => {
+    try {
+      // Update main task fields
+      if (Object.keys(restOfUpdates).length > 0) {
+        supabase.from('tasks').update(restOfUpdates).eq('id', taskId)
+          .then(({ error }) => {
+            if (error) console.error('❌ Task update error:', error);
+          });
       }
+      
+      // Update assignees (fire and forget)
+      if (assignees !== undefined) {
+        updateAssignees(taskId, assignees)
+          .catch(err => console.error('❌ Assignee update failed:', err));
+      }
+      
+      // Update tags (fire and forget)
+      if (tags !== undefined) {
+        updateTags(taskId, tags)
+          .catch(err => console.error('❌ Tag update failed:', err));
+      }
+      
+      console.log('🔥 Background updates fired');
+      
+    } catch (error: any) {
+      console.error('❌ Background update failed:', error);
+      // Don't rollback - real-time will sync the correct state
     }
-    
-    // Update assignees - AWAIT this to ensure it completes
-    if (assignees !== undefined) {
-      await updateAssignees(taskId, assignees);
-    }
+  })();
+  
+  // Return immediately without waiting
+  console.log('✅ UI updated instantly, DB updating in background');
+  
+}, [tasks, updateAssignees]);
     
     // Update tags
     if (tags !== undefined) {
