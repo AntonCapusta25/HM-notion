@@ -719,13 +719,14 @@ export const Dashboard = () => {
           </Card>
         </div>
       ) : (
-        <ListView
-          tasks={filteredTasks}
-          users={users}
-          onCreateTask={handleCreateTask}
-          onUpdateTask={handleUpdateTask}
-          onDeleteTask={handleDeleteTask}
-        />
+<ListView
+  tasks={filteredTasks}
+  users={users}
+  onCreateTask={handleCreateTask}
+  onUpdateTask={handleUpdateTask}
+  onDeleteTask={handleDeleteTask}
+  onAssignTask={(taskId, userIds) => handleUpdateTask(taskId, { assignees: userIds })}
+/>
       )}
 
       {/* Enhanced Floating Chatbot */}
