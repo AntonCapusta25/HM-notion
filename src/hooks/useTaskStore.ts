@@ -153,107 +153,107 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
     }
   }, [user, fetchUsers, fetchWorkspaces]);
 
- // OPTIMIZED: Real-time subscriptions without refresh
-useEffect(() => {
-  let tasksSubscription: RealtimeChannel;
-  let assigneesSubscription: RealtimeChannel;
-  let workspacesSubscription: RealtimeChannel;
+  // OPTIMIZED: Real-time subscriptions without refresh
+  useEffect(() => {
+    let tasksSubscription: RealtimeChannel;
+    let assigneesSubscription: RealtimeChannel;
+    let workspacesSubscription: RealtimeChannel;
 
-  if (user?.id) {
-    console.log('🔴 Setting up real-time subscriptions for user:', user.id);
-    
-    // Subscribe to tasks table changes
-    tasksSubscription = supabase
-      .channel('tasks-realtime-' + user.id)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'tasks'
-      }, (payload) => {
-        console.log('🔥 REALTIME: Tasks update received!', payload.eventType);
-        
-        // Handle different event types with optimistic state updates
-        if (payload.eventType === 'INSERT') {
-          const newTask = formatTaskFromSupabase(payload.new);
-          setTasks(prev => [...prev, newTask]);
-        } else if (payload.eventType === 'UPDATE') {
-          setTasks(prev => prev.map(task => 
-            task.id === payload.new.id ? { ...task, ...payload.new } : task
-          ));
-        } else if (payload.eventType === 'DELETE') {
-          setTasks(prev => prev.filter(task => task.id !== payload.old.id));
-        }
-      })
-      .subscribe((status) => {
-        console.log('📡 Tasks subscription status:', status);
-      });
+    if (user?.id) {
+      console.log('🔴 Setting up real-time subscriptions for user:', user.id);
+      
+      // Subscribe to tasks table changes
+      tasksSubscription = supabase
+        .channel('tasks-realtime-' + user.id)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'tasks'
+        }, (payload) => {
+          console.log('🔥 REALTIME: Tasks update received!', payload.eventType);
+          
+          // Handle different event types with optimistic state updates
+          if (payload.eventType === 'INSERT') {
+            const newTask = formatTaskFromSupabase(payload.new);
+            setTasks(prev => [...prev, newTask]);
+          } else if (payload.eventType === 'UPDATE') {
+            setTasks(prev => prev.map(task => 
+              task.id === payload.new.id ? { ...task, ...payload.new } : task
+            ));
+          } else if (payload.eventType === 'DELETE') {
+            setTasks(prev => prev.filter(task => task.id !== payload.old.id));
+          }
+        })
+        .subscribe((status) => {
+          console.log('📡 Tasks subscription status:', status);
+        });
 
-    // Subscribe to task_assignees changes
-    assigneesSubscription = supabase
-      .channel('task-assignees-' + user.id)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'task_assignees'
-      }, (payload) => {
-        console.log('🔥 REALTIME: Task assignees update!', payload.eventType);
-        
-        // Refresh only the affected task
-        const taskId = payload.new?.task_id || payload.old?.task_id;
-        if (taskId) {
-          // Fetch just this task's assignments
-          supabase
-            .from('task_assignees')
-            .select('user_id')
-            .eq('task_id', taskId)
-            .then(({ data }) => {
-              setTasks(prev => prev.map(task => 
-                task.id === taskId 
-                  ? { 
-                      ...task, 
-                      assignees: (data || []).map(a => a.user_id),
-                      task_assignees: data || []
-                    }
-                  : task
-              ));
-            });
-        }
-      })
-      .subscribe((status) => {
-        console.log('📡 Assignees subscription status:', status);
-      });
+      // Subscribe to task_assignees changes
+      assigneesSubscription = supabase
+        .channel('task-assignees-' + user.id)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'task_assignees'
+        }, (payload) => {
+          console.log('🔥 REALTIME: Task assignees update!', payload.eventType);
+          
+          // Refresh only the affected task
+          const taskId = payload.new?.task_id || payload.old?.task_id;
+          if (taskId) {
+            // Fetch just this task's assignments
+            supabase
+              .from('task_assignees')
+              .select('user_id')
+              .eq('task_id', taskId)
+              .then(({ data }) => {
+                setTasks(prev => prev.map(task => 
+                  task.id === taskId 
+                    ? { 
+                        ...task, 
+                        assignees: (data || []).map(a => a.user_id),
+                        task_assignees: data || []
+                      }
+                    : task
+                ));
+              });
+          }
+        })
+        .subscribe((status) => {
+          console.log('📡 Assignees subscription status:', status);
+        });
 
-    // Subscribe to workspaces table changes  
-    workspacesSubscription = supabase
-      .channel('workspaces-realtime-' + user.id)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'workspaces'
-      }, (payload) => {
-        console.log('🔥 REALTIME: Workspaces update received!', payload);
-        fetchWorkspaces();
-      })
-      .subscribe((status) => {
-        console.log('📡 Workspaces subscription status:', status);
-      });
-  }
-
-  return () => {
-    if (tasksSubscription) {
-      console.log('🧹 Cleaning up tasks subscription');
-      tasksSubscription.unsubscribe();
+      // Subscribe to workspaces table changes  
+      workspacesSubscription = supabase
+        .channel('workspaces-realtime-' + user.id)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'workspaces'
+        }, (payload) => {
+          console.log('🔥 REALTIME: Workspaces update received!', payload);
+          fetchWorkspaces();
+        })
+        .subscribe((status) => {
+          console.log('📡 Workspaces subscription status:', status);
+        });
     }
-    if (assigneesSubscription) {
-      console.log('🧹 Cleaning up assignees subscription');
-      assigneesSubscription.unsubscribe();
-    }
-    if (workspacesSubscription) {
-      console.log('🧹 Cleaning up workspaces subscription');
-      workspacesSubscription.unsubscribe();
-    }
-  };
-}, [user?.id, fetchWorkspaces]);
+
+    return () => {
+      if (tasksSubscription) {
+        console.log('🧹 Cleaning up tasks subscription');
+        tasksSubscription.unsubscribe();
+      }
+      if (assigneesSubscription) {
+        console.log('🧹 Cleaning up assignees subscription');
+        assigneesSubscription.unsubscribe();
+      }
+      if (workspacesSubscription) {
+        console.log('🧹 Cleaning up workspaces subscription');
+        workspacesSubscription.unsubscribe();
+      }
+    };
+  }, [user?.id, fetchWorkspaces]);
 
   const createTask = useCallback(async (taskData: Partial<Task>) => {
     console.log('📝 createTask called');
@@ -359,99 +359,62 @@ useEffect(() => {
   };
 
   // 🚀 FIRE-AND-FORGET OPTIMISTIC UPDATE
-const updateTask = useCallback(async (taskId: string, updates: Partial<Task>) => {
-  console.log('⚡ Fire-and-forget update for task:', taskId, 'updates:', updates);
-  const { assignees, tags, subtasks, ...restOfUpdates } = updates;
-  
-  // Store original task for potential rollback
-  const originalTask = tasks.find(t => t.id === taskId);
-  
-  // 🚀 STEP 1: IMMEDIATE UI UPDATE (Optimistic)
-  setTasks(prevTasks => {
-    return prevTasks.map(task => {
-      if (task.id === taskId) {
-        const updatedTask = { 
-          ...task, 
-          ...updates, 
-          updated_at: new Date().toISOString() 
-        };
-        console.log('✨ Optimistically updated task in UI:', updatedTask.title);
-        return updatedTask;
-      }
-      return task;
-    });
-  });
-  
-  // 📡 STEP 2: DATABASE UPDATE (Background - fire and forget)
-  // Don't await anything - let it happen in the background
-  (async () => {
-    try {
-      // Update main task fields
-      if (Object.keys(restOfUpdates).length > 0) {
-        supabase.from('tasks').update(restOfUpdates).eq('id', taskId)
-          .then(({ error }) => {
-            if (error) console.error('❌ Task update error:', error);
-          });
-      }
-      
-      // Update assignees (fire and forget)
-      if (assignees !== undefined) {
-        updateAssignees(taskId, assignees)
-          .catch(err => console.error('❌ Assignee update failed:', err));
-      }
-      
-      // Update tags (fire and forget)
-      if (tags !== undefined) {
-        updateTags(taskId, tags)
-          .catch(err => console.error('❌ Tag update failed:', err));
-      }
-      
-      console.log('🔥 Background updates fired');
-      
-    } catch (error: any) {
-      console.error('❌ Background update failed:', error);
-      // Don't rollback - real-time will sync the correct state
-    }
-  })();
-  
-  // Return immediately without waiting
-  console.log('✅ UI updated instantly, DB updating in background');
-  
-}, [tasks, updateAssignees]);
+  const updateTask = useCallback((taskId: string, updates: Partial<Task>) => {
+    console.log('⚡ Fire-and-forget update for task:', taskId, 'updates:', updates);
+    const { assignees, tags, subtasks, ...restOfUpdates } = updates;
     
-    // Update tags
-    if (tags !== undefined) {
-      await updateTags(taskId, tags);
-    }
+    // Store original task for potential rollback
+    const originalTask = tasks.find(t => t.id === taskId);
     
-    console.log('✅ Database update successful');
-    
-  } catch (error: any) {
-    console.error('❌ Database update failed, rolling back:', error);
-    
-    // 🔄 ROLLBACK: Revert to original state on error
-    if (originalTask) {
-      setTasks(prevTasks => {
-        return prevTasks.map(task => {
-          if (task.id === taskId) {
-            console.log('↩️ Rolled back task to original state');
-            return originalTask;
-          }
-          return task;
-        });
+    // 🚀 STEP 1: IMMEDIATE UI UPDATE (Optimistic)
+    setTasks(prevTasks => {
+      return prevTasks.map(task => {
+        if (task.id === taskId) {
+          const updatedTask = { 
+            ...task, 
+            ...updates, 
+            updated_at: new Date().toISOString() 
+          };
+          console.log('✨ Optimistically updated task in UI:', updatedTask.title);
+          return updatedTask;
+        }
+        return task;
       });
-    }
+    });
     
-    // Show error notification to user
-    setError(`Failed to update task: ${error.message}`);
+    // 📡 STEP 2: DATABASE UPDATE (Background - fire and forget)
+    (async () => {
+      try {
+        // Update main task fields
+        if (Object.keys(restOfUpdates).length > 0) {
+          const { error } = await supabase.from('tasks').update(restOfUpdates).eq('id', taskId);
+          if (error) console.error('❌ Task update error:', error);
+        }
+        
+        // Update assignees (fire and forget)
+        if (assignees !== undefined) {
+          updateAssignees(taskId, assignees)
+            .catch(err => console.error('❌ Assignee update failed:', err));
+        }
+        
+        // Update tags (fire and forget)
+        if (tags !== undefined) {
+          updateTags(taskId, tags)
+            .catch(err => console.error('❌ Tag update failed:', err));
+        }
+        
+        console.log('🔥 Background updates fired');
+        
+      } catch (error: any) {
+        console.error('❌ Background update failed:', error);
+        // Real-time will sync the correct state
+      }
+    })();
     
-    // Clear error after 5 seconds
-    setTimeout(() => setError(null), 5000);
+    // Return immediately without waiting
+    console.log('✅ UI updated instantly, DB updating in background');
     
-    throw error;
-  }
-  
-}, [tasks, updateAssignees]);
+  }, [tasks, updateAssignees]);
   
   const deleteTask = useCallback(async (taskId: string) => {
     console.log('🗑️ Deleting task:', taskId);
