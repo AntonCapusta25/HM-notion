@@ -153,111 +153,107 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
     }
   }, [user, fetchUsers, fetchWorkspaces]);
 
-  // ENHANCED: Real-time subscriptions with better logging and error handling
-  useEffect(() => {
-    let tasksSubscription: RealtimeChannel;
-    let workspacesSubscription: RealtimeChannel;
-    let refreshDebounceTimer: NodeJS.Timeout;
+ // OPTIMIZED: Real-time subscriptions without refresh
+useEffect(() => {
+  let tasksSubscription: RealtimeChannel;
+  let assigneesSubscription: RealtimeChannel;
+  let workspacesSubscription: RealtimeChannel;
 
-    // Debounced refresh function to prevent excessive updates
-    const debouncedRefresh = () => {
-      if (refreshDebounceTimer) {
-        clearTimeout(refreshDebounceTimer);
-      }
-      refreshDebounceTimer = setTimeout(() => {
-        console.log('🔄 Debounced real-time refresh triggered');
-        if (fetchTasksRef.current) {
-          fetchTasksRef.current();
+  if (user?.id) {
+    console.log('🔴 Setting up real-time subscriptions for user:', user.id);
+    
+    // Subscribe to tasks table changes
+    tasksSubscription = supabase
+      .channel('tasks-realtime-' + user.id)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'tasks'
+      }, (payload) => {
+        console.log('🔥 REALTIME: Tasks update received!', payload.eventType);
+        
+        // Handle different event types with optimistic state updates
+        if (payload.eventType === 'INSERT') {
+          const newTask = formatTaskFromSupabase(payload.new);
+          setTasks(prev => [...prev, newTask]);
+        } else if (payload.eventType === 'UPDATE') {
+          setTasks(prev => prev.map(task => 
+            task.id === payload.new.id ? { ...task, ...payload.new } : task
+          ));
+        } else if (payload.eventType === 'DELETE') {
+          setTasks(prev => prev.filter(task => task.id !== payload.old.id));
         }
-      }, 1000); // Wait 1 second after last change
-    };
+      })
+      .subscribe((status) => {
+        console.log('📡 Tasks subscription status:', status);
+      });
 
-    if (user?.id) {
-      console.log('🔴 Setting up real-time subscriptions for user:', user.id);
-      
-      // Subscribe to tasks table changes
-      tasksSubscription = supabase
-        .channel('tasks-realtime-' + user.id)
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'tasks'
-        }, (payload) => {
-          console.log('🔥 REALTIME: Tasks update received!', {
-            eventType: payload.eventType,
-            table: payload.table,
-            new: payload.new,
-            old: payload.old
-          });
-          // Debounce refresh to prevent excessive updates
-          debouncedRefresh();
-        })
-        .subscribe((status) => {
-          console.log('📡 Tasks subscription status:', status);
-        });
+    // Subscribe to task_assignees changes
+    assigneesSubscription = supabase
+      .channel('task-assignees-' + user.id)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'task_assignees'
+      }, (payload) => {
+        console.log('🔥 REALTIME: Task assignees update!', payload.eventType);
+        
+        // Refresh only the affected task
+        const taskId = payload.new?.task_id || payload.old?.task_id;
+        if (taskId) {
+          // Fetch just this task's assignments
+          supabase
+            .from('task_assignees')
+            .select('user_id')
+            .eq('task_id', taskId)
+            .then(({ data }) => {
+              setTasks(prev => prev.map(task => 
+                task.id === taskId 
+                  ? { 
+                      ...task, 
+                      assignees: (data || []).map(a => a.user_id),
+                      task_assignees: data || []
+                    }
+                  : task
+              ));
+            });
+        }
+      })
+      .subscribe((status) => {
+        console.log('📡 Assignees subscription status:', status);
+      });
 
-      // Subscribe to related tables that affect tasks
-      const relatedTablesChannel = supabase
-        .channel('task-related-' + user.id)
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'task_assignees'
-        }, (payload) => {
-          console.log('🔥 REALTIME: Task assignees update!', payload);
-          // Debounce to handle rapid assignee changes smoothly
-          debouncedRefresh();
-        })
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'task_tags'
-        }, (payload) => {
-          console.log('🔥 REALTIME: Task tags update!', payload);
-          debouncedRefresh();
-        })
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'comments'
-        }, (payload) => {
-          console.log('🔥 REALTIME: Comments update!', payload);
-          debouncedRefresh();
-        })
-        .subscribe((status) => {
-          console.log('📡 Related tables subscription status:', status);
-        });
+    // Subscribe to workspaces table changes  
+    workspacesSubscription = supabase
+      .channel('workspaces-realtime-' + user.id)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'workspaces'
+      }, (payload) => {
+        console.log('🔥 REALTIME: Workspaces update received!', payload);
+        fetchWorkspaces();
+      })
+      .subscribe((status) => {
+        console.log('📡 Workspaces subscription status:', status);
+      });
+  }
 
-      // Subscribe to workspaces table changes  
-      workspacesSubscription = supabase
-        .channel('workspaces-realtime-' + user.id)
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'workspaces'
-        }, (payload) => {
-          console.log('🔥 REALTIME: Workspaces update received!', payload);
-          fetchWorkspaces();
-        })
-        .subscribe((status) => {
-          console.log('📡 Workspaces subscription status:', status);
-        });
+  return () => {
+    if (tasksSubscription) {
+      console.log('🧹 Cleaning up tasks subscription');
+      tasksSubscription.unsubscribe();
     }
-
-    return () => {
-      if (refreshDebounceTimer) {
-        clearTimeout(refreshDebounceTimer);
-      }
-      if (tasksSubscription) {
-        console.log('🧹 Cleaning up tasks subscription');
-        tasksSubscription.unsubscribe();
-      }
-      if (workspacesSubscription) {
-        console.log('🧹 Cleaning up workspaces subscription');
-        workspacesSubscription.unsubscribe();
-      }
-    };
-  }, [user?.id]); // Only depend on user?.id
+    if (assigneesSubscription) {
+      console.log('🧹 Cleaning up assignees subscription');
+      assigneesSubscription.unsubscribe();
+    }
+    if (workspacesSubscription) {
+      console.log('🧹 Cleaning up workspaces subscription');
+      workspacesSubscription.unsubscribe();
+    }
+  };
+}, [user?.id, fetchWorkspaces]);
 
   const createTask = useCallback(async (taskData: Partial<Task>) => {
     console.log('📝 createTask called');
