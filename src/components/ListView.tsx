@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useOptimistic } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -18,7 +18,7 @@ interface ListViewProps {
   onCreateTask: (taskData: any) => void;
   onUpdateTask: (taskId: string, updates: Partial<Task>) => void;
   onDeleteTask: (taskId: string) => void;
-  onAssignTask: (taskId: string, userIds: string[]) => void; // New prop for assignment
+  onAssignTask: (taskId: string, userIds: string[]) => void;
 }
 
 // Safe date formatting utility
@@ -36,7 +36,7 @@ const safeFormatDate = (dateInput: string | null | undefined, formatStr: string 
   }
 };
 
-// Component for managing task assignees
+// Component for managing task assignees with optimistic updates
 const AssigneeManager = ({ 
   taskId, 
   currentAssignees, 
@@ -49,17 +49,23 @@ const AssigneeManager = ({
   onAssign: (taskId: string, userIds: string[]) => void;
 }) => {
   const [open, setOpen] = useState(false);
+  const [optimisticAssignees, setOptimisticAssignees] = useOptimistic(
+    currentAssignees,
+    (state, newAssignees: string[]) => newAssignees
+  );
 
-  const assignedUsers = users.filter(u => currentAssignees?.includes(u.id));
-  const unassignedUsers = users.filter(u => !currentAssignees?.includes(u.id));
+  const assignedUsers = users.filter(u => optimisticAssignees?.includes(u.id));
+  const unassignedUsers = users.filter(u => !optimisticAssignees?.includes(u.id));
 
-  const handleAssignUser = (userId: string) => {
-    const newAssignees = [...(currentAssignees || []), userId];
+  const handleAssignUser = async (userId: string) => {
+    const newAssignees = [...(optimisticAssignees || []), userId];
+    setOptimisticAssignees(newAssignees);
     onAssign(taskId, newAssignees);
   };
 
-  const handleUnassignUser = (userId: string) => {
-    const newAssignees = (currentAssignees || []).filter(id => id !== userId);
+  const handleUnassignUser = async (userId: string) => {
+    const newAssignees = (optimisticAssignees || []).filter(id => id !== userId);
+    setOptimisticAssignees(newAssignees);
     onAssign(taskId, newAssignees);
   };
 
@@ -123,7 +129,7 @@ const AssigneeManager = ({
   );
 };
 
-// Inline date editor component
+// Inline date editor component with optimistic updates
 const InlineDateEditor = ({ 
   taskId, 
   currentDate, 
@@ -135,14 +141,20 @@ const InlineDateEditor = ({
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [dateValue, setDateValue] = useState(currentDate || '');
+  const [optimisticDate, setOptimisticDate] = useOptimistic(
+    currentDate,
+    (state, newDate: string | null) => newDate
+  );
 
   const handleSave = () => {
-    onUpdate(taskId, { due_date: dateValue || null });
+    const newDate = dateValue || null;
+    setOptimisticDate(newDate);
+    onUpdate(taskId, { due_date: newDate });
     setIsEditing(false);
   };
 
   const handleCancel = () => {
-    setDateValue(currentDate || '');
+    setDateValue(optimisticDate || '');
     setIsEditing(false);
   };
 
@@ -173,7 +185,7 @@ const InlineDateEditor = ({
     >
       <Calendar className="h-3 w-3" />
       <span className="text-sm">
-        {currentDate ? safeFormatDate(currentDate, 'MMM d') : 'Set date'}
+        {optimisticDate ? safeFormatDate(optimisticDate, 'MMM d') : 'Set date'}
       </span>
       <Edit2 className="h-3 w-3 text-gray-400" />
     </div>
@@ -197,6 +209,27 @@ export const ListView = ({
     due_date: ''
   });
 
+  // Optimistic state for all tasks
+  const [optimisticTasks, setOptimisticTasks] = useOptimistic(
+    tasks,
+    (state, action: { type: string; taskId?: string; updates?: any; newTask?: Task }) => {
+      switch (action.type) {
+        case 'update':
+          return state.map(task => 
+            task.id === action.taskId 
+              ? { ...task, ...action.updates }
+              : task
+          );
+        case 'delete':
+          return state.filter(task => task.id !== action.taskId);
+        case 'create':
+          return [...state, action.newTask!];
+        default:
+          return state;
+      }
+    }
+  );
+
   const priorityColors = {
     low: 'bg-green-100 text-green-800 border-green-200',
     medium: 'bg-yellow-100 text-yellow-800 border-yellow-200',
@@ -212,6 +245,21 @@ export const ListView = ({
   const handleCreateTask = () => {
     if (!newTask.title.trim()) return;
     
+    const taskData = {
+      id: `temp-${Date.now()}`, // Temporary ID for optimistic update
+      title: newTask.title.trim(),
+      description: newTask.description.trim(),
+      priority: newTask.priority,
+      status: newTask.status,
+      due_date: newTask.due_date || null,
+      assignees: [],
+      created_at: new Date().toISOString()
+    };
+
+    // Optimistic update
+    setOptimisticTasks({ type: 'create', newTask: taskData as Task });
+    
+    // Actual API call
     onCreateTask({
       title: newTask.title.trim(),
       description: newTask.description.trim(),
@@ -231,11 +279,47 @@ export const ListView = ({
   };
 
   const handleStatusChange = (taskId: string, status: string) => {
+    // Optimistic update
+    setOptimisticTasks({ 
+      type: 'update', 
+      taskId, 
+      updates: { status: status as 'todo' | 'in_progress' | 'done' }
+    });
+    
+    // Actual API call
     onUpdateTask(taskId, { status: status as 'todo' | 'in_progress' | 'done' });
   };
 
   const handlePriorityChange = (taskId: string, priority: string) => {
+    // Optimistic update
+    setOptimisticTasks({ 
+      type: 'update', 
+      taskId, 
+      updates: { priority: priority as 'low' | 'medium' | 'high' }
+    });
+    
+    // Actual API call
     onUpdateTask(taskId, { priority: priority as 'low' | 'medium' | 'high' });
+  };
+
+  const handleDelete = (taskId: string) => {
+    // Optimistic update
+    setOptimisticTasks({ type: 'delete', taskId });
+    
+    // Actual API call
+    onDeleteTask(taskId);
+  };
+
+  const handleAssign = (taskId: string, userIds: string[]) => {
+    // Optimistic update
+    setOptimisticTasks({ 
+      type: 'update', 
+      taskId, 
+      updates: { assignees: userIds }
+    });
+    
+    // Actual API call
+    onAssignTask(taskId, userIds);
   };
 
   return (
@@ -337,15 +421,17 @@ export const ListView = ({
               </TableRow>
             )}
             
-            {tasks.map((task) => {
-              // Get assignees from the task_assignees relationship
-              const assignedUsers = users.filter(u => 
-                task.assignees?.includes(u.id) || 
-                (task as any).task_assignees?.some((ta: any) => ta.user_id === u.id)
-              );
+            {optimisticTasks.map((task) => {
+              const taskAssignees = task.assignees || [];
+              const assignedUsers = users.filter(u => taskAssignees.includes(u.id));
               
               return (
-                <TableRow key={task.id} className="hover:bg-gray-50">
+                <TableRow 
+                  key={task.id} 
+                  className={`hover:bg-gray-50 transition-opacity ${
+                    task.id.startsWith('temp-') ? 'opacity-70' : ''
+                  }`}
+                >
                   <TableCell className="font-medium">
                     <div>
                       <div className="font-medium text-gray-900">{task.title}</div>
@@ -413,9 +499,9 @@ export const ListView = ({
                       </div>
                       <AssigneeManager
                         taskId={task.id}
-                        currentAssignees={task.assignees || []}
+                        currentAssignees={taskAssignees}
                         users={users}
-                        onAssign={onAssignTask}
+                        onAssign={handleAssign}
                       />
                     </div>
                   </TableCell>
@@ -430,7 +516,7 @@ export const ListView = ({
                     <Button 
                       size="sm" 
                       variant="ghost" 
-                      onClick={() => onDeleteTask(task.id)}
+                      onClick={() => handleDelete(task.id)}
                       className="text-red-600 hover:text-red-700 hover:bg-red-50"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -442,7 +528,7 @@ export const ListView = ({
           </TableBody>
         </Table>
         
-        {tasks.length === 0 && !isAddingTask && (
+        {optimisticTasks.length === 0 && !isAddingTask && (
           <div className="text-center py-8 text-gray-500">
             <p>No tasks yet. Click "Add Task" to get started!</p>
           </div>
