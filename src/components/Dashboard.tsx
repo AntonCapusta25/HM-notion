@@ -181,7 +181,7 @@ export const Dashboard = () => {
   const handleUpdateTask = useCallback(async (taskId: string, updates: any) => {
     try {
       console.log('📝 Dashboard - Updating task:', taskId, updates);
-      await updateTask(taskId, updates);
+      updateTask(taskId, updates);
       console.log('✅ Dashboard - Task update completed');
       
     } catch (err) {
@@ -196,7 +196,7 @@ export const Dashboard = () => {
     
     try {
       console.log('🗑️ Dashboard - Deleting task:', taskId);
-      await deleteTask(taskId);
+      deleteTask(taskId);
       console.log('✅ Dashboard - Task deletion completed');
       
     } catch (err) {
@@ -208,7 +208,7 @@ export const Dashboard = () => {
   const handleAddComment = useCallback(async (taskId: string, content: string) => {
     try {
       console.log('💬 Dashboard - Adding comment to task:', taskId);
-      await addComment(taskId, content);
+      addComment(taskId, content);
       console.log('✅ Dashboard - Comment added successfully');
     } catch (err) {
       console.error('❌ Dashboard - Failed to add comment:', err);
@@ -219,7 +219,7 @@ export const Dashboard = () => {
   const handleToggleSubtask = useCallback(async (taskId: string, subtaskId: string) => {
     try {
       console.log('☑️ Dashboard - Toggling subtask:', subtaskId);
-      await toggleSubtask(taskId, subtaskId);
+      toggleSubtask(taskId, subtaskId);
       console.log('✅ Dashboard - Subtask toggled successfully');
     } catch (err) {
       console.error('❌ Dashboard - Failed to toggle subtask:', err);
