@@ -447,13 +447,14 @@ export const MyTasks = () => {
         </div>
 
         {viewMode === 'list' ? (
-          <ListView
-            tasks={myTasks}
-            users={users}
-            onCreateTask={handleCreateTask}
-            onUpdateTask={handleUpdateTask}
-            onDeleteTask={handleDeleteTask}
-          />
+<ListView
+  tasks={myTasks}
+  users={users}
+  onCreateTask={handleCreateTask}
+  onUpdateTask={handleUpdateTask}
+  onDeleteTask={handleDeleteTask}
+  onAssignTask={(taskId, userIds) => handleUpdateTask(taskId, { assignees: userIds })}
+/>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <Card>
