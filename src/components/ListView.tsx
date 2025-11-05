@@ -1,4 +1,4 @@
-import { useState, useOptimistic } from 'react';
+import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -49,24 +49,31 @@ const AssigneeManager = ({
   onAssign: (taskId: string, userIds: string[]) => void;
 }) => {
   const [open, setOpen] = useState(false);
-  const [optimisticAssignees, setOptimisticAssignees] = useOptimistic(
-    currentAssignees,
-    (state, newAssignees: string[]) => newAssignees
-  );
+  const [optimisticAssignees, setOptimisticAssignees] = useState<string[]>(currentAssignees);
+  const [isPending, startTransition] = useTransition();
+
+  // Update optimistic state when props change
+  if (currentAssignees !== optimisticAssignees && !isPending) {
+    setOptimisticAssignees(currentAssignees);
+  }
 
   const assignedUsers = users.filter(u => optimisticAssignees?.includes(u.id));
   const unassignedUsers = users.filter(u => !optimisticAssignees?.includes(u.id));
 
-  const handleAssignUser = async (userId: string) => {
+  const handleAssignUser = (userId: string) => {
     const newAssignees = [...(optimisticAssignees || []), userId];
-    setOptimisticAssignees(newAssignees);
-    onAssign(taskId, newAssignees);
+    startTransition(() => {
+      setOptimisticAssignees(newAssignees);
+      onAssign(taskId, newAssignees);
+    });
   };
 
-  const handleUnassignUser = async (userId: string) => {
+  const handleUnassignUser = (userId: string) => {
     const newAssignees = (optimisticAssignees || []).filter(id => id !== userId);
-    setOptimisticAssignees(newAssignees);
-    onAssign(taskId, newAssignees);
+    startTransition(() => {
+      setOptimisticAssignees(newAssignees);
+      onAssign(taskId, newAssignees);
+    });
   };
 
   return (
@@ -141,16 +148,21 @@ const InlineDateEditor = ({
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [dateValue, setDateValue] = useState(currentDate || '');
-  const [optimisticDate, setOptimisticDate] = useOptimistic(
-    currentDate,
-    (state, newDate: string | null) => newDate
-  );
+  const [optimisticDate, setOptimisticDate] = useState<string | null>(currentDate);
+  const [isPending, startTransition] = useTransition();
+
+  // Update optimistic state when props change
+  if (currentDate !== optimisticDate && !isPending) {
+    setOptimisticDate(currentDate);
+  }
 
   const handleSave = () => {
     const newDate = dateValue || null;
-    setOptimisticDate(newDate);
-    onUpdate(taskId, { due_date: newDate });
-    setIsEditing(false);
+    startTransition(() => {
+      setOptimisticDate(newDate);
+      onUpdate(taskId, { due_date: newDate });
+      setIsEditing(false);
+    });
   };
 
   const handleCancel = () => {
@@ -209,26 +221,15 @@ export const ListView = ({
     due_date: ''
   });
 
-  // Optimistic state for all tasks
-  const [optimisticTasks, setOptimisticTasks] = useOptimistic(
-    tasks,
-    (state, action: { type: string; taskId?: string; updates?: any; newTask?: Task }) => {
-      switch (action.type) {
-        case 'update':
-          return state.map(task => 
-            task.id === action.taskId 
-              ? { ...task, ...action.updates }
-              : task
-          );
-        case 'delete':
-          return state.filter(task => task.id !== action.taskId);
-        case 'create':
-          return [...state, action.newTask!];
-        default:
-          return state;
-      }
-    }
-  );
+  // Optimistic state management
+  const [optimisticTasks, setOptimisticTasks] = useState<Task[]>(tasks);
+  const [isPending, startTransition] = useTransition();
+  const [deletingTaskIds, setDeletingTaskIds] = useState<Set<string>>(new Set());
+
+  // Sync optimistic state with actual tasks when not pending
+  if (tasks !== optimisticTasks && !isPending) {
+    setOptimisticTasks(tasks);
+  }
 
   const priorityColors = {
     low: 'bg-green-100 text-green-800 border-green-200',
@@ -246,7 +247,7 @@ export const ListView = ({
     if (!newTask.title.trim()) return;
     
     const taskData = {
-      id: `temp-${Date.now()}`, // Temporary ID for optimistic update
+      id: `temp-${Date.now()}`,
       title: newTask.title.trim(),
       description: newTask.description.trim(),
       priority: newTask.priority,
@@ -254,18 +255,20 @@ export const ListView = ({
       due_date: newTask.due_date || null,
       assignees: [],
       created_at: new Date().toISOString()
-    };
+    } as Task;
 
-    // Optimistic update
-    setOptimisticTasks({ type: 'create', newTask: taskData as Task });
-    
-    // Actual API call
-    onCreateTask({
-      title: newTask.title.trim(),
-      description: newTask.description.trim(),
-      priority: newTask.priority,
-      status: newTask.status,
-      due_date: newTask.due_date || null
+    startTransition(() => {
+      // Add optimistically
+      setOptimisticTasks(prev => [...prev, taskData]);
+      
+      // Actual API call
+      onCreateTask({
+        title: newTask.title.trim(),
+        description: newTask.description.trim(),
+        priority: newTask.priority,
+        status: newTask.status,
+        due_date: newTask.due_date || null
+      });
     });
 
     setNewTask({
@@ -279,47 +282,89 @@ export const ListView = ({
   };
 
   const handleStatusChange = (taskId: string, status: string) => {
-    // Optimistic update
-    setOptimisticTasks({ 
-      type: 'update', 
-      taskId, 
-      updates: { status: status as 'todo' | 'in_progress' | 'done' }
+    startTransition(() => {
+      // Optimistic update
+      setOptimisticTasks(prev => 
+        prev.map(task => 
+          task.id === taskId 
+            ? { ...task, status: status as 'todo' | 'in_progress' | 'done' }
+            : task
+        )
+      );
+      
+      // Actual API call
+      onUpdateTask(taskId, { status: status as 'todo' | 'in_progress' | 'done' });
     });
-    
-    // Actual API call
-    onUpdateTask(taskId, { status: status as 'todo' | 'in_progress' | 'done' });
   };
 
   const handlePriorityChange = (taskId: string, priority: string) => {
-    // Optimistic update
-    setOptimisticTasks({ 
-      type: 'update', 
-      taskId, 
-      updates: { priority: priority as 'low' | 'medium' | 'high' }
+    startTransition(() => {
+      // Optimistic update
+      setOptimisticTasks(prev => 
+        prev.map(task => 
+          task.id === taskId 
+            ? { ...task, priority: priority as 'low' | 'medium' | 'high' }
+            : task
+        )
+      );
+      
+      // Actual API call
+      onUpdateTask(taskId, { priority: priority as 'low' | 'medium' | 'high' });
     });
-    
-    // Actual API call
-    onUpdateTask(taskId, { priority: priority as 'low' | 'medium' | 'high' });
   };
 
   const handleDelete = (taskId: string) => {
-    // Optimistic update
-    setOptimisticTasks({ type: 'delete', taskId });
+    // Mark as deleting for fade effect
+    setDeletingTaskIds(prev => new Set(prev).add(taskId));
     
-    // Actual API call
-    onDeleteTask(taskId);
+    startTransition(() => {
+      // Optimistic deletion
+      setOptimisticTasks(prev => prev.filter(task => task.id !== taskId));
+      
+      // Actual API call
+      onDeleteTask(taskId);
+      
+      // Clean up deleting state
+      setTimeout(() => {
+        setDeletingTaskIds(prev => {
+          const next = new Set(prev);
+          next.delete(taskId);
+          return next;
+        });
+      }, 300);
+    });
   };
 
   const handleAssign = (taskId: string, userIds: string[]) => {
-    // Optimistic update
-    setOptimisticTasks({ 
-      type: 'update', 
-      taskId, 
-      updates: { assignees: userIds }
+    startTransition(() => {
+      // Optimistic update
+      setOptimisticTasks(prev => 
+        prev.map(task => 
+          task.id === taskId 
+            ? { ...task, assignees: userIds }
+            : task
+        )
+      );
+      
+      // Actual API call
+      onAssignTask(taskId, userIds);
     });
-    
-    // Actual API call
-    onAssignTask(taskId, userIds);
+  };
+
+  const handleDateUpdate = (taskId: string, updates: Partial<Task>) => {
+    startTransition(() => {
+      // Optimistic update
+      setOptimisticTasks(prev => 
+        prev.map(task => 
+          task.id === taskId 
+            ? { ...task, ...updates }
+            : task
+        )
+      );
+      
+      // Actual API call
+      onUpdateTask(taskId, updates);
+    });
   };
 
   return (
@@ -424,12 +469,14 @@ export const ListView = ({
             {optimisticTasks.map((task) => {
               const taskAssignees = task.assignees || [];
               const assignedUsers = users.filter(u => taskAssignees.includes(u.id));
+              const isDeleting = deletingTaskIds.has(task.id);
+              const isTempTask = task.id.startsWith('temp-');
               
               return (
                 <TableRow 
                   key={task.id} 
-                  className={`hover:bg-gray-50 transition-opacity ${
-                    task.id.startsWith('temp-') ? 'opacity-70' : ''
+                  className={`hover:bg-gray-50 transition-all duration-300 ${
+                    isDeleting ? 'opacity-0' : isTempTask ? 'opacity-70' : 'opacity-100'
                   }`}
                 >
                   <TableCell className="font-medium">
@@ -509,7 +556,7 @@ export const ListView = ({
                     <InlineDateEditor
                       taskId={task.id}
                       currentDate={task.due_date}
-                      onUpdate={onUpdateTask}
+                      onUpdate={handleDateUpdate}
                     />
                   </TableCell>
                   <TableCell>
@@ -518,6 +565,7 @@ export const ListView = ({
                       variant="ghost" 
                       onClick={() => handleDelete(task.id)}
                       className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      disabled={isDeleting}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
