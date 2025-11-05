@@ -36,7 +36,7 @@ const safeFormatDate = (dateInput: string | null | undefined, formatStr: string 
   }
 };
 
-// Component for managing task assignees with optimistic updates
+// Component for managing task assignees - NO LOCAL STATE, uses props directly
 const AssigneeManager = ({ 
   taskId, 
   currentAssignees, 
@@ -49,31 +49,21 @@ const AssigneeManager = ({
   onAssign: (taskId: string, userIds: string[]) => void;
 }) => {
   const [open, setOpen] = useState(false);
-  const [optimisticAssignees, setOptimisticAssignees] = useState<string[]>(currentAssignees);
-  const [isPending, startTransition] = useTransition();
 
-  // Update optimistic state when props change
-  if (currentAssignees !== optimisticAssignees && !isPending) {
-    setOptimisticAssignees(currentAssignees);
-  }
-
-  const assignedUsers = users.filter(u => optimisticAssignees?.includes(u.id));
-  const unassignedUsers = users.filter(u => !optimisticAssignees?.includes(u.id));
+  // Always use currentAssignees from props - no local optimistic state
+  const assignedUsers = users.filter(u => currentAssignees?.includes(u.id));
+  const unassignedUsers = users.filter(u => !currentAssignees?.includes(u.id));
 
   const handleAssignUser = (userId: string) => {
-    const newAssignees = [...(optimisticAssignees || []), userId];
-    startTransition(() => {
-      setOptimisticAssignees(newAssignees);
-      onAssign(taskId, newAssignees);
-    });
+    const newAssignees = [...(currentAssignees || []), userId];
+    console.log('[AssigneeManager] Assigning user:', { taskId, userId, currentAssignees, newAssignees });
+    onAssign(taskId, newAssignees);
   };
 
   const handleUnassignUser = (userId: string) => {
-    const newAssignees = (optimisticAssignees || []).filter(id => id !== userId);
-    startTransition(() => {
-      setOptimisticAssignees(newAssignees);
-      onAssign(taskId, newAssignees);
-    });
+    const newAssignees = (currentAssignees || []).filter(id => id !== userId);
+    console.log('[AssigneeManager] Unassigning user:', { taskId, userId, currentAssignees, newAssignees });
+    onAssign(taskId, newAssignees);
   };
 
   return (
@@ -136,7 +126,7 @@ const AssigneeManager = ({
   );
 };
 
-// Inline date editor component with optimistic updates
+// Inline date editor component - NO LOCAL STATE except for editing mode
 const InlineDateEditor = ({ 
   taskId, 
   currentDate, 
@@ -148,27 +138,22 @@ const InlineDateEditor = ({
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [dateValue, setDateValue] = useState(currentDate || '');
-  const [optimisticDate, setOptimisticDate] = useState<string | null>(currentDate);
-  const [isPending, startTransition] = useTransition();
-
-  // Update optimistic state when props change
-  if (currentDate !== optimisticDate && !isPending) {
-    setOptimisticDate(currentDate);
-  }
 
   const handleSave = () => {
     const newDate = dateValue || null;
-    startTransition(() => {
-      setOptimisticDate(newDate);
-      onUpdate(taskId, { due_date: newDate });
-      setIsEditing(false);
-    });
+    onUpdate(taskId, { due_date: newDate });
+    setIsEditing(false);
   };
 
   const handleCancel = () => {
-    setDateValue(optimisticDate || '');
+    setDateValue(currentDate || '');
     setIsEditing(false);
   };
+
+  // Sync with prop changes when not editing
+  if (!isEditing && dateValue !== (currentDate || '')) {
+    setDateValue(currentDate || '');
+  }
 
   if (isEditing) {
     return (
@@ -197,7 +182,7 @@ const InlineDateEditor = ({
     >
       <Calendar className="h-3 w-3" />
       <span className="text-sm">
-        {optimisticDate ? safeFormatDate(optimisticDate, 'MMM d') : 'Set date'}
+        {currentDate ? safeFormatDate(currentDate, 'MMM d') : 'Set date'}
       </span>
       <Edit2 className="h-3 w-3 text-gray-400" />
     </div>
@@ -221,7 +206,7 @@ export const ListView = ({
     due_date: ''
   });
 
-  // Optimistic state management
+  // Optimistic state for all tasks
   const [optimisticTasks, setOptimisticTasks] = useState<Task[]>(tasks);
   const [isPending, startTransition] = useTransition();
   const [deletingTaskIds, setDeletingTaskIds] = useState<Set<string>>(new Set());
@@ -336,14 +321,18 @@ export const ListView = ({
   };
 
   const handleAssign = (taskId: string, userIds: string[]) => {
+    console.log('[ListView] handleAssign called:', { taskId, userIds });
+    
     startTransition(() => {
       // Optimistic update
       setOptimisticTasks(prev => 
-        prev.map(task => 
-          task.id === taskId 
-            ? { ...task, assignees: userIds }
-            : task
-        )
+        prev.map(task => {
+          if (task.id === taskId) {
+            console.log('[ListView] Updating task optimistically:', { taskId, oldAssignees: task.assignees, newAssignees: userIds });
+            return { ...task, assignees: userIds };
+          }
+          return task;
+        })
       );
       
       // Actual API call
