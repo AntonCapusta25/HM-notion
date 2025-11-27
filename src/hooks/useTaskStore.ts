@@ -160,6 +160,8 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
   useEffect(() => {
     let tasksSubscription: RealtimeChannel;
     let assigneesSubscription: RealtimeChannel;
+    let commentsSubscription: RealtimeChannel;
+    let subtasksSubscription: RealtimeChannel;
     let workspacesSubscription: RealtimeChannel;
 
     if (user?.id) {
@@ -226,6 +228,105 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
           console.log('📡 Assignees subscription status:', status);
         });
 
+      // ⚡ NEW: Subscribe to comments table changes
+      commentsSubscription = supabase
+        .channel('comments-realtime-' + user.id)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'comments'
+        }, (payload) => {
+          console.log('🔥 REALTIME: Comments update!', payload.eventType);
+          
+          const taskId = payload.new?.task_id || payload.old?.task_id;
+          if (!taskId) return;
+          
+          if (payload.eventType === 'INSERT') {
+            // Add new comment to the task
+            setTasks(prev => prev.map(task => 
+              task.id === taskId
+                ? { 
+                    ...task, 
+                    comments: [...(task.comments || []), payload.new]
+                  }
+                : task
+            ));
+          } else if (payload.eventType === 'UPDATE') {
+            // Update existing comment
+            setTasks(prev => prev.map(task => 
+              task.id === taskId
+                ? {
+                    ...task,
+                    comments: (task.comments || []).map(c => 
+                      c.id === payload.new.id ? payload.new : c
+                    )
+                  }
+                : task
+            ));
+          } else if (payload.eventType === 'DELETE') {
+            // Remove deleted comment
+            setTasks(prev => prev.map(task => 
+              task.id === taskId
+                ? {
+                    ...task,
+                    comments: (task.comments || []).filter(c => c.id !== payload.old.id)
+                  }
+                : task
+            ));
+          }
+        })
+        .subscribe((status) => {
+          console.log('📡 Comments subscription status:', status);
+        });
+
+      // ⚡ NEW: Subscribe to subtasks table changes
+      subtasksSubscription = supabase
+        .channel('subtasks-realtime-' + user.id)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'subtasks'
+        }, (payload) => {
+          console.log('🔥 REALTIME: Subtasks update!', payload.eventType);
+          
+          const taskId = payload.new?.task_id || payload.old?.task_id;
+          if (!taskId) return;
+          
+          if (payload.eventType === 'INSERT') {
+            setTasks(prev => prev.map(task => 
+              task.id === taskId
+                ? { 
+                    ...task, 
+                    subtasks: [...(task.subtasks || []), payload.new]
+                  }
+                : task
+            ));
+          } else if (payload.eventType === 'UPDATE') {
+            setTasks(prev => prev.map(task => 
+              task.id === taskId
+                ? {
+                    ...task,
+                    subtasks: (task.subtasks || []).map(st => 
+                      st.id === payload.new.id ? payload.new : st
+                    )
+                  }
+                : task
+            ));
+          } else if (payload.eventType === 'DELETE') {
+            setTasks(prev => prev.map(task => 
+              task.id === taskId
+                ? {
+                    ...task,
+                    subtasks: (task.subtasks || []).filter(st => st.id !== payload.old.id)
+                  }
+                : task
+            ));
+          }
+        })
+        .subscribe((status) => {
+          console.log('📡 Subtasks subscription status:', status);
+        });
+
       // Subscribe to workspaces table changes  
       workspacesSubscription = supabase
         .channel('workspaces-realtime-' + user.id)
@@ -250,6 +351,14 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
       if (assigneesSubscription) {
         console.log('🧹 Cleaning up assignees subscription');
         assigneesSubscription.unsubscribe();
+      }
+      if (commentsSubscription) {
+        console.log('🧹 Cleaning up comments subscription');
+        commentsSubscription.unsubscribe();
+      }
+      if (subtasksSubscription) {
+        console.log('🧹 Cleaning up subtasks subscription');
+        subtasksSubscription.unsubscribe();
       }
       if (workspacesSubscription) {
         console.log('🧹 Cleaning up workspaces subscription');
@@ -455,20 +564,81 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
     
   }, []);
 
+  // 🚀 OPTIMISTIC: Add comment with instant UI update
   const addComment = useCallback(async (taskId: string, content: string) => {
     if (!user) throw new Error("User not authenticated");
     
     console.log('💬 Adding comment to task:', taskId);
-    const { error } = await supabase.from('comments').insert({ 
-      task_id: taskId, 
-      content, 
+    
+    // Generate temporary ID for optimistic update
+    const tempId = `temp-${Date.now()}-${Math.random()}`;
+    const timestamp = new Date().toISOString();
+    
+    const optimisticComment = {
+      id: tempId,
+      task_id: taskId,
+      content,
       author: user.id,
-      created_at: new Date().toISOString()
-    });
+      created_at: timestamp
+    };
     
-    if (error) throw error;
+    // 🚀 STEP 1: IMMEDIATE UI UPDATE (Optimistic)
+    setTasks(prev => prev.map(task => 
+      task.id === taskId
+        ? { 
+            ...task, 
+            comments: [...(task.comments || []), optimisticComment]
+          }
+        : task
+    ));
     
-    // ✅ No manual refresh needed - real-time subscription will update the UI
+    console.log('✨ Optimistically added comment to UI');
+    
+    // 📡 STEP 2: DATABASE INSERT (Background)
+    try {
+      const { data, error } = await supabase
+        .from('comments')
+        .insert({ 
+          task_id: taskId, 
+          content, 
+          author: user.id,
+          created_at: timestamp
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      // Replace temporary comment with real one from database
+      if (data) {
+        setTasks(prev => prev.map(task => 
+          task.id === taskId
+            ? {
+                ...task,
+                comments: (task.comments || []).map(c => 
+                  c.id === tempId ? data : c
+                )
+              }
+            : task
+        ));
+        console.log('✅ Comment saved to database, replaced temp ID');
+      }
+      
+    } catch (error: any) {
+      console.error('❌ Failed to save comment:', error);
+      
+      // Rollback: Remove optimistic comment on error
+      setTasks(prev => prev.map(task => 
+        task.id === taskId
+          ? {
+              ...task,
+              comments: (task.comments || []).filter(c => c.id !== tempId)
+            }
+          : task
+      ));
+      
+      throw error;
+    }
     
   }, [user?.id]);
   
