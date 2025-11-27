@@ -19,7 +19,7 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
 
   // Create stable reference for fetchTasks
   const fetchTasksRef = useRef<() => Promise<void>>();
-  
+
   // Track pending assignee updates to prevent concurrent requests
   const pendingAssigneeUpdates = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
@@ -71,7 +71,7 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
       }
 
       console.log('✅ Raw data from Supabase:', data?.length || 0, 'records');
-      
+
       // Debug: Log raw assignment data for first task
       if (data && data.length > 0) {
         console.log('🔍 Raw Supabase task sample:', {
@@ -84,18 +84,18 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
       // Format tasks with proper assignment data preserved
       const formattedTasks = (data || []).map(supabaseTask => {
         const formatted = formatTaskFromSupabase(supabaseTask);
-        
+
         // CRITICAL: Preserve the raw task_assignees data for filtering
         formatted.task_assignees = supabaseTask.task_assignees || [];
-        
+
         console.log(`📋 Task "${formatted.title}": assignees=${formatted.assignees}, task_assignees=${JSON.stringify(formatted.task_assignees)}`);
-        
+
         return formatted;
       });
 
       console.log('📝 Formatted tasks:', formattedTasks.length, 'tasks');
       console.log('📋 Task titles:', formattedTasks.map(t => t.title));
-      
+
       setTasks(formattedTasks);
       console.log('✅ Tasks state updated successfully');
       setError(null);
@@ -118,7 +118,7 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
     try {
       const { data, error } = await supabase.from('users').select('*');
       if (error) throw error;
-      
+
       console.log('👥 Users response:', data?.length || 0, 'users');
       setUsers(data || []);
       console.log('✅ Users state updated');
@@ -131,7 +131,7 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
     try {
       const { data, error } = await supabase.from('workspaces').select('*');
       if (error) throw error;
-      
+
       console.log('🏢 Workspaces response:', data?.length || 0, 'workspaces');
       setWorkspaces(data || []);
       console.log('✅ Workspaces state updated');
@@ -166,7 +166,7 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
 
     if (user?.id) {
       console.log('🔴 Setting up real-time subscriptions for user:', user.id);
-      
+
       // Subscribe to tasks table changes
       tasksSubscription = supabase
         .channel('tasks-realtime-' + user.id)
@@ -176,13 +176,13 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
           table: 'tasks'
         }, (payload) => {
           console.log('🔥 REALTIME: Tasks update received!', payload.eventType);
-          
+
           // Handle different event types with optimistic state updates
           if (payload.eventType === 'INSERT') {
             const newTask = formatTaskFromSupabase(payload.new);
             setTasks(prev => [...prev, newTask]);
           } else if (payload.eventType === 'UPDATE') {
-            setTasks(prev => prev.map(task => 
+            setTasks(prev => prev.map(task =>
               task.id === payload.new.id ? { ...task, ...payload.new } : task
             ));
           } else if (payload.eventType === 'DELETE') {
@@ -202,7 +202,7 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
           table: 'task_assignees'
         }, (payload) => {
           console.log('🔥 REALTIME: Task assignees update!', payload.eventType);
-          
+
           // Refresh only the affected task
           const taskId = payload.new?.task_id || payload.old?.task_id;
           if (taskId) {
@@ -212,13 +212,13 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
               .select('user_id')
               .eq('task_id', taskId)
               .then(({ data }) => {
-                setTasks(prev => prev.map(task => 
-                  task.id === taskId 
-                    ? { 
-                        ...task, 
-                        assignees: (data || []).map(a => a.user_id),
-                        task_assignees: data || []
-                      }
+                setTasks(prev => prev.map(task =>
+                  task.id === taskId
+                    ? {
+                      ...task,
+                      assignees: (data || []).map(a => a.user_id),
+                      task_assignees: data || []
+                    }
                     : task
                 ));
               });
@@ -237,40 +237,69 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
           table: 'comments'
         }, (payload) => {
           console.log('🔥 REALTIME: Comments update!', payload.eventType);
-          
+
           const taskId = payload.new?.task_id || payload.old?.task_id;
           if (!taskId) return;
-          
+
           if (payload.eventType === 'INSERT') {
-            // Add new comment to the task
-            setTasks(prev => prev.map(task => 
-              task.id === taskId
-                ? { 
-                    ...task, 
-                    comments: [...(task.comments || []), payload.new]
-                  }
-                : task
-            ));
+            // Add new comment to the task, but check for duplicates first
+            setTasks(prev => prev.map(task => {
+              if (task.id !== taskId) return task;
+
+              const existingComments = task.comments || [];
+
+              // Check if comment already exists (by ID or by temp ID pattern)
+              const commentExists = existingComments.some(c =>
+                c.id === payload.new.id ||
+                // Check if this is replacing a temp comment (same content, author, and similar timestamp)
+                (c.id.toString().startsWith('temp-') &&
+                  c.content === payload.new.content &&
+                  c.author === payload.new.author &&
+                  Math.abs(new Date(c.created_at).getTime() - new Date(payload.new.created_at).getTime()) < 2000)
+              );
+
+              if (commentExists) {
+                console.log('⚠️ Comment already exists, skipping duplicate from realtime');
+                // Replace temp comment with real one
+                return {
+                  ...task,
+                  comments: existingComments.map(c =>
+                    (c.id.toString().startsWith('temp-') &&
+                      c.content === payload.new.content &&
+                      c.author === payload.new.author &&
+                      Math.abs(new Date(c.created_at).getTime() - new Date(payload.new.created_at).getTime()) < 2000)
+                      ? payload.new
+                      : c
+                  )
+                };
+              }
+
+              // Add new comment
+              return {
+                ...task,
+                comments: [...existingComments, payload.new]
+              };
+            }));
           } else if (payload.eventType === 'UPDATE') {
             // Update existing comment
-            setTasks(prev => prev.map(task => 
+            setTasks(prev => prev.map(task =>
               task.id === taskId
                 ? {
-                    ...task,
-                    comments: (task.comments || []).map(c => 
-                      c.id === payload.new.id ? payload.new : c
-                    )
-                  }
+                  ...task,
+                  comments: (task.comments || []).map(c =>
+                    c.id === payload.new.id ? payload.new : c
+                  )
+                }
                 : task
             ));
           } else if (payload.eventType === 'DELETE') {
             // Remove deleted comment
-            setTasks(prev => prev.map(task => 
+            setTasks(prev => prev.map(task =>
               task.id === taskId
                 ? {
-                    ...task,
-                    comments: (task.comments || []).filter(c => c.id !== payload.old.id)
-                  }
+                  ...task,
+                  comments: (task.comments || []).filter(c => c.id !== payload.old.id)
+                }
                 : task
             ));
           }
@@ -288,37 +317,37 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
           table: 'subtasks'
         }, (payload) => {
           console.log('🔥 REALTIME: Subtasks update!', payload.eventType);
-          
+
           const taskId = payload.new?.task_id || payload.old?.task_id;
           if (!taskId) return;
-          
+
           if (payload.eventType === 'INSERT') {
-            setTasks(prev => prev.map(task => 
+            setTasks(prev => prev.map(task =>
               task.id === taskId
-                ? { 
-                    ...task, 
-                    subtasks: [...(task.subtasks || []), payload.new]
-                  }
+                ? {
+                  ...task,
+                  subtasks: [...(task.subtasks || []), payload.new]
+                }
                 : task
             ));
           } else if (payload.eventType === 'UPDATE') {
-            setTasks(prev => prev.map(task => 
+            setTasks(prev => prev.map(task =>
               task.id === taskId
                 ? {
-                    ...task,
-                    subtasks: (task.subtasks || []).map(st => 
-                      st.id === payload.new.id ? payload.new : st
-                    )
-                  }
+                  ...task,
+                  subtasks: (task.subtasks || []).map(st =>
+                    st.id === payload.new.id ? payload.new : st
+                  )
+                }
                 : task
             ));
           } else if (payload.eventType === 'DELETE') {
-            setTasks(prev => prev.map(task => 
+            setTasks(prev => prev.map(task =>
               task.id === taskId
                 ? {
-                    ...task,
-                    subtasks: (task.subtasks || []).filter(st => st.id !== payload.old.id)
-                  }
+                  ...task,
+                  subtasks: (task.subtasks || []).filter(st => st.id !== payload.old.id)
+                }
                 : task
             ));
           }
@@ -379,20 +408,20 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
     console.log('  - Using userId:', userId);
 
     const { assignees, tags, subtasks, ...restOfTaskData } = taskData;
-    
+
     console.log('⏳ Inserting task to Supabase...');
     console.log('  - workspace_id from taskData:', taskData.workspace_id);
-    
+
     const { data: newTask, error } = await supabase
       .from('tasks')
-      .insert({ 
-        ...restOfTaskData, 
+      .insert({
+        ...restOfTaskData,
         created_by: userId,
         workspace_id: taskData.workspace_id || null
       })
       .select()
       .single();
-      
+
     if (error) {
       console.error('❌ Task creation error:', error);
       throw error;
@@ -423,50 +452,50 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
     }
 
     console.log('✅ Task creation completed successfully');
-    
+
     // ✅ No manual refresh needed - real-time subscription will update the UI
-    
+
   }, [user?.id, userProfile?.id]);
 
   const updateAssignees = useCallback(async (taskId: string, assigneeIds: string[]) => {
     console.log('👥 updateAssignees called for task:', taskId, 'assignees:', assigneeIds);
-    
+
     // Cancel any pending update for this task
     const pendingTimeout = pendingAssigneeUpdates.current.get(taskId);
     if (pendingTimeout) {
       clearTimeout(pendingTimeout);
       console.log('⏸️ Cancelled pending update for task:', taskId);
     }
-    
+
     // Debounce: wait 300ms before actually updating
     return new Promise<void>((resolve) => {
       const timeoutId = setTimeout(async () => {
         pendingAssigneeUpdates.current.delete(taskId);
-        
+
         try {
           console.log('🔄 Executing debounced assignee update:', { taskId, assigneeIds });
-          
+
           // Delete all existing assignments for this task
           const { error: deleteError } = await supabase
             .from('task_assignees')
             .delete()
             .eq('task_id', taskId);
-          
+
           if (deleteError) {
             console.error('❌ Error deleting assignments:', deleteError);
           }
-          
+
           // Insert new assignments if any
           if (assigneeIds.length > 0) {
-            const newAssignments = assigneeIds.map(userId => ({ 
-              task_id: taskId, 
-              user_id: userId 
+            const newAssignments = assigneeIds.map(userId => ({
+              task_id: taskId,
+              user_id: userId
             }));
-            
+
             const { error: insertError } = await supabase
               .from('task_assignees')
               .insert(newAssignments);
-            
+
             if (insertError) {
               console.error('❌ Error inserting assignments:', insertError);
             } else {
@@ -475,17 +504,17 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
           } else {
             console.log('✅ Task assignments cleared successfully');
           }
-          
+
           resolve();
         } catch (error) {
           console.error('❌ Error in updateAssignees:', error);
           resolve(); // Resolve anyway to prevent hanging
         }
       }, 300); // 300ms debounce
-      
+
       pendingAssigneeUpdates.current.set(taskId, timeoutId);
     });
-    
+
   }, []);
 
   const updateTags = async (taskId: string, tags: string[]) => {
@@ -501,18 +530,18 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
   const updateTask = useCallback((taskId: string, updates: Partial<Task>) => {
     console.log('⚡ Fire-and-forget update for task:', taskId, 'updates:', updates);
     const { assignees, tags, subtasks, ...restOfUpdates } = updates;
-    
+
     // Store original task for potential rollback
     const originalTask = tasks.find(t => t.id === taskId);
-    
+
     // 🚀 STEP 1: IMMEDIATE UI UPDATE (Optimistic)
     setTasks(prevTasks => {
       return prevTasks.map(task => {
         if (task.id === taskId) {
-          const updatedTask = { 
-            ...task, 
-            ...updates, 
-            updated_at: new Date().toISOString() 
+          const updatedTask = {
+            ...task,
+            ...updates,
+            updated_at: new Date().toISOString()
           };
           console.log('✨ Optimistically updated task in UI:', updatedTask.title);
           return updatedTask;
@@ -520,7 +549,7 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
         return task;
       });
     });
-    
+
     // 📡 STEP 2: DATABASE UPDATE (Background - fire and forget)
     (async () => {
       try {
@@ -529,51 +558,51 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
           const { error } = await supabase.from('tasks').update(restOfUpdates).eq('id', taskId);
           if (error) console.error('❌ Task update error:', error);
         }
-        
+
         // Update assignees (fire and forget)
         if (assignees !== undefined) {
           updateAssignees(taskId, assignees)
             .catch(err => console.error('❌ Assignee update failed:', err));
         }
-        
+
         // Update tags (fire and forget)
         if (tags !== undefined) {
           updateTags(taskId, tags)
             .catch(err => console.error('❌ Tag update failed:', err));
         }
-        
+
         console.log('🔥 Background updates fired');
-        
+
       } catch (error: any) {
         console.error('❌ Background update failed:', error);
         // Real-time will sync the correct state
       }
     })();
-    
+
     // Return immediately without waiting
     console.log('✅ UI updated instantly, DB updating in background');
-    
+
   }, [tasks, updateAssignees]);
-  
+
   const deleteTask = useCallback(async (taskId: string) => {
     console.log('🗑️ Deleting task:', taskId);
     const { error } = await supabase.from('tasks').delete().eq('id', taskId);
     if (error) throw error;
-    
+
     // ✅ No manual refresh needed - real-time subscription will update the UI
-    
+
   }, []);
 
   // 🚀 OPTIMISTIC: Add comment with instant UI update
   const addComment = useCallback(async (taskId: string, content: string) => {
     if (!user) throw new Error("User not authenticated");
-    
+
     console.log('💬 Adding comment to task:', taskId);
-    
+
     // Generate temporary ID for optimistic update
     const tempId = `temp-${Date.now()}-${Math.random()}`;
     const timestamp = new Date().toISOString();
-    
+
     const optimisticComment = {
       id: tempId,
       task_id: taskId,
@@ -581,67 +610,53 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
       author: user.id,
       created_at: timestamp
     };
-    
+
     // 🚀 STEP 1: IMMEDIATE UI UPDATE (Optimistic)
-    setTasks(prev => prev.map(task => 
+    setTasks(prev => prev.map(task =>
       task.id === taskId
-        ? { 
-            ...task, 
-            comments: [...(task.comments || []), optimisticComment]
-          }
+        ? {
+          ...task,
+          comments: [...(task.comments || []), optimisticComment]
+        }
         : task
     ));
-    
+
     console.log('✨ Optimistically added comment to UI');
-    
+
     // 📡 STEP 2: DATABASE INSERT (Background)
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('comments')
-        .insert({ 
-          task_id: taskId, 
-          content, 
+        .insert({
+          task_id: taskId,
+          content,
           author: user.id,
           created_at: timestamp
-        })
-        .select()
-        .single();
-      
+        });
+
       if (error) throw error;
-      
-      // Replace temporary comment with real one from database
-      if (data) {
-        setTasks(prev => prev.map(task => 
-          task.id === taskId
-            ? {
-                ...task,
-                comments: (task.comments || []).map(c => 
-                  c.id === tempId ? data : c
-                )
-              }
-            : task
-        ));
-        console.log('✅ Comment saved to database, replaced temp ID');
-      }
-      
+
+      // ✅ Real-time subscription will replace temp comment with real one
+      console.log('✅ Comment saved to database, real-time will sync');
+
     } catch (error: any) {
       console.error('❌ Failed to save comment:', error);
-      
+
       // Rollback: Remove optimistic comment on error
-      setTasks(prev => prev.map(task => 
+      setTasks(prev => prev.map(task =>
         task.id === taskId
           ? {
-              ...task,
-              comments: (task.comments || []).filter(c => c.id !== tempId)
-            }
+            ...task,
+            comments: (task.comments || []).filter(c => c.id !== tempId)
+          }
           : task
       ));
-      
+
       throw error;
     }
-    
+
   }, [user?.id]);
-  
+
   const toggleSubtask = useCallback(async (taskId: string, subtaskId: string) => {
     console.log('☑️ Toggling subtask:', subtaskId);
     // First get current subtask state
@@ -650,30 +665,30 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
       .select('completed')
       .eq('id', subtaskId)
       .single();
-    
+
     if (subtask) {
       await supabase
         .from('subtasks')
         .update({ completed: !subtask.completed })
         .eq('id', subtaskId);
     }
-    
+
     // ✅ No manual refresh needed - real-time subscription will update the UI
-    
+
   }, []);
-  
-  return { 
-    tasks, 
-    users, 
-    workspaces, 
-    loading, 
-    error, 
-    createTask, 
-    updateTask, 
-    deleteTask, 
-    addComment, 
-    updateAssignees, 
-    updateTags, 
+
+  return {
+    tasks,
+    users,
+    workspaces,
+    loading,
+    error,
+    createTask,
+    updateTask,
+    deleteTask,
+    addComment,
+    updateAssignees,
+    updateTags,
     toggleSubtask,
     refreshTasks
   };
