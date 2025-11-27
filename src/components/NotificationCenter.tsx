@@ -39,6 +39,8 @@ export const NotificationCenter = () => {
   const [userTasks, setUserTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [readRtIds, setReadRtIds] = useState<Set<string>>(new Set());
+  const [dismissedRtIds, setDismissedRtIds] = useState<Set<string>>(new Set());
 
   // Set notification settings from the profile data
   const notificationSettings: NotificationSettings = useMemo(() => {
@@ -51,7 +53,7 @@ export const NotificationCenter = () => {
       dueSoon: true
     };
   }, [profile]);
-  
+
   // Load user's tasks with assignees from the actual schema
   useEffect(() => {
     if (!user) return;
@@ -87,7 +89,7 @@ export const NotificationCenter = () => {
 
         // Combine and deduplicate tasks
         const allTasks = new Map();
-        
+
         // Add assigned tasks
         assignedTasks?.forEach(assignment => {
           if (assignment.tasks) {
@@ -160,11 +162,11 @@ export const NotificationCenter = () => {
         },
         (payload) => {
           setDbNotifications(prev => [payload.new as DBNotification, ...prev]);
-          
+
           // Show desktop notification if enabled
           const newNotif = payload.new as DBNotification;
-          if (notificationSettings.desktop && 
-              ['overdue', 'due_soon', 'task_assigned'].includes(newNotif.type)) {
+          if (notificationSettings.desktop &&
+            ['overdue', 'due_soon', 'task_assigned'].includes(newNotif.type)) {
             showDesktopNotification(newNotif);
           }
         }
@@ -178,8 +180,8 @@ export const NotificationCenter = () => {
           filter: `user_id=eq.${user.id}`
         },
         (payload) => {
-          setDbNotifications(prev => 
-            prev.map(notif => 
+          setDbNotifications(prev =>
+            prev.map(notif =>
               notif.id === payload.new.id ? payload.new as DBNotification : notif
             )
           );
@@ -206,7 +208,7 @@ export const NotificationCenter = () => {
           const assignedNotifExists = dbNotifications.some(
             n => n.task_id === task.id && n.type === 'task_assigned'
           );
-          
+
           if (!assignedNotifExists) {
             realTimeNotifs.push({
               id: `rt-assigned-${task.id}`,
@@ -222,15 +224,15 @@ export const NotificationCenter = () => {
         }
 
         // Due soon/overdue notifications
-        if (notificationSettings.dueSoon && task.due_date && task.status !== 'done' && 
-            (task.isAssigned || task.isCreator)) {
+        if (notificationSettings.dueSoon && task.due_date && task.status !== 'done' &&
+          (task.isAssigned || task.isCreator)) {
           const dueDate = new Date(task.due_date);
-          
+
           if (isToday(dueDate)) {
             const dueTodayExists = dbNotifications.some(
               n => n.task_id === task.id && (n.type === 'due_soon' || n.type === 'task_due')
             );
-            
+
             if (!dueTodayExists) {
               realTimeNotifs.push({
                 id: `rt-due-today-${task.id}`,
@@ -247,7 +249,7 @@ export const NotificationCenter = () => {
             const dueTomorrowExists = dbNotifications.some(
               n => n.task_id === task.id && n.type === 'due_soon'
             );
-            
+
             if (!dueTomorrowExists) {
               realTimeNotifs.push({
                 id: `rt-due-tomorrow-${task.id}`,
@@ -264,7 +266,7 @@ export const NotificationCenter = () => {
             const overdueExists = dbNotifications.some(
               n => n.task_id === task.id && (n.type === 'overdue' || n.type === 'task_overdue')
             );
-            
+
             if (!overdueExists) {
               realTimeNotifs.push({
                 id: `rt-overdue-${task.id}`,
@@ -282,11 +284,19 @@ export const NotificationCenter = () => {
       });
     }
 
+    // Filter out dismissed RT notifications and update read status
+    const processedRtNotifs = realTimeNotifs
+      .filter(n => !dismissedRtIds.has(n.id))
+      .map(n => ({
+        ...n,
+        read: readRtIds.has(n.id)
+      }));
+
     // Combine DB notifications with real-time ones, remove duplicates
-    const combined = [...dbNotifications, ...realTimeNotifs];
-    const uniqueNotifications = combined.filter((notif, index, self) => 
-      index === self.findIndex(n => 
-        (n.id === notif.id) || 
+    const combined = [...dbNotifications, ...processedRtNotifs];
+    const uniqueNotifications = combined.filter((notif, index, self) =>
+      index === self.findIndex(n =>
+        (n.id === notif.id) ||
         (n.task_id === notif.task_id && n.type === notif.type)
       )
     );
@@ -294,7 +304,7 @@ export const NotificationCenter = () => {
     return uniqueNotifications
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
       .slice(0, 20);
-  }, [dbNotifications, userTasks, user, notificationSettings]);
+  }, [dbNotifications, userTasks, user, notificationSettings, readRtIds, dismissedRtIds]);
 
   // Filter notifications based on user settings
   const filteredNotifications = useMemo(() => {
@@ -321,13 +331,18 @@ export const NotificationCenter = () => {
   const unreadCount = filteredNotifications.filter(n => !n.read).length;
 
   const markAsRead = async (id: string) => {
+    // Handle RT notifications locally
     if (id.startsWith('rt-')) {
-      setDbNotifications(prev => 
-        prev.map(notif => notif.id === id ? { ...notif, read: true } : notif)
-      );
+      setReadRtIds(prev => new Set(prev).add(id));
       return;
     }
 
+    // ⚡ OPTIMISTIC: Update UI immediately
+    setDbNotifications(prev =>
+      prev.map(notif => notif.id === id ? { ...notif, read: true } : notif)
+    );
+
+    // 📡 Update database in background
     try {
       const { error } = await supabase
         .from('notifications')
@@ -336,13 +351,34 @@ export const NotificationCenter = () => {
 
       if (error) {
         console.error('Error marking notification as read:', error);
+        // Rollback on error
+        setDbNotifications(prev =>
+          prev.map(notif => notif.id === id ? { ...notif, read: false } : notif)
+        );
       }
     } catch (error) {
       console.error('Failed to mark notification as read:', error);
+      // Rollback on error
+      setDbNotifications(prev =>
+        prev.map(notif => notif.id === id ? { ...notif, read: false } : notif)
+      );
     }
   };
 
   const markAllAsRead = async () => {
+    // Mark RT notifications as read
+    const rtIds = filteredNotifications
+      .filter(n => !n.read && n.id.startsWith('rt-'))
+      .map(n => n.id);
+
+    if (rtIds.length > 0) {
+      setReadRtIds(prev => {
+        const next = new Set(prev);
+        rtIds.forEach(id => next.add(id));
+        return next;
+      });
+    }
+
     try {
       const unreadIds = filteredNotifications
         .filter(n => !n.read && !n.id.startsWith('rt-'))
@@ -359,7 +395,7 @@ export const NotificationCenter = () => {
         }
       }
 
-      setDbNotifications(prev => 
+      setDbNotifications(prev =>
         prev.map(notif => ({ ...notif, read: true }))
       );
     } catch (error) {
@@ -368,11 +404,19 @@ export const NotificationCenter = () => {
   };
 
   const removeNotification = async (id: string) => {
+    // Handle RT notifications locally
     if (id.startsWith('rt-')) {
-      setDbNotifications(prev => prev.filter(notif => notif.id !== id));
+      setDismissedRtIds(prev => new Set(prev).add(id));
       return;
     }
 
+    // Store original notification for potential rollback
+    const originalNotif = dbNotifications.find(n => n.id === id);
+
+    // ⚡ OPTIMISTIC: Remove from UI immediately
+    setDbNotifications(prev => prev.filter(notif => notif.id !== id));
+
+    // 📡 Delete from database in background
     try {
       const { error } = await supabase
         .from('notifications')
@@ -381,9 +425,17 @@ export const NotificationCenter = () => {
 
       if (error) {
         console.error('Error removing notification:', error);
+        // Rollback on error
+        if (originalNotif) {
+          setDbNotifications(prev => [...prev, originalNotif]);
+        }
       }
     } catch (error) {
       console.error('Failed to remove notification:', error);
+      // Rollback on error
+      if (originalNotif) {
+        setDbNotifications(prev => [...prev, originalNotif]);
+      }
     }
   };
 
@@ -413,7 +465,7 @@ export const NotificationCenter = () => {
       const date = new Date(dateString);
       const now = new Date();
       const diffInHours = Math.abs(now.getTime() - date.getTime()) / (1000 * 60 * 60);
-      
+
       if (diffInHours < 1) {
         return 'just now';
       } else if (diffInHours < 24) {
@@ -429,11 +481,11 @@ export const NotificationCenter = () => {
 
   const showDesktopNotification = (notification: DBNotification) => {
     if (!notificationSettings.desktop) return;
-    
+
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
     }
-    
+
     if ('Notification' in window && Notification.permission === 'granted') {
       try {
         new Notification(notification.title, {
@@ -450,13 +502,13 @@ export const NotificationCenter = () => {
   // Update document title with notification count
   useEffect(() => {
     const originalTitle = document.title.replace(/^\(\d+\) /, '');
-    
+
     if (unreadCount > 0 && Object.values(notificationSettings).some(v => v)) {
       document.title = `(${unreadCount}) ${originalTitle}`;
     } else {
       document.title = originalTitle;
     }
-    
+
     return () => {
       document.title = originalTitle;
     };
@@ -493,14 +545,10 @@ export const NotificationCenter = () => {
                 )}
               </CardTitle>
               {unreadCount > 0 && (
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    markAllAsRead();
-                  }}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => markAllAsRead()}
                 >
                   Mark all read
                 </Button>
@@ -529,9 +577,8 @@ export const NotificationCenter = () => {
                 filteredNotifications.map(notification => (
                   <div
                     key={notification.id}
-                    className={`p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors ${
-                      !notification.read ? 'bg-blue-50 border-l-2 border-l-blue-500' : ''
-                    }`}
+                    className={`p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors ${!notification.read ? 'bg-blue-50 border-l-2 border-l-blue-500' : ''
+                      }`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
@@ -558,12 +605,8 @@ export const NotificationCenter = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-8 w-8 p-0"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              markAsRead(notification.id);
-                            }}
+                            className="h-8 w-8 p-0 hover:bg-blue-100 text-blue-600"
+                            onClick={() => markAsRead(notification.id)}
                           >
                             <Check className="h-4 w-4" />
                           </Button>
@@ -571,12 +614,8 @@ export const NotificationCenter = () => {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-8 w-8 p-0"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            removeNotification(notification.id);
-                          }}
+                          className="h-8 w-8 p-0 hover:bg-red-100 text-gray-400 hover:text-red-600"
+                          onClick={() => removeNotification(notification.id)}
                         >
                           <X className="h-4 w-4" />
                         </Button>
@@ -586,7 +625,7 @@ export const NotificationCenter = () => {
                 ))
               )}
             </div>
-            
+
             <div className="p-2 border-t bg-gray-50">
               <p className="text-xs text-gray-500 text-center">
                 {filteredNotifications.length > 0 ? (
