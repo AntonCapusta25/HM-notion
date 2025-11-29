@@ -39,12 +39,15 @@ interface TaskCreationContext {
 }
 
 // --- Enhanced API Functions ---
+import { supabase } from '../lib/supabase';
+
+// --- Enhanced API Functions ---
 const chatbotAPI = {
-  // Send message to intelligent backend
+  // Send message to intelligent backend (now client-side logic)
   sendMessage: async (
-    message: string, 
-    sessionId: string, 
-    userAuthToken: string,
+    message: string,
+    sessionId: string,
+    userId: string,
     workspaceId?: string
   ): Promise<{
     response: string;
@@ -55,96 +58,162 @@ const chatbotAPI = {
     query_result?: any;
   }> => {
     console.log('📤 Sending message to chatbot:', { message, sessionId, workspaceId });
-    
-    const response = await fetch('https://wqpmhnsxqcsplfdyxrih.supabase.co/functions/v1/chatbot', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${userAuthToken}`
-      },
-      body: JSON.stringify({
-        message,
-        session_id: sessionId,
-        workspace_id: workspaceId,
-        timestamp: new Date().toISOString()
-      })
-    });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('❌ Chatbot API error:', response.status, errorText);
-      throw new Error(`Failed to get response from chatbot: ${response.status}`);
+    // 1. Save user message
+    const { error: msgError } = await supabase
+      .from('chat_messages')
+      .insert({
+        session_id: sessionId,
+        role: 'user',
+        content: message,
+        metadata: { workspace_id: workspaceId }
+      });
+
+    if (msgError) throw msgError;
+
+    // 2. Get OpenAI Key
+    let query = supabase
+      .from('outreach_settings')
+      .select('openai_api_key');
+
+    if (workspaceId) {
+      query = query.eq('workspace_id', workspaceId);
     }
 
-    const result = await response.json();
-    console.log('✅ Chatbot response received:', result);
-    return result;
+    const { data: settings } = await query.limit(1).maybeSingle();
+
+    const apiKey = settings?.openai_api_key;
+    let responseContent = "I'm sorry, I can't help with that right now. Please configure your OpenAI API key in settings.";
+    let intent = 'unknown';
+
+    if (apiKey) {
+      try {
+        // 3. Call OpenAI
+        const completion = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [
+              {
+                role: 'system',
+                content: `You are a helpful assistant for Homebase, a task management and outreach platform. 
+                You help users manage tasks, track chefs, and log outreach.
+                Current Workspace ID: ${workspaceId || 'unknown'}
+                User ID: ${userId}
+                
+                If the user asks to create a task, chef, or log outreach, guide them or confirm the action (actual DB actions are not yet connected to AI, so just give a helpful response).`
+              },
+              { role: 'user', content: message }
+            ]
+          })
+        });
+
+        const data = await completion.json();
+        if (data.error) throw new Error(data.error.message);
+        responseContent = data.choices[0].message.content;
+        intent = 'chat';
+      } catch (err) {
+        console.error('OpenAI API Error:', err);
+        responseContent = "I encountered an error connecting to the AI service. Please check your API key.";
+      }
+    }
+
+    // 4. Save assistant message
+    const { error: respError } = await supabase
+      .from('chat_messages')
+      .insert({
+        session_id: sessionId,
+        role: 'assistant',
+        content: responseContent,
+        metadata: { intent }
+      });
+
+    if (respError) throw respError;
+
+    // 5. Update session timestamp
+    await supabase
+      .from('chat_sessions')
+      .update({ updated_at: new Date().toISOString() })
+      .eq('id', sessionId);
+
+    return {
+      response: responseContent,
+      intent
+    };
   },
 
   // Load conversation history
-  loadSession: async (sessionId: string, userAuthToken: string): Promise<ChatSession | null> => {
-    const response = await fetch(`https://wqpmhnsxqcsplfdyxrih.supabase.co/functions/v1/chatbot/sessions/${sessionId}`, {
-      headers: {
-        'Authorization': `Bearer ${userAuthToken}`
-      }
-    });
+  loadSession: async (sessionId: string): Promise<ChatSession | null> => {
+    const { data: session, error } = await supabase
+      .from('chat_sessions')
+      .select('*')
+      .eq('id', sessionId)
+      .single();
 
-    if (response.status === 404) return null;
-    if (!response.ok) throw new Error('Failed to load session');
+    if (error || !session) return null;
 
-    return response.json();
+    const { data: messages } = await supabase
+      .from('chat_messages')
+      .select('*')
+      .eq('session_id', sessionId)
+      .order('created_at', { ascending: true });
+
+    return {
+      ...session,
+      messages: messages || []
+    };
   },
 
   // Get all user sessions
-  getUserSessions: async (userAuthToken: string): Promise<ChatSession[]> => {
-    const response = await fetch('https://wqpmhnsxqcsplfdyxrih.supabase.co/functions/v1/chatbot/sessions', {
-      headers: {
-        'Authorization': `Bearer ${userAuthToken}`
-      }
-    });
+  getUserSessions: async (userId: string): Promise<ChatSession[]> => {
+    const { data, error } = await supabase
+      .from('chat_sessions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('updated_at', { ascending: false });
 
-    if (!response.ok) throw new Error('Failed to load sessions');
-    return response.json();
+    if (error) throw error;
+    return data || [];
   },
 
   // Create new session
-  createSession: async (userAuthToken: string): Promise<ChatSession> => {
-    const response = await fetch('https://wqpmhnsxqcsplfdyxrih.supabase.co/functions/v1/chatbot/sessions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${userAuthToken}`
-      },
-      body: JSON.stringify({
-        title: `Chat ${new Date().toLocaleDateString()}`
+  createSession: async (userId: string): Promise<ChatSession> => {
+    const { data, error } = await supabase
+      .from('chat_sessions')
+      .insert({
+        user_id: userId,
+        title: `Chat ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`
       })
-    });
+      .select()
+      .single();
 
-    if (!response.ok) throw new Error('Failed to create session');
-    return response.json();
+    if (error) throw error;
+    return { ...data, messages: [] };
   },
 
   // Delete session
-  deleteSession: async (sessionId: string, userAuthToken: string): Promise<void> => {
-    const response = await fetch(`https://wqpmhnsxqcsplfdyxrih.supabase.co/functions/v1/chatbot/sessions/${sessionId}`, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${userAuthToken}`
-      }
-    });
+  deleteSession: async (sessionId: string): Promise<void> => {
+    const { error } = await supabase
+      .from('chat_sessions')
+      .delete()
+      .eq('id', sessionId);
 
-    if (!response.ok) throw new Error('Failed to delete session');
+    if (error) throw error;
   }
 };
 
 // --- Enhanced Chatbot Component ---
-export const EnhancedChatbot = ({ 
-  userAuthToken, 
-  userId, 
-  workspaceId 
-}: { 
-  userAuthToken: string; 
-  userId: string; 
+export const EnhancedChatbot = ({
+  userAuthToken,
+  userId,
+  workspaceId
+}: {
+  userAuthToken: string;
+  userId: string;
   workspaceId?: string;
 }) => {
   const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
@@ -177,9 +246,9 @@ export const EnhancedChatbot = ({
 
   const loadUserSessions = async () => {
     try {
-      const userSessions = await chatbotAPI.getUserSessions(userAuthToken);
+      const userSessions = await chatbotAPI.getUserSessions(userId);
       setSessions(userSessions);
-      
+
       // Load most recent session or create new one
       if (userSessions.length > 0) {
         const latest = userSessions[0];
@@ -195,7 +264,7 @@ export const EnhancedChatbot = ({
 
   const createNewSession = async () => {
     try {
-      const newSession = await chatbotAPI.createSession(userAuthToken);
+      const newSession = await chatbotAPI.createSession(userId);
       setCurrentSession(newSession);
       setSessions(prev => [newSession, ...prev]);
       setMessages([{
@@ -219,7 +288,7 @@ export const EnhancedChatbot = ({
       content: input.trim(),
       timestamp: new Date().toISOString()
     };
-    
+
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
@@ -227,12 +296,12 @@ export const EnhancedChatbot = ({
 
     try {
       const result = await chatbotAPI.sendMessage(
-        userMessage.content, 
-        currentSession.id, 
-        userAuthToken,
+        userMessage.content,
+        currentSession.id,
+        userId,
         workspaceId
       );
-      
+
       const assistantMessage: Message = {
         id: `assistant-${Date.now()}`,
         role: 'assistant',
@@ -275,7 +344,7 @@ export const EnhancedChatbot = ({
 
   const switchToSession = async (sessionId: string) => {
     try {
-      const session = await chatbotAPI.loadSession(sessionId, userAuthToken);
+      const session = await chatbotAPI.loadSession(sessionId);
       if (session) {
         setCurrentSession(session);
         setShowSessions(false);
@@ -290,9 +359,9 @@ export const EnhancedChatbot = ({
     if (!confirm('Delete this conversation?')) return;
 
     try {
-      await chatbotAPI.deleteSession(sessionId, userAuthToken);
+      await chatbotAPI.deleteSession(sessionId);
       setSessions(prev => prev.filter(s => s.id !== sessionId));
-      
+
       if (currentSession?.id === sessionId) {
         if (sessions.length > 1) {
           const remaining = sessions.filter(s => s.id !== sessionId);
@@ -329,15 +398,14 @@ export const EnhancedChatbot = ({
           <Bot size={20} />
         </div>
       )}
-      <div 
-        className={`max-w-xs md:max-w-md p-3 rounded-lg text-sm whitespace-pre-wrap ${
-          msg.role === 'user' 
-            ? 'bg-blue-500 text-white rounded-br-none' 
-            : 'bg-gray-200 text-gray-800 rounded-bl-none'
-        }`}
+      <div
+        className={`max-w-xs md:max-w-md p-3 rounded-lg text-sm whitespace-pre-wrap ${msg.role === 'user'
+          ? 'bg-blue-500 text-white rounded-br-none'
+          : 'bg-gray-200 text-gray-800 rounded-bl-none'
+          }`}
       >
         {msg.content}
-        
+
         {/* Success indicators */}
         {msg.metadata?.task_created && (
           <div className="mt-2 text-xs text-green-600 bg-green-50 p-2 rounded">
@@ -420,9 +488,8 @@ export const EnhancedChatbot = ({
               <div
                 key={session.id}
                 onClick={() => switchToSession(session.id)}
-                className={`flex items-center justify-between p-2 rounded cursor-pointer hover:bg-gray-100 ${
-                  currentSession?.id === session.id ? 'bg-blue-100' : ''
-                }`}
+                className={`flex items-center justify-between p-2 rounded cursor-pointer hover:bg-gray-100 ${currentSession?.id === session.id ? 'bg-blue-100' : ''
+                  }`}
               >
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{session.title}</p>
@@ -450,20 +517,20 @@ export const EnhancedChatbot = ({
           {messages.map(renderMessage)}
           {isLoading && (
             <div className="flex gap-3 justify-start">
-               <div className="w-8 h-8 bg-homemade-orange text-white rounded-full flex items-center justify-center flex-shrink-0">
-                  <Bot size={20} />
-                </div>
+              <div className="w-8 h-8 bg-homemade-orange text-white rounded-full flex items-center justify-center flex-shrink-0">
+                <Bot size={20} />
+              </div>
               <div className="max-w-xs md:max-w-md p-3 rounded-lg bg-gray-200 text-gray-800 rounded-bl-none flex items-center space-x-2">
-                 <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-                 <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                 <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
+                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
               </div>
             </div>
           )}
           <div ref={messagesEndRef} />
         </div>
       </div>
-      
+
       {/* Smart Suggestions */}
       {!isLoading && getSmartSuggestions().length > 0 && (
         <div className="p-4 border-t border-gray-200 bg-white">
