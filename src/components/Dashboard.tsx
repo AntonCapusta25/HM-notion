@@ -33,15 +33,15 @@ interface DashboardStats {
 export const Dashboard = () => {
   const { user } = useAuth();
   const { profile: userProfile, loading: profileLoading, error: profileError } = useProfile();
-  const { 
-    tasks, 
-    users, 
-    createTask, 
-    updateTask, 
-    deleteTask, 
-    addComment, 
-    toggleSubtask, 
-    loading: tasksLoading, 
+  const {
+    tasks,
+    users,
+    createTask,
+    updateTask,
+    deleteTask,
+    addComment,
+    toggleSubtask,
+    loading: tasksLoading,
     error,
     refreshTasks
   } = useTaskContext();
@@ -78,13 +78,13 @@ export const Dashboard = () => {
       console.log('📊 No userProfile.id available for dashboard stats');
       return;
     }
-    
+
     try {
       console.log('📊 Refreshing dashboard stats for user:', userProfile.id);
-      
+
       const { data, error } = await supabase
         .rpc('get_dashboard_stats', { user_uuid: userProfile.id });
-      
+
       if (error) {
         console.error('📊 Dashboard stats error:', error);
         setDashboardStats(null);
@@ -102,16 +102,16 @@ export const Dashboard = () => {
   const handleManualRefresh = useCallback(async () => {
     setIsRefreshing(true);
     console.log('🔄 Manual refresh triggered');
-    
+
     try {
       if (refreshTasks) {
         console.log('🔄 Refreshing tasks via refreshTasks method...');
         await refreshTasks();
       }
-      
+
       console.log('🔄 Refreshing dashboard stats...');
       await refreshDashboardStats();
-      
+
       console.log('✅ Manual refresh completed');
     } catch (err) {
       console.error('❌ Manual refresh failed:', err);
@@ -137,16 +137,16 @@ export const Dashboard = () => {
         setStatsLoading(false);
         return;
       }
-      
+
       try {
         setStatsLoading(true);
         console.log('📊 Initial dashboard stats fetch for user:', userProfile.id);
-        
+
         const { data, error } = await supabase
           .rpc('get_dashboard_stats', { user_uuid: userProfile.id });
-        
+
         console.log('📊 Initial dashboard stats response:', { data, error });
-        
+
         if (error) {
           console.error('📊 Initial dashboard stats error:', error);
           setDashboardStats(null);
@@ -160,7 +160,7 @@ export const Dashboard = () => {
         setStatsLoading(false);
       }
     };
-    
+
     fetchInitialStats();
   }, [userProfile?.id]);
 
@@ -171,7 +171,7 @@ export const Dashboard = () => {
       await createTask(taskData);
       setShowCreateTask(false);
       console.log('✅ Dashboard - Task creation completed');
-      
+
     } catch (err) {
       console.error('❌ Dashboard - Failed to create task:', err);
       throw err;
@@ -183,7 +183,7 @@ export const Dashboard = () => {
       console.log('📝 Dashboard - Updating task:', taskId, updates);
       updateTask(taskId, updates);
       console.log('✅ Dashboard - Task update completed');
-      
+
     } catch (err) {
       console.error('❌ Dashboard - Failed to update task:', err);
       throw err;
@@ -193,18 +193,18 @@ export const Dashboard = () => {
   const handleDeleteTask = useCallback(async (taskId: string) => {
     const confirmed = window.confirm('Are you sure you want to delete this task?');
     if (!confirmed) return;
-    
+
     try {
       console.log('🗑️ Dashboard - Deleting task:', taskId);
       deleteTask(taskId);
       console.log('✅ Dashboard - Task deletion completed');
-      
+
     } catch (err) {
       console.error('❌ Dashboard - Failed to delete task:', err);
       throw err;
     }
   }, [deleteTask, refreshDashboardStats]);
-  
+
   const handleAddComment = useCallback(async (taskId: string, content: string) => {
     try {
       console.log('💬 Dashboard - Adding comment to task:', taskId);
@@ -230,9 +230,9 @@ export const Dashboard = () => {
   // Enhanced filtering with better performance
   const filteredTasks = useMemo(() => {
     let result = [...tasks];
-    
+
     if (filter === 'my' && userProfile) {
-      result = result.filter(t => 
+      result = result.filter(t =>
         (t.assignees && t.assignees.includes(userProfile.id)) || t.created_by === userProfile.id
       );
     }
@@ -244,19 +244,19 @@ export const Dashboard = () => {
       result = result.filter(t => taskFilters.priority.includes(t.priority));
     }
     if (taskFilters.assignee.length > 0) {
-      result = result.filter(t => 
+      result = result.filter(t =>
         t.assignees && t.assignees.some(assigneeId => taskFilters.assignee.includes(assigneeId))
       );
     }
     if (taskFilters.tags.length > 0) {
-      result = result.filter(t => 
+      result = result.filter(t =>
         t.tags && t.tags.some(tag => taskFilters.tags.includes(tag))
       );
     }
 
     return result.sort((a, b) => {
       let aValue: any, bValue: any;
-      
+
       try {
         switch (taskFilters.sortBy) {
           case 'due_date':
@@ -269,22 +269,22 @@ export const Dashboard = () => {
                 return new Date('9999-12-31').getTime();
               }
             };
-            
+
             aValue = parseDate(a.due_date);
             bValue = parseDate(b.due_date);
             break;
-            
+
           case 'priority':
             const priorityOrder = { high: 3, medium: 2, low: 1 };
             aValue = priorityOrder[a.priority as keyof typeof priorityOrder] || 0;
             bValue = priorityOrder[b.priority as keyof typeof priorityOrder] || 0;
             break;
-            
+
           case 'title':
             aValue = (a.title || '').toLowerCase();
             bValue = (b.title || '').toLowerCase();
             break;
-            
+
           default: // created_at
             const parseCreatedDate = (dateStr: string) => {
               try {
@@ -294,17 +294,17 @@ export const Dashboard = () => {
                 return 0;
               }
             };
-            
+
             aValue = parseCreatedDate(a.created_at);
             bValue = parseCreatedDate(b.created_at);
         }
-        
+
         if (taskFilters.sortOrder === 'desc') {
           return bValue > aValue ? 1 : bValue < aValue ? -1 : 0;
         } else {
           return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
         }
-        
+
       } catch (error) {
         console.warn('⚠️ Error in task sorting:', error);
         return 0;
@@ -404,7 +404,7 @@ export const Dashboard = () => {
             New Task
           </Button>
         </div>
-        
+
         <Alert className="m-6">
           <AlertDescription>
             Profile data is still loading. Some features may be limited.
@@ -471,7 +471,7 @@ export const Dashboard = () => {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => {/* Error will auto-clear after 5s */}}
+                onClick={() => {/* Error will auto-clear after 5s */ }}
                 className="h-6 w-6 p-0 ml-2"
               >
                 <X className="h-4 w-4" />
@@ -493,9 +493,9 @@ export const Dashboard = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button 
-            onClick={handleManualRefresh} 
-            variant="outline" 
+          <Button
+            onClick={handleManualRefresh}
+            variant="outline"
             size="sm"
             disabled={isRefreshing}
             className="flex items-center gap-2"
@@ -503,7 +503,7 @@ export const Dashboard = () => {
             <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             {isRefreshing ? 'Refreshing...' : 'Refresh'}
           </Button>
-          
+
           {/* Import/Export Button */}
           {userProfile && (
             <TaskImportExport
@@ -513,10 +513,10 @@ export const Dashboard = () => {
               currentUserId={userProfile.id}
             />
           )}
-          
-          <Button 
+
+          <Button
             onClick={toggleChatbot}
-            variant="outline" 
+            variant="outline"
             size="sm"
             className="flex items-center gap-2"
           >
@@ -597,24 +597,24 @@ export const Dashboard = () => {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <Button 
-              variant={filter === 'all' ? 'default' : 'outline'} 
+            <Button
+              variant={filter === 'all' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setFilter('all')}
               className={filter === 'all' ? 'bg-homemade-orange hover:bg-homemade-orange-dark' : ''}
             >
               All Tasks ({stats.total})
             </Button>
-            <Button 
-              variant={filter === 'my' ? 'default' : 'outline'} 
+            <Button
+              variant={filter === 'my' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setFilter('my')}
               className={filter === 'my' ? 'bg-homemade-orange hover:bg-homemade-orange-dark' : ''}
             >
               My Tasks ({stats.myTasks})
             </Button>
-            <Button 
-              variant={filter === 'team' ? 'default' : 'outline'} 
+            <Button
+              variant={filter === 'team' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setFilter('team')}
               className={filter === 'team' ? 'bg-homemade-orange hover:bg-homemade-orange-dark' : ''}
@@ -631,8 +631,8 @@ export const Dashboard = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button 
-            variant={viewMode === 'cards' ? 'default' : 'outline'} 
+          <Button
+            variant={viewMode === 'cards' ? 'default' : 'outline'}
             size="sm"
             onClick={() => setViewMode('cards')}
             className={viewMode === 'cards' ? 'bg-homemade-orange hover:bg-homemade-orange-dark' : ''}
@@ -640,8 +640,8 @@ export const Dashboard = () => {
             <Grid3X3 className="h-4 w-4 mr-2" />
             Cards
           </Button>
-          <Button 
-            variant={viewMode === 'list' ? 'default' : 'outline'} 
+          <Button
+            variant={viewMode === 'list' ? 'default' : 'outline'}
             size="sm"
             onClick={() => setViewMode('list')}
             className={viewMode === 'list' ? 'bg-homemade-orange hover:bg-homemade-orange-dark' : ''}
@@ -654,8 +654,8 @@ export const Dashboard = () => {
 
       {/* Task Views */}
       {viewMode === 'cards' ? (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Card>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 max-w-full overflow-hidden">
+          <Card className="min-w-0">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center justify-between text-base">
                 <span className="flex items-center gap-2">
@@ -665,18 +665,18 @@ export const Dashboard = () => {
                 <Badge variant="secondary">{tasksByStatus.todo.length}</Badge>
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-3 max-h-[calc(100vh-400px)] overflow-y-auto">
               {tasksByStatus.todo.map(task => (
-                <TaskCard 
-                  key={task.id} 
-                  task={task} 
+                <TaskCard
+                  key={task.id}
+                  task={task}
                   onClick={() => setSelectedTask(task)}
                 />
               ))}
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="min-w-0">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center justify-between text-base">
                 <span className="flex items-center gap-2">
@@ -686,18 +686,18 @@ export const Dashboard = () => {
                 <Badge variant="secondary">{tasksByStatus.in_progress.length}</Badge>
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-3 max-h-[calc(100vh-400px)] overflow-y-auto">
               {tasksByStatus.in_progress.map(task => (
-                <TaskCard 
-                  key={task.id} 
-                  task={task} 
+                <TaskCard
+                  key={task.id}
+                  task={task}
                   onClick={() => setSelectedTask(task)}
                 />
               ))}
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="min-w-0">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center justify-between text-base">
                 <span className="flex items-center gap-2">
@@ -707,11 +707,11 @@ export const Dashboard = () => {
                 <Badge variant="secondary">{tasksByStatus.done.length}</Badge>
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-3 max-h-[calc(100vh-400px)] overflow-y-auto">
               {tasksByStatus.done.map(task => (
-                <TaskCard 
-                  key={task.id} 
-                  task={task} 
+                <TaskCard
+                  key={task.id}
+                  task={task}
                   onClick={() => setSelectedTask(task)}
                 />
               ))}
@@ -719,14 +719,14 @@ export const Dashboard = () => {
           </Card>
         </div>
       ) : (
-<ListView
-  tasks={filteredTasks}
-  users={users}
-  onCreateTask={handleCreateTask}
-  onUpdateTask={handleUpdateTask}
-  onDeleteTask={handleDeleteTask}
-  onAssignTask={(taskId, userIds) => handleUpdateTask(taskId, { assignees: userIds })}
-/>
+        <ListView
+          tasks={filteredTasks}
+          users={users}
+          onCreateTask={handleCreateTask}
+          onUpdateTask={handleUpdateTask}
+          onDeleteTask={handleDeleteTask}
+          onAssignTask={(taskId, userIds) => handleUpdateTask(taskId, { assignees: userIds })}
+        />
       )}
 
       {/* Enhanced Floating Chatbot */}
@@ -774,7 +774,7 @@ export const Dashboard = () => {
             </div>
             {/* Enhanced Chatbot Component */}
             {authToken && userProfile && (
-              <EnhancedChatbot 
+              <EnhancedChatbot
                 userAuthToken={authToken}
                 userId={userProfile.id}
               />
@@ -784,8 +784,8 @@ export const Dashboard = () => {
       </div>
 
       {/* Dialogs */}
-      <CreateTaskDialog 
-        open={showCreateTask} 
+      <CreateTaskDialog
+        open={showCreateTask}
         onOpenChange={setShowCreateTask}
         onCreateTask={handleCreateTask}
       />
