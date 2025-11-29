@@ -39,15 +39,12 @@ interface TaskCreationContext {
 }
 
 // --- Enhanced API Functions ---
-import { supabase } from '../lib/supabase';
-
-// --- Enhanced API Functions ---
 const chatbotAPI = {
-  // Send message to intelligent backend (now client-side logic)
+  // Send message to intelligent backend
   sendMessage: async (
     message: string,
     sessionId: string,
-    userId: string,
+    userAuthToken: string,
     workspaceId?: string
   ): Promise<{
     response: string;
@@ -59,150 +56,84 @@ const chatbotAPI = {
   }> => {
     console.log('📤 Sending message to chatbot:', { message, sessionId, workspaceId });
 
-    // 1. Save user message
-    const { error: msgError } = await supabase
-      .from('chat_messages')
-      .insert({
+    const response = await fetch('https://wqpmhnsxqcsplfdyxrih.supabase.co/functions/v1/chatbot', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${userAuthToken}`
+      },
+      body: JSON.stringify({
+        message,
         session_id: sessionId,
-        role: 'user',
-        content: message,
-        metadata: { workspace_id: workspaceId }
-      });
+        workspace_id: workspaceId,
+        timestamp: new Date().toISOString()
+      })
+    });
 
-    if (msgError) throw msgError;
-
-    // 2. Get OpenAI Key
-    let query = supabase
-      .from('outreach_settings')
-      .select('openai_api_key');
-
-    if (workspaceId) {
-      query = query.eq('workspace_id', workspaceId);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Chatbot API error:', response.status, errorText);
+      throw new Error(`Failed to get response from chatbot: ${response.status}`);
     }
 
-    const { data: settings } = await query.limit(1).maybeSingle();
-
-    const apiKey = settings?.openai_api_key;
-    let responseContent = "I'm sorry, I can't help with that right now. Please configure your OpenAI API key in settings.";
-    let intent = 'unknown';
-
-    if (apiKey) {
-      try {
-        // 3. Call OpenAI
-        const completion = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-          },
-          body: JSON.stringify({
-            model: 'gpt-4o-mini',
-            messages: [
-              {
-                role: 'system',
-                content: `You are a helpful assistant for Homebase, a task management and outreach platform. 
-                You help users manage tasks, track chefs, and log outreach.
-                Current Workspace ID: ${workspaceId || 'unknown'}
-                User ID: ${userId}
-                
-                If the user asks to create a task, chef, or log outreach, guide them or confirm the action (actual DB actions are not yet connected to AI, so just give a helpful response).`
-              },
-              { role: 'user', content: message }
-            ]
-          })
-        });
-
-        const data = await completion.json();
-        if (data.error) throw new Error(data.error.message);
-        responseContent = data.choices[0].message.content;
-        intent = 'chat';
-      } catch (err) {
-        console.error('OpenAI API Error:', err);
-        responseContent = "I encountered an error connecting to the AI service. Please check your API key.";
-      }
-    }
-
-    // 4. Save assistant message
-    const { error: respError } = await supabase
-      .from('chat_messages')
-      .insert({
-        session_id: sessionId,
-        role: 'assistant',
-        content: responseContent,
-        metadata: { intent }
-      });
-
-    if (respError) throw respError;
-
-    // 5. Update session timestamp
-    await supabase
-      .from('chat_sessions')
-      .update({ updated_at: new Date().toISOString() })
-      .eq('id', sessionId);
-
-    return {
-      response: responseContent,
-      intent
-    };
+    const result = await response.json();
+    console.log('✅ Chatbot response received:', result);
+    return result;
   },
 
   // Load conversation history
-  loadSession: async (sessionId: string): Promise<ChatSession | null> => {
-    const { data: session, error } = await supabase
-      .from('chat_sessions')
-      .select('*')
-      .eq('id', sessionId)
-      .single();
+  loadSession: async (sessionId: string, userAuthToken: string): Promise<ChatSession | null> => {
+    const response = await fetch(`https://wqpmhnsxqcsplfdyxrih.supabase.co/functions/v1/chatbot/sessions/${sessionId}`, {
+      headers: {
+        'Authorization': `Bearer ${userAuthToken}`
+      }
+    });
 
-    if (error || !session) return null;
+    if (response.status === 404) return null;
+    if (!response.ok) throw new Error('Failed to load session');
 
-    const { data: messages } = await supabase
-      .from('chat_messages')
-      .select('*')
-      .eq('session_id', sessionId)
-      .order('created_at', { ascending: true });
-
-    return {
-      ...session,
-      messages: messages || []
-    };
+    return response.json();
   },
 
   // Get all user sessions
-  getUserSessions: async (userId: string): Promise<ChatSession[]> => {
-    const { data, error } = await supabase
-      .from('chat_sessions')
-      .select('*')
-      .eq('user_id', userId)
-      .order('updated_at', { ascending: false });
+  getUserSessions: async (userAuthToken: string): Promise<ChatSession[]> => {
+    const response = await fetch('https://wqpmhnsxqcsplfdyxrih.supabase.co/functions/v1/chatbot/sessions', {
+      headers: {
+        'Authorization': `Bearer ${userAuthToken}`
+      }
+    });
 
-    if (error) throw error;
-    return data || [];
+    if (!response.ok) throw new Error('Failed to load sessions');
+    return response.json();
   },
 
   // Create new session
-  createSession: async (userId: string): Promise<ChatSession> => {
-    const { data, error } = await supabase
-      .from('chat_sessions')
-      .insert({
-        user_id: userId,
-        title: `Chat ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`
+  createSession: async (userAuthToken: string): Promise<ChatSession> => {
+    const response = await fetch('https://wqpmhnsxqcsplfdyxrih.supabase.co/functions/v1/chatbot/sessions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${userAuthToken}`
+      },
+      body: JSON.stringify({
+        title: `Chat ${new Date().toLocaleDateString()}`
       })
-      .select()
-      .single();
+    });
 
-    if (error) throw error;
-    return { ...data, messages: [] };
+    if (!response.ok) throw new Error('Failed to create session');
+    return response.json();
   },
 
   // Delete session
-  deleteSession: async (sessionId: string): Promise<void> => {
-    const { error } = await supabase
-      .from('chat_sessions')
-      .delete()
-      .eq('id', sessionId);
+  deleteSession: async (sessionId: string, userAuthToken: string): Promise<void> => {
+    const response = await fetch(`https://wqpmhnsxqcsplfdyxrih.supabase.co/functions/v1/chatbot/sessions/${sessionId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${userAuthToken}`
+      }
+    });
 
-    if (error) throw error;
+    if (!response.ok) throw new Error('Failed to delete session');
   }
 };
 
@@ -246,7 +177,7 @@ export const EnhancedChatbot = ({
 
   const loadUserSessions = async () => {
     try {
-      const userSessions = await chatbotAPI.getUserSessions(userId);
+      const userSessions = await chatbotAPI.getUserSessions(userAuthToken);
       setSessions(userSessions);
 
       // Load most recent session or create new one
@@ -264,7 +195,7 @@ export const EnhancedChatbot = ({
 
   const createNewSession = async () => {
     try {
-      const newSession = await chatbotAPI.createSession(userId);
+      const newSession = await chatbotAPI.createSession(userAuthToken);
       setCurrentSession(newSession);
       setSessions(prev => [newSession, ...prev]);
       setMessages([{
@@ -298,7 +229,7 @@ export const EnhancedChatbot = ({
       const result = await chatbotAPI.sendMessage(
         userMessage.content,
         currentSession.id,
-        userId,
+        userAuthToken,
         workspaceId
       );
 
@@ -344,7 +275,7 @@ export const EnhancedChatbot = ({
 
   const switchToSession = async (sessionId: string) => {
     try {
-      const session = await chatbotAPI.loadSession(sessionId);
+      const session = await chatbotAPI.loadSession(sessionId, userAuthToken);
       if (session) {
         setCurrentSession(session);
         setShowSessions(false);
@@ -359,7 +290,7 @@ export const EnhancedChatbot = ({
     if (!confirm('Delete this conversation?')) return;
 
     try {
-      await chatbotAPI.deleteSession(sessionId);
+      await chatbotAPI.deleteSession(sessionId, userAuthToken);
       setSessions(prev => prev.filter(s => s.id !== sessionId));
 
       if (currentSession?.id === sessionId) {
