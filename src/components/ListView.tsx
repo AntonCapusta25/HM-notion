@@ -376,9 +376,9 @@ export const ListView = ({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="min-w-[180px] max-w-[250px]">Task</TableHead>
-                <TableHead className="w-[90px]">Status</TableHead>
-                <TableHead className="w-[80px]">Priority</TableHead>
+                <TableHead className="min-w-[180px] max-w-[300px]">Task</TableHead>
+                <TableHead className="w-[110px]">Status</TableHead>
+                <TableHead className="w-[90px]">Priority</TableHead>
                 <TableHead className="w-[110px]">Assignees</TableHead>
                 <TableHead className="w-[100px]">Due Date</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
@@ -472,7 +472,7 @@ export const ListView = ({
                       <div>
                         <div className="font-medium text-gray-900">{task.title}</div>
                         {task.description && (
-                          <div className="text-sm text-gray-500 mt-1 line-clamp-2">
+                          <div className="text-sm text-gray-500 mt-1 whitespace-normal break-words">
                             {task.description}
                           </div>
                         )}
@@ -483,11 +483,11 @@ export const ListView = ({
                         value={task.status}
                         onValueChange={(value) => handleStatusChange(task.id, value)}
                       >
-                        <SelectTrigger className="h-7 text-xs">
+                        <SelectTrigger className="h-7 text-xs w-full">
                           <SelectValue>
                             <Badge className={`${statusColors[task.status]} text-xs px-1 py-0`}>
-                              {task.status === 'todo' ? 'Todo' :
-                                task.status === 'in_progress' ? 'Progress' : 'Done'}
+                              {task.status === 'todo' ? 'To Do' :
+                                task.status === 'in_progress' ? 'In Progress' : 'Done'}
                             </Badge>
                           </SelectValue>
                         </SelectTrigger>
