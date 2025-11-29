@@ -376,12 +376,12 @@ export const ListView = ({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="min-w-[200px]">Task</TableHead>
-                <TableHead className="w-[100px]">Status</TableHead>
-                <TableHead className="w-[100px]">Priority</TableHead>
-                <TableHead className="w-[130px]">Assignees</TableHead>
-                <TableHead className="w-[120px]">Due Date</TableHead>
-                <TableHead className="w-[60px]">Actions</TableHead>
+                <TableHead className="min-w-[180px] max-w-[250px]">Task</TableHead>
+                <TableHead className="w-[90px]">Status</TableHead>
+                <TableHead className="w-[80px]">Priority</TableHead>
+                <TableHead className="w-[110px]">Assignees</TableHead>
+                <TableHead className="w-[100px]">Due Date</TableHead>
+                <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -483,11 +483,11 @@ export const ListView = ({
                         value={task.status}
                         onValueChange={(value) => handleStatusChange(task.id, value)}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="h-7 text-xs">
                           <SelectValue>
-                            <Badge className={statusColors[task.status]}>
-                              {task.status === 'todo' ? 'To Do' :
-                                task.status === 'in_progress' ? 'In Progress' : 'Done'}
+                            <Badge className={`${statusColors[task.status]} text-xs px-1 py-0`}>
+                              {task.status === 'todo' ? 'Todo' :
+                                task.status === 'in_progress' ? 'Progress' : 'Done'}
                             </Badge>
                           </SelectValue>
                         </SelectTrigger>
@@ -503,10 +503,10 @@ export const ListView = ({
                         value={task.priority}
                         onValueChange={(value) => handlePriorityChange(task.id, value)}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="h-7 text-xs">
                           <SelectValue>
-                            <Badge className={`${priorityColors[task.priority]} text-xs border`}>
-                              {task.priority}
+                            <Badge className={`${priorityColors[task.priority]} text-xs border px-1 py-0`}>
+                              {task.priority.charAt(0).toUpperCase()}
                             </Badge>
                           </SelectValue>
                         </SelectTrigger>
