@@ -20,8 +20,8 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
   // Create stable reference for fetchTasks
   const fetchTasksRef = useRef<() => Promise<void>>();
 
-  // Track pending assignee updates to prevent concurrent requests
-  const pendingAssigneeUpdates = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  // Track pending real-time fetches for batching
+  const pendingRealtimeFetches = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
   const fetchTasks = useCallback(async () => {
     console.log('🔄 fetchTasks called');
@@ -193,7 +193,7 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
           console.log('📡 Tasks subscription status:', status);
         });
 
-      // Subscribe to task_assignees changes
+      // Subscribe to task_assignees changes with batching
       assigneesSubscription = supabase
         .channel('task-assignees-' + user.id)
         .on('postgres_changes', {
@@ -203,10 +203,20 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
         }, (payload) => {
           console.log('🔥 REALTIME: Task assignees update!', payload.eventType);
 
-          // Refresh only the affected task
           const taskId = payload.new?.task_id || payload.old?.task_id;
-          if (taskId) {
-            // Fetch just this task's assignments
+          if (!taskId) return;
+
+          // Cancel any pending fetch for this task
+          const existingTimeout = pendingRealtimeFetches.current.get(taskId);
+          if (existingTimeout) {
+            clearTimeout(existingTimeout);
+          }
+
+          // Batch multiple events: wait 100ms before fetching
+          const timeoutId = setTimeout(() => {
+            pendingRealtimeFetches.current.delete(taskId);
+
+            // Fetch this task's assignments
             supabase
               .from('task_assignees')
               .select('user_id')
@@ -221,8 +231,11 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
                     }
                     : task
                 ));
+                console.log('✅ Batched assignee update applied for task:', taskId);
               });
-          }
+          }, 100);
+
+          pendingRealtimeFetches.current.set(taskId, timeoutId);
         })
         .subscribe((status) => {
           console.log('📡 Assignees subscription status:', status);
@@ -458,63 +471,44 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
   }, [user?.id, userProfile?.id]);
 
   const updateAssignees = useCallback(async (taskId: string, assigneeIds: string[]) => {
-    console.log('👥 updateAssignees called for task:', taskId, 'assignees:', assigneeIds);
+    console.log('👥 updateAssignees called:', { taskId, assigneeIds });
 
-    // Cancel any pending update for this task
-    const pendingTimeout = pendingAssigneeUpdates.current.get(taskId);
-    if (pendingTimeout) {
-      clearTimeout(pendingTimeout);
-      console.log('⏸️ Cancelled pending update for task:', taskId);
-    }
+    try {
+      // Delete all existing assignments for this task
+      const { error: deleteError } = await supabase
+        .from('task_assignees')
+        .delete()
+        .eq('task_id', taskId);
 
-    // Debounce: wait 300ms before actually updating
-    return new Promise<void>((resolve) => {
-      const timeoutId = setTimeout(async () => {
-        pendingAssigneeUpdates.current.delete(taskId);
+      if (deleteError) {
+        console.error('❌ Error deleting assignments:', deleteError);
+        throw deleteError;
+      }
 
-        try {
-          console.log('🔄 Executing debounced assignee update:', { taskId, assigneeIds });
+      // Insert new assignments if any
+      if (assigneeIds.length > 0) {
+        const newAssignments = assigneeIds.map(userId => ({
+          task_id: taskId,
+          user_id: userId
+        }));
 
-          // Delete all existing assignments for this task
-          const { error: deleteError } = await supabase
-            .from('task_assignees')
-            .delete()
-            .eq('task_id', taskId);
+        const { error: insertError } = await supabase
+          .from('task_assignees')
+          .insert(newAssignments);
 
-          if (deleteError) {
-            console.error('❌ Error deleting assignments:', deleteError);
-          }
-
-          // Insert new assignments if any
-          if (assigneeIds.length > 0) {
-            const newAssignments = assigneeIds.map(userId => ({
-              task_id: taskId,
-              user_id: userId
-            }));
-
-            const { error: insertError } = await supabase
-              .from('task_assignees')
-              .insert(newAssignments);
-
-            if (insertError) {
-              console.error('❌ Error inserting assignments:', insertError);
-            } else {
-              console.log('✅ Task assignments updated successfully');
-            }
-          } else {
-            console.log('✅ Task assignments cleared successfully');
-          }
-
-          resolve();
-        } catch (error) {
-          console.error('❌ Error in updateAssignees:', error);
-          resolve(); // Resolve anyway to prevent hanging
+        if (insertError) {
+          console.error('❌ Error inserting assignments:', insertError);
+          throw insertError;
         }
-      }, 300); // 300ms debounce
 
-      pendingAssigneeUpdates.current.set(taskId, timeoutId);
-    });
-
+        console.log('✅ Task assignments updated successfully');
+      } else {
+        console.log('✅ Task assignments cleared successfully');
+      }
+    } catch (error) {
+      console.error('❌ Error in updateAssignees:', error);
+      throw error;
+    }
   }, []);
 
   const updateTags = async (taskId: string, tags: string[]) => {
@@ -543,6 +537,12 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
             ...updates,
             updated_at: new Date().toISOString()
           };
+
+          // Also update task_assignees if assignees changed
+          if (assignees !== undefined) {
+            updatedTask.task_assignees = assignees.map(userId => ({ user_id: userId }));
+          }
+
           console.log('✨ Optimistically updated task in UI:', updatedTask.title);
           return updatedTask;
         }
