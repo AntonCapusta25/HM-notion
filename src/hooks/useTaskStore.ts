@@ -212,7 +212,7 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
             clearTimeout(existingTimeout);
           }
 
-          // Batch multiple events: wait 100ms before fetching
+          // Batch multiple events: wait 50ms before fetching (reduced from 100ms)
           const timeoutId = setTimeout(() => {
             pendingRealtimeFetches.current.delete(taskId);
 
@@ -233,7 +233,7 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
                 ));
                 console.log('✅ Batched assignee update applied for task:', taskId);
               });
-          }, 100);
+          }, 50); // Reduced from 100ms to 50ms for snappier updates
 
           pendingRealtimeFetches.current.set(taskId, timeoutId);
         })
