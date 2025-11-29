@@ -6,20 +6,22 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { 
-  Calendar as CalendarIcon, 
-  Clock, 
-  MessageCircle, 
-  CheckSquare, 
+import {
+  Calendar as CalendarIcon,
+  Clock,
+  MessageCircle,
+  CheckSquare,
   Flag,
   User,
   MoreHorizontal,
   Edit3,
-  Trash2
+  Trash2,
+  Check
 } from 'lucide-react';
 import { Task, User as UserType } from '../types';
 import { format, isAfter, isBefore, startOfDay, isToday, isTomorrow } from 'date-fns';
 import { useTaskContext } from '../contexts/TaskContext';
+import { cn } from '@/lib/utils';
 
 interface TaskCardProps {
   task: Task;
@@ -30,7 +32,7 @@ interface TaskCardProps {
 
 const safeFormatDate = (dateInput: string | null | undefined, formatStr: string = 'MMM d'): string => {
   if (!dateInput) return 'No date';
-  
+
   try {
     const date = new Date(dateInput);
     if (isNaN(date.getTime())) {
@@ -77,7 +79,7 @@ export const TaskCard = ({ task, onClick, onAssign, compact = false }: TaskCardP
 
   const getDueDateStatus = () => {
     if (!task.due_date || !isValidDate(task.due_date)) return null;
-    
+
     const dueDate = new Date(task.due_date);
     if (task.status === 'done') return { type: 'completed', color: 'text-green-600' };
     if (isBefore(dueDate, startOfDay(new Date()))) return { type: 'overdue', color: 'text-red-600' };
@@ -125,7 +127,7 @@ export const TaskCard = ({ task, onClick, onAssign, compact = false }: TaskCardP
   const updateDueDate = (date: Date | undefined) => {
     try {
       let dueDateString: string | null = null;
-      
+
       if (date) {
         // 🔧 FIX: Use local date, not UTC (prevents timezone issues)
         const year = date.getFullYear();
@@ -133,13 +135,13 @@ export const TaskCard = ({ task, onClick, onAssign, compact = false }: TaskCardP
         const day = String(date.getDate()).padStart(2, '0');
         dueDateString = `${year}-${month}-${day}`;
       }
-      
+
       // 🚀 Fire update without waiting
       updateTask(task.id, { due_date: dueDateString });
-      
+
       // ✅ Close popover immediately (don't wait for database)
       setDatePickerOpen(false);
-      
+
     } catch (error) {
       console.error('Failed to update due date:', error);
     }
@@ -192,7 +194,7 @@ export const TaskCard = ({ task, onClick, onAssign, compact = false }: TaskCardP
                 className="flex-1 font-medium text-gray-900 bg-transparent border-0 outline-none focus:ring-2 focus:ring-blue-500 rounded px-1"
               />
             ) : (
-              <h3 
+              <h3
                 className="flex-1 font-medium text-gray-900 leading-tight hover:text-blue-600 transition-colors"
                 onClick={onClick}
                 onDoubleClick={handleTitleEdit}
@@ -201,13 +203,13 @@ export const TaskCard = ({ task, onClick, onAssign, compact = false }: TaskCardP
                 {task.title}
               </h3>
             )}
-            
+
             {/* Actions Menu */}
             <Popover>
               <PopoverTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  variant="ghost"
+                  size="sm"
                   className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
                 >
                   <MoreHorizontal className="h-4 w-4" />
@@ -238,7 +240,7 @@ export const TaskCard = ({ task, onClick, onAssign, compact = false }: TaskCardP
             {/* Status Badge - Clickable */}
             <Popover>
               <PopoverTrigger asChild>
-                <Badge 
+                <Badge
                   className={`${statusConfig[task.status].color} cursor-pointer hover:opacity-80 transition-opacity text-xs`}
                   variant="outline"
                 >
@@ -266,7 +268,7 @@ export const TaskCard = ({ task, onClick, onAssign, compact = false }: TaskCardP
             {/* Priority Badge - Clickable */}
             <Popover>
               <PopoverTrigger asChild>
-                <Badge 
+                <Badge
                   className={`${priorityConfig[task.priority].color} cursor-pointer hover:opacity-80 transition-opacity text-xs border flex items-center gap-1`}
                 >
                   <Flag className="h-3 w-3" />
@@ -350,54 +352,72 @@ export const TaskCard = ({ task, onClick, onAssign, compact = false }: TaskCardP
           {/* Bottom Row - Assignees, Subtasks, Comments */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              {/* Assignees */}
+              {/* Assignees - Always clickable */}
               <div className="flex items-center gap-1">
-                {assignedUsers.length > 0 ? (
-                  <div className="flex -space-x-2">
-                    {assignedUsers.slice(0, 3).map((user, index) => (
-                      <Avatar key={user.id} className="h-6 w-6 border-2 border-white">
-                        <AvatarFallback className="text-xs bg-blue-500 text-white">
-                          {user.name ? user.name.charAt(0).toUpperCase() : '?'}
-                        </AvatarFallback>
-                      </Avatar>
-                    ))}
-                    {assignedUsers.length > 3 && (
-                      <div className="h-6 w-6 bg-gray-200 border-2 border-white rounded-full flex items-center justify-center">
-                        <span className="text-xs text-gray-600">+{assignedUsers.length - 3}</span>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    {assignedUsers.length > 0 ? (
+                      <div className="flex -space-x-2 cursor-pointer hover:opacity-80 transition-opacity">
+                        {assignedUsers.slice(0, 3).map((user, index) => (
+                          <Avatar key={user.id} className="h-6 w-6 border-2 border-white">
+                            <AvatarFallback className="text-xs bg-blue-500 text-white">
+                              {user.name ? user.name.charAt(0).toUpperCase() : '?'}
+                            </AvatarFallback>
+                          </Avatar>
+                        ))}
+                        {assignedUsers.length > 3 && (
+                          <div className="h-6 w-6 bg-gray-200 border-2 border-white rounded-full flex items-center justify-center">
+                            <span className="text-xs text-gray-600">+{assignedUsers.length - 3}</span>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                ) : (
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         className="h-6 w-6 p-0 rounded-full border-2 border-dashed border-gray-300 hover:border-gray-400"
                       >
                         <User className="h-3 w-3 text-gray-400" />
                       </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-56 p-1" align="start">
-                      <div className="space-y-1">
-                        {users.map(user => (
+                    )}
+                  </PopoverTrigger>
+                  <PopoverContent className="w-56 p-2" align="start" onClick={(e) => e.stopPropagation()}>
+                    <div className="space-y-1">
+                      <div className="text-xs font-medium text-gray-500 px-2 py-1">Assign to:</div>
+                      {users.map(user => {
+                        const isAssigned = task.assignees?.includes(user.id);
+                        return (
                           <Button
                             key={user.id}
                             variant="ghost"
                             size="sm"
-                            className="w-full justify-start"
-                            onClick={() => onAssign?.(task.id, user.id)}
+                            className={cn(
+                              "w-full justify-start",
+                              isAssigned && "bg-blue-50 hover:bg-blue-100"
+                            )}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const newAssignees = isAssigned
+                                ? task.assignees.filter(id => id !== user.id)
+                                : [...(task.assignees || []), user.id];
+                              updateTask(task.id, { assignees: newAssignees });
+                            }}
                           >
-                            <Avatar className="h-5 w-5 mr-2">
-                              <AvatarFallback className="text-xs">{user.name.charAt(0)}</AvatarFallback>
-                            </Avatar>
-                            {user.name}
+                            <div className="flex items-center gap-2 flex-1">
+                              <Avatar className="h-5 w-5">
+                                <AvatarFallback className="text-xs">
+                                  {user.name.charAt(0)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="flex-1 text-left">{user.name}</span>
+                              {isAssigned && <Check className="h-4 w-4 text-blue-600" />}
+                            </div>
                           </Button>
-                        ))}
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                )}
+                        );
+                      })}
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
 
               {/* Subtasks Counter */}
