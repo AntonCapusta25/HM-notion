@@ -24,7 +24,7 @@ interface ListViewProps {
 // Safe date formatting utility
 const safeFormatDate = (dateInput: string | null | undefined, formatStr: string = 'MMM d'): string => {
   if (!dateInput) return 'No date';
-  
+
   try {
     const date = new Date(dateInput);
     if (isNaN(date.getTime())) {
@@ -37,12 +37,12 @@ const safeFormatDate = (dateInput: string | null | undefined, formatStr: string 
 };
 
 // Component for managing task assignees - NO LOCAL STATE, uses props directly
-const AssigneeManager = ({ 
-  taskId, 
-  currentAssignees, 
-  users, 
-  onAssign 
-}: { 
+const AssigneeManager = ({
+  taskId,
+  currentAssignees,
+  users,
+  onAssign
+}: {
   taskId: string;
   currentAssignees: string[];
   users: UserType[];
@@ -78,7 +78,7 @@ const AssigneeManager = ({
         <Command>
           <CommandInput placeholder="Search users..." />
           <CommandEmpty>No users found.</CommandEmpty>
-          
+
           {assignedUsers.length > 0 && (
             <CommandGroup heading="Assigned">
               {assignedUsers.map(user => (
@@ -99,7 +99,7 @@ const AssigneeManager = ({
               ))}
             </CommandGroup>
           )}
-          
+
           {unassignedUsers.length > 0 && (
             <CommandGroup heading="Available">
               {unassignedUsers.map(user => (
@@ -127,11 +127,11 @@ const AssigneeManager = ({
 };
 
 // Inline date editor component - NO LOCAL STATE except for editing mode
-const InlineDateEditor = ({ 
-  taskId, 
-  currentDate, 
-  onUpdate 
-}: { 
+const InlineDateEditor = ({
+  taskId,
+  currentDate,
+  onUpdate
+}: {
   taskId: string;
   currentDate: string | null;
   onUpdate: (taskId: string, updates: Partial<Task>) => void;
@@ -176,7 +176,7 @@ const InlineDateEditor = ({
   }
 
   return (
-    <div 
+    <div
       className="flex items-center gap-1 cursor-pointer hover:bg-gray-100 rounded px-1 py-1"
       onClick={() => setIsEditing(true)}
     >
@@ -189,11 +189,11 @@ const InlineDateEditor = ({
   );
 };
 
-export const ListView = ({ 
-  tasks, 
-  users, 
-  onCreateTask, 
-  onUpdateTask, 
+export const ListView = ({
+  tasks,
+  users,
+  onCreateTask,
+  onUpdateTask,
   onDeleteTask,
   onAssignTask
 }: ListViewProps) => {
@@ -230,7 +230,7 @@ export const ListView = ({
 
   const handleCreateTask = () => {
     if (!newTask.title.trim()) return;
-    
+
     const taskData = {
       id: `temp-${Date.now()}`,
       title: newTask.title.trim(),
@@ -245,7 +245,7 @@ export const ListView = ({
     startTransition(() => {
       // Add optimistically
       setOptimisticTasks(prev => [...prev, taskData]);
-      
+
       // Actual API call
       onCreateTask({
         title: newTask.title.trim(),
@@ -269,14 +269,14 @@ export const ListView = ({
   const handleStatusChange = (taskId: string, status: string) => {
     startTransition(() => {
       // Optimistic update
-      setOptimisticTasks(prev => 
-        prev.map(task => 
-          task.id === taskId 
+      setOptimisticTasks(prev =>
+        prev.map(task =>
+          task.id === taskId
             ? { ...task, status: status as 'todo' | 'in_progress' | 'done' }
             : task
         )
       );
-      
+
       // Actual API call
       onUpdateTask(taskId, { status: status as 'todo' | 'in_progress' | 'done' });
     });
@@ -285,14 +285,14 @@ export const ListView = ({
   const handlePriorityChange = (taskId: string, priority: string) => {
     startTransition(() => {
       // Optimistic update
-      setOptimisticTasks(prev => 
-        prev.map(task => 
-          task.id === taskId 
+      setOptimisticTasks(prev =>
+        prev.map(task =>
+          task.id === taskId
             ? { ...task, priority: priority as 'low' | 'medium' | 'high' }
             : task
         )
       );
-      
+
       // Actual API call
       onUpdateTask(taskId, { priority: priority as 'low' | 'medium' | 'high' });
     });
@@ -301,14 +301,14 @@ export const ListView = ({
   const handleDelete = (taskId: string) => {
     // Mark as deleting for fade effect
     setDeletingTaskIds(prev => new Set(prev).add(taskId));
-    
+
     startTransition(() => {
       // Optimistic deletion
       setOptimisticTasks(prev => prev.filter(task => task.id !== taskId));
-      
+
       // Actual API call
       onDeleteTask(taskId);
-      
+
       // Clean up deleting state
       setTimeout(() => {
         setDeletingTaskIds(prev => {
@@ -322,10 +322,10 @@ export const ListView = ({
 
   const handleAssign = (taskId: string, userIds: string[]) => {
     console.log('[ListView] handleAssign called:', { taskId, userIds });
-    
+
     startTransition(() => {
       // Optimistic update
-      setOptimisticTasks(prev => 
+      setOptimisticTasks(prev =>
         prev.map(task => {
           if (task.id === taskId) {
             console.log('[ListView] Updating task optimistically:', { taskId, oldAssignees: task.assignees, newAssignees: userIds });
@@ -334,7 +334,7 @@ export const ListView = ({
           return task;
         })
       );
-      
+
       // Actual API call
       onAssignTask(taskId, userIds);
     });
@@ -343,14 +343,14 @@ export const ListView = ({
   const handleDateUpdate = (taskId: string, updates: Partial<Task>) => {
     startTransition(() => {
       // Optimistic update
-      setOptimisticTasks(prev => 
-        prev.map(task => 
-          task.id === taskId 
+      setOptimisticTasks(prev =>
+        prev.map(task =>
+          task.id === taskId
             ? { ...task, ...updates }
             : task
         )
       );
-      
+
       // Actual API call
       onUpdateTask(taskId, updates);
     });
@@ -361,8 +361,8 @@ export const ListView = ({
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <CardTitle>Tasks List</CardTitle>
-          <Button 
-            onClick={() => setIsAddingTask(true)} 
+          <Button
+            onClick={() => setIsAddingTask(true)}
             className="bg-homemade-orange hover:bg-homemade-orange-dark"
             disabled={isAddingTask}
           >
@@ -371,125 +371,45 @@ export const ListView = ({
           </Button>
         </div>
       </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[300px]">Task</TableHead>
-              <TableHead className="w-[120px]">Status</TableHead>
-              <TableHead className="w-[120px]">Priority</TableHead>
-              <TableHead className="w-[150px]">Assignees</TableHead>
-              <TableHead className="w-[140px]">Due Date</TableHead>
-              <TableHead className="w-[80px]">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isAddingTask && (
-              <TableRow className="bg-blue-50">
-                <TableCell>
-                  <div className="space-y-2">
-                    <Input
-                      placeholder="Enter task title..."
-                      value={newTask.title}
-                      onChange={(e) => setNewTask(prev => ({ ...prev, title: e.target.value }))}
-                      onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleCreateTask()}
-                      autoFocus
-                    />
-                    <Input
-                      placeholder="Enter task description (optional)..."
-                      value={newTask.description}
-                      onChange={(e) => setNewTask(prev => ({ ...prev, description: e.target.value }))}
-                    />
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Select 
-                    value={newTask.status} 
-                    onValueChange={(value) => setNewTask(prev => ({ ...prev, status: value as any }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="todo">To Do</SelectItem>
-                      <SelectItem value="in_progress">In Progress</SelectItem>
-                      <SelectItem value="done">Done</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </TableCell>
-                <TableCell>
-                  <Select 
-                    value={newTask.priority} 
-                    onValueChange={(value) => setNewTask(prev => ({ ...prev, priority: value as any }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </TableCell>
-                <TableCell>
-                  <span className="text-sm text-gray-500">Assign after creation</span>
-                </TableCell>
-                <TableCell>
-                  <Input
-                    type="date"
-                    value={newTask.due_date}
-                    onChange={(e) => setNewTask(prev => ({ ...prev, due_date: e.target.value }))}
-                  />
-                </TableCell>
-                <TableCell>
-                  <div className="flex gap-1">
-                    <Button size="sm" variant="ghost" onClick={handleCreateTask}>
-                      <Check className="h-4 w-4 text-green-600" />
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => setIsAddingTask(false)}>
-                      <X className="h-4 w-4 text-red-600" />
-                    </Button>
-                  </div>
-                </TableCell>
+      <CardContent className="overflow-x-auto">
+        <div className="min-w-full">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="min-w-[200px]">Task</TableHead>
+                <TableHead className="w-[100px]">Status</TableHead>
+                <TableHead className="w-[100px]">Priority</TableHead>
+                <TableHead className="w-[130px]">Assignees</TableHead>
+                <TableHead className="w-[120px]">Due Date</TableHead>
+                <TableHead className="w-[60px]">Actions</TableHead>
               </TableRow>
-            )}
-            
-            {optimisticTasks.map((task) => {
-              const taskAssignees = task.assignees || [];
-              const assignedUsers = users.filter(u => taskAssignees.includes(u.id));
-              const isDeleting = deletingTaskIds.has(task.id);
-              const isTempTask = task.id.startsWith('temp-');
-              
-              return (
-                <TableRow 
-                  key={task.id} 
-                  className={`hover:bg-gray-50 transition-all duration-300 ${
-                    isDeleting ? 'opacity-0' : isTempTask ? 'opacity-70' : 'opacity-100'
-                  }`}
-                >
-                  <TableCell className="font-medium">
-                    <div>
-                      <div className="font-medium text-gray-900">{task.title}</div>
-                      {task.description && (
-                        <div className="text-sm text-gray-500 mt-1 line-clamp-2">
-                          {task.description}
-                        </div>
-                      )}
+            </TableHeader>
+            <TableBody>
+              {isAddingTask && (
+                <TableRow className="bg-blue-50">
+                  <TableCell>
+                    <div className="space-y-2">
+                      <Input
+                        placeholder="Enter task title..."
+                        value={newTask.title}
+                        onChange={(e) => setNewTask(prev => ({ ...prev, title: e.target.value }))}
+                        onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleCreateTask()}
+                        autoFocus
+                      />
+                      <Input
+                        placeholder="Enter task description (optional)..."
+                        value={newTask.description}
+                        onChange={(e) => setNewTask(prev => ({ ...prev, description: e.target.value }))}
+                      />
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Select 
-                      value={task.status} 
-                      onValueChange={(value) => handleStatusChange(task.id, value)}
+                    <Select
+                      value={newTask.status}
+                      onValueChange={(value) => setNewTask(prev => ({ ...prev, status: value as any }))}
                     >
                       <SelectTrigger>
-                        <SelectValue>
-                          <Badge className={statusColors[task.status]}>
-                            {task.status === 'todo' ? 'To Do' : 
-                             task.status === 'in_progress' ? 'In Progress' : 'Done'}
-                          </Badge>
-                        </SelectValue>
+                        <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="todo">To Do</SelectItem>
@@ -499,16 +419,12 @@ export const ListView = ({
                     </Select>
                   </TableCell>
                   <TableCell>
-                    <Select 
-                      value={task.priority} 
-                      onValueChange={(value) => handlePriorityChange(task.id, value)}
+                    <Select
+                      value={newTask.priority}
+                      onValueChange={(value) => setNewTask(prev => ({ ...prev, priority: value as any }))}
                     >
                       <SelectTrigger>
-                        <SelectValue>
-                          <Badge className={`${priorityColors[task.priority]} text-xs border`}>
-                            {task.priority}
-                          </Badge>
-                        </SelectValue>
+                        <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="low">Low</SelectItem>
@@ -518,53 +434,138 @@ export const ListView = ({
                     </Select>
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-2">
-                      <div className="flex -space-x-1">
-                        {assignedUsers.slice(0, 3).map(user => (
-                          <Avatar key={user.id} className="h-6 w-6 border-2 border-white">
-                            <AvatarFallback className="text-xs bg-blue-100">
-                              {user.name.charAt(0)}
-                            </AvatarFallback>
-                          </Avatar>
-                        ))}
-                        {assignedUsers.length > 3 && (
-                          <div className="h-6 w-6 rounded-full bg-gray-200 border-2 border-white flex items-center justify-center">
-                            <span className="text-xs text-gray-600">+{assignedUsers.length - 3}</span>
-                          </div>
-                        )}
-                      </div>
-                      <AssigneeManager
-                        taskId={task.id}
-                        currentAssignees={taskAssignees}
-                        users={users}
-                        onAssign={handleAssign}
-                      />
-                    </div>
+                    <span className="text-sm text-gray-500">Assign after creation</span>
                   </TableCell>
                   <TableCell>
-                    <InlineDateEditor
-                      taskId={task.id}
-                      currentDate={task.due_date}
-                      onUpdate={handleDateUpdate}
+                    <Input
+                      type="date"
+                      value={newTask.due_date}
+                      onChange={(e) => setNewTask(prev => ({ ...prev, due_date: e.target.value }))}
                     />
                   </TableCell>
                   <TableCell>
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
-                      onClick={() => handleDelete(task.id)}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      disabled={isDeleting}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button size="sm" variant="ghost" onClick={handleCreateTask}>
+                        <Check className="h-4 w-4 text-green-600" />
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setIsAddingTask(false)}>
+                        <X className="h-4 w-4 text-red-600" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-        
+              )}
+
+              {optimisticTasks.map((task) => {
+                const taskAssignees = task.assignees || [];
+                const assignedUsers = users.filter(u => taskAssignees.includes(u.id));
+                const isDeleting = deletingTaskIds.has(task.id);
+                const isTempTask = task.id.startsWith('temp-');
+
+                return (
+                  <TableRow
+                    key={task.id}
+                    className={`hover:bg-gray-50 transition-all duration-300 ${isDeleting ? 'opacity-0' : isTempTask ? 'opacity-70' : 'opacity-100'
+                      }`}
+                  >
+                    <TableCell className="font-medium">
+                      <div>
+                        <div className="font-medium text-gray-900">{task.title}</div>
+                        {task.description && (
+                          <div className="text-sm text-gray-500 mt-1 line-clamp-2">
+                            {task.description}
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Select
+                        value={task.status}
+                        onValueChange={(value) => handleStatusChange(task.id, value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue>
+                            <Badge className={statusColors[task.status]}>
+                              {task.status === 'todo' ? 'To Do' :
+                                task.status === 'in_progress' ? 'In Progress' : 'Done'}
+                            </Badge>
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="todo">To Do</SelectItem>
+                          <SelectItem value="in_progress">In Progress</SelectItem>
+                          <SelectItem value="done">Done</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell>
+                      <Select
+                        value={task.priority}
+                        onValueChange={(value) => handlePriorityChange(task.id, value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue>
+                            <Badge className={`${priorityColors[task.priority]} text-xs border`}>
+                              {task.priority}
+                            </Badge>
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="low">Low</SelectItem>
+                          <SelectItem value="medium">Medium</SelectItem>
+                          <SelectItem value="high">High</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <div className="flex -space-x-1">
+                          {assignedUsers.slice(0, 3).map(user => (
+                            <Avatar key={user.id} className="h-6 w-6 border-2 border-white">
+                              <AvatarFallback className="text-xs bg-blue-100">
+                                {user.name.charAt(0)}
+                              </AvatarFallback>
+                            </Avatar>
+                          ))}
+                          {assignedUsers.length > 3 && (
+                            <div className="h-6 w-6 rounded-full bg-gray-200 border-2 border-white flex items-center justify-center">
+                              <span className="text-xs text-gray-600">+{assignedUsers.length - 3}</span>
+                            </div>
+                          )}
+                        </div>
+                        <AssigneeManager
+                          taskId={task.id}
+                          currentAssignees={taskAssignees}
+                          users={users}
+                          onAssign={handleAssign}
+                        />
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <InlineDateEditor
+                        taskId={task.id}
+                        currentDate={task.due_date}
+                        onUpdate={handleDateUpdate}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleDelete(task.id)}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        disabled={isDeleting}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+
         {optimisticTasks.length === 0 && !isAddingTask && (
           <div className="text-center py-8 text-gray-500">
             <p>No tasks yet. Click "Add Task" to get started!</p>
