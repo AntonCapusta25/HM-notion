@@ -23,6 +23,9 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
   // Track pending real-time fetches for batching
   const pendingRealtimeFetches = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
+  // Track tasks with optimistic assignee updates to prevent flicker
+  const optimisticAssigneeUpdates = useRef<Set<string>>(new Set());
+
   const fetchTasks = useCallback(async () => {
     console.log('🔄 fetchTasks called');
     console.log('  - user:', user?.id);
@@ -206,6 +209,12 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
           const taskId = payload.new?.task_id || payload.old?.task_id;
           if (!taskId) return;
 
+          // Skip real-time updates if we have an optimistic update pending
+          if (optimisticAssigneeUpdates.current.has(taskId)) {
+            console.log('⏭️ Skipping real-time update for task with optimistic changes:', taskId);
+            return;
+          }
+
           // Cancel any pending fetch for this task
           const existingTimeout = pendingRealtimeFetches.current.get(taskId);
           if (existingTimeout) {
@@ -215,6 +224,12 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
           // Batch multiple events: wait 50ms before fetching (reduced from 100ms)
           const timeoutId = setTimeout(() => {
             pendingRealtimeFetches.current.delete(taskId);
+
+            // Double-check: skip if optimistic update is still pending
+            if (optimisticAssigneeUpdates.current.has(taskId)) {
+              console.log('⏭️ Skipping batched update for task with optimistic changes:', taskId);
+              return;
+            }
 
             // Fetch this task's assignments
             supabase
@@ -473,6 +488,9 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
   const updateAssignees = useCallback(async (taskId: string, assigneeIds: string[]) => {
     console.log('👥 updateAssignees called:', { taskId, assigneeIds });
 
+    // Mark this task as having an optimistic update
+    optimisticAssigneeUpdates.current.add(taskId);
+
     try {
       // Delete all existing assignments for this task
       const { error: deleteError } = await supabase
@@ -505,8 +523,17 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
       } else {
         console.log('✅ Task assignments cleared successfully');
       }
+
+      // Wait a bit for real-time events to settle, then allow real-time updates again
+      setTimeout(() => {
+        optimisticAssigneeUpdates.current.delete(taskId);
+        console.log('🔓 Unlocked real-time updates for task:', taskId);
+      }, 200); // Wait 200ms for all real-time events to process
+
     } catch (error) {
       console.error('❌ Error in updateAssignees:', error);
+      // Remove lock on error
+      optimisticAssigneeUpdates.current.delete(taskId);
       throw error;
     }
   }, []);
