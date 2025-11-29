@@ -162,13 +162,13 @@ const InlineDateEditor = ({
           type="date"
           value={dateValue}
           onChange={(e) => setDateValue(e.target.value)}
-          className="h-7 text-xs"
+          className="h-7 text-xs w-full"
           autoFocus
         />
-        <Button size="sm" variant="ghost" onClick={handleSave} className="h-6 w-6 p-0">
+        <Button size="sm" variant="ghost" onClick={handleSave} className="h-6 w-6 p-0 flex-shrink-0">
           <Check className="h-3 w-3 text-green-600" />
         </Button>
-        <Button size="sm" variant="ghost" onClick={handleCancel} className="h-6 w-6 p-0">
+        <Button size="sm" variant="ghost" onClick={handleCancel} className="h-6 w-6 p-0 flex-shrink-0">
           <X className="h-3 w-3 text-red-600" />
         </Button>
       </div>
@@ -177,14 +177,14 @@ const InlineDateEditor = ({
 
   return (
     <div
-      className="flex items-center gap-1 cursor-pointer hover:bg-gray-100 rounded px-1 py-1"
+      className="flex items-center gap-1 cursor-pointer hover:bg-gray-100 rounded px-2 py-1"
       onClick={() => setIsEditing(true)}
     >
-      <Calendar className="h-3 w-3" />
-      <span className="text-sm">
+      <Calendar className="h-3 w-3 flex-shrink-0" />
+      <span className="text-sm whitespace-nowrap">
         {currentDate ? safeFormatDate(currentDate, 'MMM d') : 'Set date'}
       </span>
-      <Edit2 className="h-3 w-3 text-gray-400" />
+      <Edit2 className="h-3 w-3 text-gray-400 flex-shrink-0" />
     </div>
   );
 };
@@ -376,11 +376,11 @@ export const ListView = ({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="min-w-[180px] max-w-[300px]">Task</TableHead>
-                <TableHead className="w-[110px]">Status</TableHead>
-                <TableHead className="w-[90px]">Priority</TableHead>
-                <TableHead className="w-[110px]">Assignees</TableHead>
-                <TableHead className="w-[100px]">Due Date</TableHead>
+                <TableHead className="min-w-[250px] max-w-[450px]">Task</TableHead>
+                <TableHead className="w-[140px]">Status</TableHead>
+                <TableHead className="w-[120px]">Priority</TableHead>
+                <TableHead className="w-[180px]">Assignees</TableHead>
+                <TableHead className="w-[140px]">Due Date</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -408,7 +408,7 @@ export const ListView = ({
                       value={newTask.status}
                       onValueChange={(value) => setNewTask(prev => ({ ...prev, status: value as any }))}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -423,7 +423,7 @@ export const ListView = ({
                       value={newTask.priority}
                       onValueChange={(value) => setNewTask(prev => ({ ...prev, priority: value as any }))}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -441,6 +441,7 @@ export const ListView = ({
                       type="date"
                       value={newTask.due_date}
                       onChange={(e) => setNewTask(prev => ({ ...prev, due_date: e.target.value }))}
+                      className="w-full"
                     />
                   </TableCell>
                   <TableCell>
@@ -469,10 +470,10 @@ export const ListView = ({
                       }`}
                   >
                     <TableCell className="font-medium">
-                      <div>
+                      <div className="space-y-1">
                         <div className="font-medium text-gray-900">{task.title}</div>
                         {task.description && (
-                          <div className="text-sm text-gray-500 mt-1 whitespace-normal break-words">
+                          <div className="text-sm text-gray-500 whitespace-pre-wrap break-words max-w-prose">
                             {task.description}
                           </div>
                         )}
@@ -483,9 +484,9 @@ export const ListView = ({
                         value={task.status}
                         onValueChange={(value) => handleStatusChange(task.id, value)}
                       >
-                        <SelectTrigger className="h-7 text-xs w-full">
+                        <SelectTrigger className="h-8 w-full">
                           <SelectValue>
-                            <Badge className={`${statusColors[task.status]} text-xs px-1 py-0`}>
+                            <Badge className={`${statusColors[task.status]} text-xs px-2 py-0.5 whitespace-nowrap`}>
                               {task.status === 'todo' ? 'To Do' :
                                 task.status === 'in_progress' ? 'In Progress' : 'Done'}
                             </Badge>
@@ -503,10 +504,10 @@ export const ListView = ({
                         value={task.priority}
                         onValueChange={(value) => handlePriorityChange(task.id, value)}
                       >
-                        <SelectTrigger className="h-7 text-xs">
+                        <SelectTrigger className="h-8 w-full">
                           <SelectValue>
-                            <Badge className={`${priorityColors[task.priority]} text-xs border px-1 py-0`}>
-                              {task.priority.charAt(0).toUpperCase()}
+                            <Badge className={`${priorityColors[task.priority]} text-xs border px-2 py-0.5 whitespace-nowrap`}>
+                              {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
                             </Badge>
                           </SelectValue>
                         </SelectTrigger>
@@ -518,7 +519,7 @@ export const ListView = ({
                       </Select>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <div className="flex -space-x-1">
                           {assignedUsers.slice(0, 3).map(user => (
                             <Avatar key={user.id} className="h-6 w-6 border-2 border-white">
