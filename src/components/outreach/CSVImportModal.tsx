@@ -15,11 +15,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { 
-  Upload, 
-  FileText, 
-  CheckCircle, 
-  AlertCircle, 
+import {
+  Upload,
+  FileText,
+  CheckCircle,
+  AlertCircle,
   Download,
   ArrowRight,
   X,
@@ -52,7 +52,7 @@ interface MappingConfig {
 const REQUIRED_FIELDS = ['name', 'email']
 const OPTIONAL_FIELDS = [
   'company',
-  'position', 
+  'position',
   'industry',
   'phone',
   'website',
@@ -99,7 +99,7 @@ export default function CSVImportModal({ open, onClose, workspaceId }: CSVImport
     }
 
     setFile(file)
-    
+
     // Parse CSV to preview
     Papa.parse(file, {
       complete: (results) => {
@@ -166,20 +166,20 @@ export default function CSVImportModal({ open, onClose, workspaceId }: CSVImport
   const handleMappingChange = (columnIndex: number, fieldName: string) => {
     setMappingConfig(prev => {
       const newMapping = { ...prev }
-      
+
       // Remove the field from other columns if it was already mapped
       Object.keys(newMapping).forEach(key => {
         if (newMapping[key] === fieldName && key !== columnIndex.toString()) {
           delete newMapping[key]
         }
       })
-      
+
       if (fieldName === '') {
         delete newMapping[columnIndex]
       } else {
         newMapping[columnIndex] = fieldName
       }
-      
+
       return newMapping
     })
   }
@@ -187,7 +187,7 @@ export default function CSVImportModal({ open, onClose, workspaceId }: CSVImport
   const validateMapping = () => {
     const mappedFields = Object.values(mappingConfig)
     const missingRequired = REQUIRED_FIELDS.filter(field => !mappedFields.includes(field))
-    
+
     if (missingRequired.length > 0) {
       toast({
         title: "Missing required fields",
@@ -196,7 +196,7 @@ export default function CSVImportModal({ open, onClose, workspaceId }: CSVImport
       })
       return false
     }
-    
+
     return true
   }
 
@@ -205,14 +205,14 @@ export default function CSVImportModal({ open, onClose, workspaceId }: CSVImport
 
     const preview = csvData.slice(0, 5).map(row => {
       const lead: any = {}
-      
+
       Object.entries(mappingConfig).forEach(([columnIndex, fieldName]) => {
         const value = row[parseInt(columnIndex)]?.trim()
         if (value) {
           lead[fieldName] = value
         }
       })
-      
+
       return lead
     })
 
@@ -229,13 +229,13 @@ export default function CSVImportModal({ open, onClose, workspaceId }: CSVImport
 
       // Upload CSV file
       const fileUrl = await uploadCSV(file, workspaceId)
-      
-      setImportProgress(20)
 
-      // Process import
-      let successfulImports = 0
-      let failedImports = 0
+      setImportProgress(10)
+
+      // Phase 1: Validate all rows and prepare lead data (fast, in-memory)
+      const validLeads: any[] = []
       const errors: string[] = []
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
       for (let i = 0; i < csvData.length; i++) {
         try {
@@ -244,7 +244,7 @@ export default function CSVImportModal({ open, onClose, workspaceId }: CSVImport
             workspace_id: workspaceId,
             created_by: user.id,
             source: 'csv_import',
-            segment_id: targetSegmentId || undefined
+            segment_id: targetSegmentId || null
           }
 
           // Map CSV data to lead fields
@@ -261,23 +261,65 @@ export default function CSVImportModal({ open, onClose, workspaceId }: CSVImport
           }
 
           // Validate email format
-          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
           if (!emailRegex.test(leadData.email)) {
             throw new Error('Invalid email format')
           }
 
-          await createLead(leadData)
-          successfulImports++
+          validLeads.push(leadData)
 
         } catch (error: any) {
-          failedImports++
           errors.push(`Row ${i + 2}: ${error.message}`)
         }
 
-        setImportProgress(20 + (i / csvData.length) * 70)
+        // Update progress during validation (10% -> 50%)
+        setImportProgress(10 + (i / csvData.length) * 40)
       }
 
-      // Save import record
+      setImportProgress(50)
+
+      // Phase 2: Bulk insert all valid leads (one database call!)
+      let successfulImports = 0
+      let failedImports = errors.length
+
+      if (validLeads.length > 0) {
+        try {
+          const { data, error } = await supabase
+            .from('leads')
+            .insert(validLeads)
+            .select()
+
+          if (error) {
+            console.error('❌ Bulk insert error:', error)
+            // If bulk insert fails, fall back to individual inserts
+            toast({
+              title: "Bulk insert failed, trying individual inserts...",
+              description: "This may take longer",
+            })
+
+            for (let i = 0; i < validLeads.length; i++) {
+              try {
+                await createLead(validLeads[i])
+                successfulImports++
+              } catch (err: any) {
+                failedImports++
+                errors.push(`Lead ${i + 1}: ${err.message}`)
+              }
+              setImportProgress(50 + (i / validLeads.length) * 30)
+            }
+          } else {
+            successfulImports = data?.length || validLeads.length
+            setImportProgress(80)
+          }
+        } catch (error: any) {
+          console.error('❌ Import error:', error)
+          failedImports = validLeads.length
+          errors.push(`Bulk insert failed: ${error.message}`)
+        }
+      }
+
+      setImportProgress(85)
+
+      // Phase 3: Save import record
       await processCSVImport({
         file_name: file.name,
         file_url: fileUrl,
@@ -352,11 +394,11 @@ export default function CSVImportModal({ open, onClose, workspaceId }: CSVImport
               <div key={step} className="flex items-center">
                 <div className={`
                   w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium
-                  ${currentStep === step 
-                    ? 'bg-blue-600 text-white' 
+                  ${currentStep === step
+                    ? 'bg-blue-600 text-white'
                     : index < ['upload', 'mapping', 'preview', 'importing', 'complete'].indexOf(currentStep)
-                    ? 'bg-green-600 text-white'
-                    : 'bg-gray-200 text-gray-600'
+                      ? 'bg-green-600 text-white'
+                      : 'bg-gray-200 text-gray-600'
                   }
                 `}>
                   {index < ['upload', 'mapping', 'preview', 'importing', 'complete'].indexOf(currentStep) ? (
@@ -476,9 +518,9 @@ export default function CSVImportModal({ open, onClose, workspaceId }: CSVImport
                           Sample: {column.sample || 'No data'}
                         </p>
                       </div>
-                      
+
                       <ArrowRight className="h-4 w-4 text-gray-400 mx-auto" />
-                      
+
                       <Select
                         value={mappingConfig[index] || ''}
                         onValueChange={(value) => handleMappingChange(index, value)}
@@ -505,7 +547,7 @@ export default function CSVImportModal({ open, onClose, workspaceId }: CSVImport
                           ))}
                         </SelectContent>
                       </Select>
-                      
+
                       <div>
                         {mappingConfig[index] && (
                           <Badge variant={REQUIRED_FIELDS.includes(mappingConfig[index]) ? 'destructive' : 'secondary'}>
@@ -527,8 +569,8 @@ export default function CSVImportModal({ open, onClose, workspaceId }: CSVImport
                       {segments.map(segment => (
                         <SelectItem key={segment.id} value={segment.id}>
                           <div className="flex items-center gap-2">
-                            <div 
-                              className="w-3 h-3 rounded-full" 
+                            <div
+                              className="w-3 h-3 rounded-full"
                               style={{ backgroundColor: segment.color }}
                             />
                             {segment.name}
@@ -596,7 +638,7 @@ export default function CSVImportModal({ open, onClose, workspaceId }: CSVImport
                     </div>
                     <div>
                       <span className="text-blue-600">Target segment:</span> {
-                        targetSegmentId 
+                        targetSegmentId
                           ? segments.find(s => s.id === targetSegmentId)?.name || 'Unknown'
                           : 'None'
                       }
