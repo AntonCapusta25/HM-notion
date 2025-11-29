@@ -492,6 +492,22 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
     optimisticAssigneeUpdates.current.add(taskId);
 
     try {
+      // Get current assignees to determine who is new
+      const { data: currentAssignees } = await supabase
+        .from('task_assignees')
+        .select('user_id')
+        .eq('task_id', taskId);
+
+      const currentAssigneeIds = currentAssignees?.map(a => a.user_id) || [];
+      const newAssigneeIds = assigneeIds.filter(id => !currentAssigneeIds.includes(id));
+
+      // Get task details for notification
+      const { data: task } = await supabase
+        .from('tasks')
+        .select('title, created_by')
+        .eq('id', taskId)
+        .single();
+
       // Delete all existing assignments for this task
       const { error: deleteError } = await supabase
         .from('task_assignees')
@@ -520,6 +536,47 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
         }
 
         console.log('✅ Task assignments updated successfully');
+
+        // Create notifications for NEW assignees only (not the task creator)
+        if (newAssigneeIds.length > 0 && task) {
+          const notificationsToCreate = newAssigneeIds
+            .filter(userId => userId !== task.created_by) // Don't notify task creator
+            .map(userId => ({
+              user_id: userId,
+              task_id: taskId,
+              type: 'task_assigned',
+              title: 'New Task Assigned',
+              message: `You have been assigned to "${task.title}"`,
+              read: false
+            }));
+
+          if (notificationsToCreate.length > 0) {
+            // Check for existing notifications to avoid duplicates
+            const { data: existingNotifs } = await supabase
+              .from('notifications')
+              .select('user_id')
+              .eq('task_id', taskId)
+              .eq('type', 'task_assigned')
+              .in('user_id', newAssigneeIds);
+
+            const existingUserIds = existingNotifs?.map(n => n.user_id) || [];
+            const uniqueNotifications = notificationsToCreate.filter(
+              n => !existingUserIds.includes(n.user_id)
+            );
+
+            if (uniqueNotifications.length > 0) {
+              const { error: notifError } = await supabase
+                .from('notifications')
+                .insert(uniqueNotifications);
+
+              if (notifError) {
+                console.error('❌ Error creating notifications:', notifError);
+              } else {
+                console.log(`✅ Created ${uniqueNotifications.length} task assignment notifications`);
+              }
+            }
+          }
+        }
       } else {
         console.log('✅ Task assignments cleared successfully');
       }
@@ -663,60 +720,3 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
 
       if (error) throw error;
 
-      // ✅ Real-time subscription will replace temp comment with real one
-      console.log('✅ Comment saved to database, real-time will sync');
-
-    } catch (error: any) {
-      console.error('❌ Failed to save comment:', error);
-
-      // Rollback: Remove optimistic comment on error
-      setTasks(prev => prev.map(task =>
-        task.id === taskId
-          ? {
-            ...task,
-            comments: (task.comments || []).filter(c => c.id !== tempId)
-          }
-          : task
-      ));
-
-      throw error;
-    }
-
-  }, [user?.id]);
-
-  const toggleSubtask = useCallback(async (taskId: string, subtaskId: string) => {
-    console.log('☑️ Toggling subtask:', subtaskId);
-    // First get current subtask state
-    const { data: subtask } = await supabase
-      .from('subtasks')
-      .select('completed')
-      .eq('id', subtaskId)
-      .single();
-
-    if (subtask) {
-      await supabase
-        .from('subtasks')
-        .update({ completed: !subtask.completed })
-        .eq('id', subtaskId);
-    }
-
-    // ✅ No manual refresh needed - real-time subscription will update the UI
-
-  }, []);
-
-  return {
-    tasks,
-    users,
-    workspaces,
-    loading,
-    error,
-    createTask,
-    updateTask,
-    deleteTask,
-    addComment,
-    updateAssignees,
-    updateTags,
-    toggleSubtask,
-    refreshTasks
-  };
-};
