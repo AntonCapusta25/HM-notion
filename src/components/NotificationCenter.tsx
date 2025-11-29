@@ -39,8 +39,6 @@ export const NotificationCenter = () => {
   const [userTasks, setUserTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
-  const [readRtIds, setReadRtIds] = useState<Set<string>>(new Set());
-  const [dismissedRtIds, setDismissedRtIds] = useState<Set<string>>(new Set());
 
   // Set notification settings from the profile data
   const notificationSettings: NotificationSettings = useMemo(() => {
@@ -194,121 +192,16 @@ export const NotificationCenter = () => {
     };
   }, [user, notificationSettings.desktop]);
 
-  // Generate additional real-time notifications based on current tasks
-  const combinedNotifications = useMemo(() => {
-    if (!user || !userTasks.length) return dbNotifications;
-
-    const realTimeNotifs: DBNotification[] = [];
-
-    // Only generate real-time notifications if settings allow them
-    if (notificationSettings.dueSoon || notificationSettings.taskAssigned) {
-      userTasks.forEach(task => {
-        // Task assigned notifications
-        if (notificationSettings.taskAssigned && task.isAssigned && !task.isCreator) {
-          const assignedNotifExists = dbNotifications.some(
-            n => n.task_id === task.id && n.type === 'task_assigned'
-          );
-
-          if (!assignedNotifExists) {
-            realTimeNotifs.push({
-              id: `rt-assigned-${task.id}`,
-              user_id: user.id,
-              task_id: task.id,
-              type: 'task_assigned',
-              title: 'New Task Assigned',
-              message: `You have been assigned to "${task.title}"`,
-              read: false,
-              created_at: task.created_at
-            });
-          }
-        }
-
-        // Due soon/overdue notifications
-        if (notificationSettings.dueSoon && task.due_date && task.status !== 'done' &&
-          (task.isAssigned || task.isCreator)) {
-          const dueDate = new Date(task.due_date);
-
-          if (isToday(dueDate)) {
-            const dueTodayExists = dbNotifications.some(
-              n => n.task_id === task.id && (n.type === 'due_soon' || n.type === 'task_due')
-            );
-
-            if (!dueTodayExists) {
-              realTimeNotifs.push({
-                id: `rt-due-today-${task.id}`,
-                user_id: user.id,
-                task_id: task.id,
-                type: 'due_soon',
-                title: 'Task Due Today',
-                message: `"${task.title}" is due today`,
-                read: false,
-                created_at: task.due_date
-              });
-            }
-          } else if (isTomorrow(dueDate)) {
-            const dueTomorrowExists = dbNotifications.some(
-              n => n.task_id === task.id && n.type === 'due_soon'
-            );
-
-            if (!dueTomorrowExists) {
-              realTimeNotifs.push({
-                id: `rt-due-tomorrow-${task.id}`,
-                user_id: user.id,
-                task_id: task.id,
-                type: 'due_soon',
-                title: 'Task Due Tomorrow',
-                message: `"${task.title}" is due tomorrow`,
-                read: false,
-                created_at: task.due_date
-              });
-            }
-          } else if (isPast(dueDate) && !isToday(dueDate)) {
-            const overdueExists = dbNotifications.some(
-              n => n.task_id === task.id && (n.type === 'overdue' || n.type === 'task_overdue')
-            );
-
-            if (!overdueExists) {
-              realTimeNotifs.push({
-                id: `rt-overdue-${task.id}`,
-                user_id: user.id,
-                task_id: task.id,
-                type: 'overdue',
-                title: 'Task Overdue',
-                message: `"${task.title}" is overdue`,
-                read: false,
-                created_at: task.due_date
-              });
-            }
-          }
-        }
-      });
-    }
-
-    // Filter out dismissed RT notifications and update read status
-    const processedRtNotifs = realTimeNotifs
-      .filter(n => !dismissedRtIds.has(n.id))
-      .map(n => ({
-        ...n,
-        read: readRtIds.has(n.id)
-      }));
-
-    // Combine DB notifications with real-time ones, remove duplicates
-    const combined = [...dbNotifications, ...processedRtNotifs];
-    const uniqueNotifications = combined.filter((notif, index, self) =>
-      index === self.findIndex(n =>
-        (n.id === notif.id) ||
-        (n.task_id === notif.task_id && n.type === notif.type)
-      )
+  // Use database notifications directly (no real-time generation)
+  const notifications = useMemo(() => {
+    return dbNotifications.sort((a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
-
-    return uniqueNotifications
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-      .slice(0, 20);
-  }, [dbNotifications, userTasks, user, notificationSettings, readRtIds, dismissedRtIds]);
+  }, [dbNotifications]);
 
   // Filter notifications based on user settings
   const filteredNotifications = useMemo(() => {
-    return combinedNotifications.filter(notif => {
+    return notifications.filter(notif => {
       switch (notif.type) {
         case 'task_assigned':
           return notificationSettings.taskAssigned;
@@ -326,17 +219,11 @@ export const NotificationCenter = () => {
           return true;
       }
     });
-  }, [combinedNotifications, notificationSettings]);
+  }, [notifications, notificationSettings]);
 
   const unreadCount = filteredNotifications.filter(n => !n.read).length;
 
   const markAsRead = async (id: string) => {
-    // Handle RT notifications locally
-    if (id.startsWith('rt-')) {
-      setReadRtIds(prev => new Set(prev).add(id));
-      return;
-    }
-
     // ⚡ OPTIMISTIC: Update UI immediately
     setDbNotifications(prev =>
       prev.map(notif => notif.id === id ? { ...notif, read: true } : notif)
@@ -366,22 +253,9 @@ export const NotificationCenter = () => {
   };
 
   const markAllAsRead = async () => {
-    // Mark RT notifications as read
-    const rtIds = filteredNotifications
-      .filter(n => !n.read && n.id.startsWith('rt-'))
-      .map(n => n.id);
-
-    if (rtIds.length > 0) {
-      setReadRtIds(prev => {
-        const next = new Set(prev);
-        rtIds.forEach(id => next.add(id));
-        return next;
-      });
-    }
-
     try {
       const unreadIds = filteredNotifications
-        .filter(n => !n.read && !n.id.startsWith('rt-'))
+        .filter(n => !n.read)
         .map(n => n.id);
 
       if (unreadIds.length > 0) {
@@ -404,12 +278,6 @@ export const NotificationCenter = () => {
   };
 
   const removeNotification = async (id: string) => {
-    // Handle RT notifications locally
-    if (id.startsWith('rt-')) {
-      setDismissedRtIds(prev => new Set(prev).add(id));
-      return;
-    }
-
     // Store original notification for potential rollback
     const originalNotif = dbNotifications.find(n => n.id === id);
 
