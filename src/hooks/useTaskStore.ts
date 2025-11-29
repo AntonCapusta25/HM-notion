@@ -720,3 +720,60 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
 
       if (error) throw error;
 
+      // ✅ Real-time subscription will replace temp comment with real one
+      console.log('✅ Comment saved to database, real-time will sync');
+
+    } catch (error: any) {
+      console.error('❌ Failed to save comment:', error);
+
+      // Rollback: Remove optimistic comment on error
+      setTasks(prev => prev.map(task =>
+        task.id === taskId
+          ? {
+            ...task,
+            comments: (task.comments || []).filter(c => c.id !== tempId)
+          }
+          : task
+      ));
+
+      throw error;
+    }
+
+  }, [user?.id]);
+
+  const toggleSubtask = useCallback(async (taskId: string, subtaskId: string) => {
+    console.log('☑️ Toggling subtask:', subtaskId);
+    // First get current subtask state
+    const { data: subtask } = await supabase
+      .from('subtasks')
+      .select('completed')
+      .eq('id', subtaskId)
+      .single();
+
+    if (subtask) {
+      await supabase
+        .from('subtasks')
+        .update({ completed: !subtask.completed })
+        .eq('id', subtaskId);
+    }
+
+    // ✅ No manual refresh needed - real-time subscription will update the UI
+
+  }, []);
+
+  return {
+    tasks,
+    users,
+    workspaces,
+    loading,
+    error,
+    createTask,
+    updateTask,
+    deleteTask,
+    addComment,
+    updateAssignees,
+    updateTags,
+    toggleSubtask,
+    refreshTasks
+  };
+};
