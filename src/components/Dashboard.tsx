@@ -665,7 +665,7 @@ export const Dashboard = () => {
                 <Badge variant="secondary">{tasksByStatus.todo.length}</Badge>
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3 max-h-[calc(100vh-400px)] overflow-y-auto">
+            <CardContent className="space-y-3">
               {tasksByStatus.todo.map(task => (
                 <TaskCard
                   key={task.id}
@@ -686,7 +686,7 @@ export const Dashboard = () => {
                 <Badge variant="secondary">{tasksByStatus.in_progress.length}</Badge>
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3 max-h-[calc(100vh-400px)] overflow-y-auto">
+            <CardContent className="space-y-3">
               {tasksByStatus.in_progress.map(task => (
                 <TaskCard
                   key={task.id}
@@ -707,7 +707,7 @@ export const Dashboard = () => {
                 <Badge variant="secondary">{tasksByStatus.done.length}</Badge>
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3 max-h-[calc(100vh-400px)] overflow-y-auto">
+            <CardContent className="space-y-3">
               {tasksByStatus.done.map(task => (
                 <TaskCard
                   key={task.id}
