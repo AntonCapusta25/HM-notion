@@ -1,18 +1,27 @@
 import { useState, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  CheckSquare, 
-  Users, 
-  Calendar, 
-  Settings, 
+import {
+  LayoutDashboard,
+  CheckSquare,
+  Users,
+  Calendar,
+  Settings,
   ChevronLeft,
   Search,
   Plus,
   MoreHorizontal,
   Edit,
   Trash2,
-  X
+  X,
+  ChevronDown,
+  ChevronRight,
+  BookOpen,
+  Zap,
+  Building2,
+  Sparkles,
+  MessageSquare,
+  Bot,
+  Image
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,6 +37,7 @@ import { EditWorkspaceDialog } from '../components/EditWorkspaceDialog';
 import { CreateTaskDialog } from '../components/CreateTaskDialog';
 import { TaskDetailDialog } from '../components/TaskDetailDialog';
 import { Workspace, Task } from '../types';
+import { educationData } from '../data/education-data';
 
 interface SidebarProps {
   collapsed: boolean;
@@ -52,12 +62,14 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
   const [showCreateWorkspace, setShowCreateWorkspace] = useState(false);
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [editingWorkspace, setEditingWorkspace] = useState<Workspace | null>(null);
-  
+  const [educationExpanded, setEducationExpanded] = useState(false);
+  const [aiToolsExpanded, setAiToolsExpanded] = useState(false);
+
   // Get real data from TaskContext
-  const { 
-    tasks, 
+  const {
+    tasks,
     users,
-    workspaces, 
+    workspaces,
     loading,
     updateTask,
     addComment,
@@ -69,7 +81,7 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
     if (!searchQuery.trim()) return { tasks: [], users: [], workspaces: [] };
 
     const query = searchQuery.toLowerCase();
-    
+
     const filteredTasks = tasks.filter(task =>
       task.title.toLowerCase().includes(query) ||
       (task.description && task.description.toLowerCase().includes(query)) ||
@@ -100,7 +112,7 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
   const workspacesWithCounts = workspaces.map(workspace => {
     const workspaceTasks = tasks.filter(task => task.workspace_id === workspace.id);
     const activeTasks = workspaceTasks.filter(task => task.status !== 'done');
-    
+
     return {
       ...workspace,
       taskCount: activeTasks.length
@@ -111,7 +123,7 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
     const confirmed = window.confirm(
       `Delete "${workspace.name}"? This will remove the workspace from all tasks.`
     );
-    
+
     if (!confirmed) return;
 
     try {
@@ -160,12 +172,12 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
       // Get current task to preserve existing assignees (using correct field mapping)
       const currentTask = tasks.find(t => t.id === taskId);
       const currentAssignees = currentTask?.assignees || [];
-      
+
       // Add user if not already assigned
-      const newAssignees = currentAssignees.includes(userId) 
-        ? currentAssignees 
+      const newAssignees = currentAssignees.includes(userId)
+        ? currentAssignees
         : [...currentAssignees, userId];
-      
+
       await updateTask(taskId, { assignees: newAssignees });
     } catch (err) {
       console.error('Failed to assign task:', err);
@@ -201,8 +213,8 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
             <div className="p-4 relative">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input 
-                  placeholder="Search tasks, users..." 
+                <Input
+                  placeholder="Search tasks, users..."
                   className="pl-10 pr-8"
                   value={searchQuery}
                   onChange={handleSearchInputChange}
@@ -218,7 +230,7 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
                   </Button>
                 )}
               </div>
-              
+
               {/* Search Results Dropdown */}
               {showSearchResults && (
                 <Card className="absolute top-full left-4 right-4 mt-1 z-50 max-h-96 overflow-y-auto shadow-lg">
@@ -247,7 +259,7 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
                                     {task.title}
                                   </div>
                                   <div className="flex items-center gap-2 mt-1">
-                                    <Badge 
+                                    <Badge
                                       variant={task.priority === 'high' ? 'destructive' : 'secondary'}
                                       className="text-xs"
                                     >
@@ -256,7 +268,7 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
                                     <span className={cn(
                                       "text-xs px-2 py-1 rounded-full",
                                       task.status === 'todo' && "bg-gray-100 text-gray-600",
-                                      task.status === 'in_progress' && "bg-yellow-100 text-yellow-600", 
+                                      task.status === 'in_progress' && "bg-yellow-100 text-yellow-600",
                                       task.status === 'done' && "bg-green-100 text-green-600"
                                     )}>
                                       {task.status.replace('_', ' ')}
@@ -315,8 +327,8 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
                                   onClick={() => handleWorkspaceClick(workspace.id)}
                                   className="w-full text-left p-2 rounded hover:bg-gray-50 flex items-center gap-2"
                                 >
-                                  <div 
-                                    className="w-3 h-3 rounded-full" 
+                                  <div
+                                    className="w-3 h-3 rounded-full"
                                     style={{ backgroundColor: workspace.color }}
                                   />
                                   <div className="flex-1 min-w-0">
@@ -355,7 +367,7 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
           {/* Quick Actions */}
           {!collapsed && (
             <div className="px-4 pb-4">
-              <Button 
+              <Button
                 className="w-full bg-homemade-orange hover:bg-homemade-orange-dark"
                 onClick={() => setShowCreateTask(true)}
               >
@@ -368,7 +380,7 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
           {/* Collapsed New Task Button */}
           {collapsed && (
             <div className="px-2 pb-4">
-              <Button 
+              <Button
                 className="w-full bg-homemade-orange hover:bg-homemade-orange-dark p-2"
                 onClick={() => setShowCreateTask(true)}
                 title="New Task"
@@ -389,8 +401,8 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
                     to={item.href}
                     className={cn(
                       "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                      isActive 
-                        ? "bg-homemade-orange text-white" 
+                      isActive
+                        ? "bg-homemade-orange text-white"
                         : "text-gray-700 hover:bg-gray-100",
                       collapsed && "justify-center px-2"
                     )}
@@ -403,6 +415,99 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
             </nav>
           </div>
 
+          {/* Education Section */}
+          {!collapsed && (
+            <div className="px-4 py-4 border-t border-gray-200">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Education
+                </h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 hover:bg-gray-100"
+                  onClick={() => setEducationExpanded(!educationExpanded)}
+                >
+                  {educationExpanded ? (
+                    <ChevronDown className="h-4 w-4 text-gray-500" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 text-gray-500" />
+                  )}
+                </Button>
+              </div>
+
+              {educationExpanded && (
+                <div className="space-y-1">
+                  {educationData.map((item) => {
+                    const Icon = item.icon === 'Zap' ? Zap : item.icon === 'Building2' ? Building2 : Sparkles;
+                    const isActive = location.pathname.startsWith(item.route);
+                    const hasChildren = item.children && item.children.length > 0;
+                    const isAiTools = item.id === 'ai-tools';
+
+                    return (
+                      <div key={item.id}>
+                        <div className="flex items-center gap-1">
+                          <Link
+                            to={item.route}
+                            className={cn(
+                              "flex items-center gap-2 px-2 py-2 rounded-lg text-sm flex-1 transition-colors",
+                              isActive
+                                ? "bg-homemade-orange/10 text-homemade-orange font-medium"
+                                : "text-gray-700 hover:bg-gray-100"
+                            )}
+                          >
+                            <Icon className="h-4 w-4 flex-shrink-0" />
+                            <span className="truncate">{item.title}</span>
+                          </Link>
+                          {hasChildren && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 hover:bg-gray-100"
+                              onClick={() => isAiTools && setAiToolsExpanded(!aiToolsExpanded)}
+                            >
+                              {aiToolsExpanded ? (
+                                <ChevronDown className="h-3 w-3 text-gray-500" />
+                              ) : (
+                                <ChevronRight className="h-3 w-3 text-gray-500" />
+                              )}
+                            </Button>
+                          )}
+                        </div>
+
+                        {/* Nested AI Tools */}
+                        {hasChildren && isAiTools && aiToolsExpanded && (
+                          <div className="ml-6 mt-1 space-y-1 border-l-2 border-gray-200 pl-2">
+                            {item.children!.map((child) => {
+                              const ChildIcon = child.icon === 'MessageSquare' ? MessageSquare : child.icon === 'Bot' ? Bot : Image;
+                              const isChildActive = location.pathname === child.route;
+
+                              return (
+                                <Link
+                                  key={child.id}
+                                  to={child.route}
+                                  className={cn(
+                                    "flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm transition-colors",
+                                    isChildActive
+                                      ? "bg-homemade-orange/10 text-homemade-orange font-medium"
+                                      : "text-gray-600 hover:bg-gray-100"
+                                  )}
+                                >
+                                  <ChildIcon className="h-3.5 w-3.5 flex-shrink-0" />
+                                  <span className="truncate">{child.title}</span>
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Workspaces Section */}
           {!collapsed && (
             <div className="flex-1 px-4 py-4 border-t border-gray-200 overflow-hidden">
@@ -410,8 +515,8 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
                 <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Workspaces
                 </h3>
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   size="sm"
                   className="h-6 w-6 p-0 hover:bg-gray-100"
                   onClick={() => setShowCreateWorkspace(true)}
@@ -419,14 +524,14 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
                   <Plus className="h-4 w-4 text-gray-500" />
                 </Button>
               </div>
-              
+
               <div className="space-y-1 overflow-y-auto flex-1">
                 {!loading && workspacesWithCounts.length === 0 ? (
                   <div className="text-center py-8">
                     <p className="text-sm text-gray-500 mb-3">No workspaces yet</p>
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
+                    <Button
+                      size="sm"
+                      variant="outline"
                       onClick={() => setShowCreateWorkspace(true)}
                       className="text-xs"
                     >
@@ -444,22 +549,22 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
                         to={`/workspace/${workspace.id}`}
                         className="flex items-center gap-2 flex-1 min-w-0"
                       >
-                        <div 
-                          className="w-3 h-3 rounded-full flex-shrink-0" 
+                        <div
+                          className="w-3 h-3 rounded-full flex-shrink-0"
                           style={{ backgroundColor: workspace.color }}
                         />
                         <span className="text-sm text-gray-700 truncate group-hover:text-gray-900">
                           {workspace.name}
                         </span>
                       </Link>
-                      
+
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         {workspace.taskCount > 0 && (
                           <Badge variant="secondary" className="text-xs px-1.5 py-0.5 h-5">
                             {workspace.taskCount}
                           </Badge>
                         )}
-                        
+
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button
@@ -472,14 +577,14 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-40">
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               onClick={() => setEditingWorkspace(workspace)}
                               className="text-sm"
                             >
                               <Edit className="h-3 w-3 mr-2" />
                               Edit
                             </DropdownMenuItem>
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               onClick={() => handleDeleteWorkspace(workspace)}
                               className="text-sm text-red-600 focus:text-red-600"
                             >
@@ -529,7 +634,7 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
 
       {/* Overlay to close search results */}
       {showSearchResults && (
-        <div 
+        <div
           className="fixed inset-0 z-30 bg-transparent"
           onClick={clearSearch}
         />
@@ -553,7 +658,7 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
       />
 
       {/* Create Workspace Dialog */}
-      <CreateWorkspaceDialog 
+      <CreateWorkspaceDialog
         open={showCreateWorkspace}
         onOpenChange={setShowCreateWorkspace}
       />

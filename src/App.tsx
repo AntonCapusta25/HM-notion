@@ -17,6 +17,7 @@ import Login from "./pages/Login";
 import LoadingScreen from "./components/LoadingScreen";
 import TestPage from './pages/TestPage';
 import WorkspaceDetail from "./pages/WorkspaceDetail";
+import Education from "./pages/Education";
 
 // CRITICAL FIX: Move QueryClient creation outside component
 const queryClient = new QueryClient({
@@ -40,7 +41,7 @@ const App = () => (
             <Routes>
               {/* Public routes */}
               <Route path="/login" element={<Login />} />
-              
+
               {/* Protected routes - require authentication */}
               <Route path="/" element={
                 <ProtectedRoute>
@@ -73,18 +74,30 @@ const App = () => (
                 </ProtectedRoute>
               } />
               <Route path="/workspace/:id" element={
-               <ProtectedRoute>
-                 <WorkspaceDetail />
-               </ProtectedRoute>
+                <ProtectedRoute>
+                  <WorkspaceDetail />
+                </ProtectedRoute>
               } />
-              
+
+              {/* Education routes */}
+              <Route path="/education/:topic/:subtopic" element={
+                <ProtectedRoute>
+                  <Education />
+                </ProtectedRoute>
+              } />
+              <Route path="/education/:topic" element={
+                <ProtectedRoute>
+                  <Education />
+                </ProtectedRoute>
+              } />
+
               {/* Test route - can be removed in production */}
               <Route path="/test" element={
                 <ProtectedRoute>
                   <TestPage />
                 </ProtectedRoute>
               } />
-              
+
               {/* Catch-all route */}
               <Route path="*" element={<NotFound />} />
             </Routes>

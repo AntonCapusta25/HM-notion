@@ -63,13 +63,13 @@ export interface Task {
   workspace_id: string | null;
   created_at: string;
   updated_at: string;
-  
+
   // Data loaded from related tables
   assignees: string[]; // From `task_assignees` - formatted as array of user IDs
   tags: string[];      // From `task_tags`
   subtasks: Subtask[]; // From `subtasks`
   comments: Comment[]; // From `comments`
-  
+
   // Raw assignment data for filtering (preserve original Supabase structure)
   task_assignees?: Array<{ user_id: string }>; // Raw data from Supabase join
 }
@@ -494,6 +494,49 @@ export const CAMPAIGN_STATUS_CONFIG = {
 };
 
 // ======================================
+// EDUCATION RESOURCES TYPES
+// ======================================
+
+// Education item for individual topics
+export interface EducationItem {
+  id: string;
+  title: string;
+  description: string;
+  icon?: string;
+  route: string;
+  content?: EducationContent;
+  children?: EducationItem[]; // For nested items like AI Tools
+}
+
+// Education section grouping
+export interface EducationSection {
+  id: string;
+  title: string;
+  items: EducationItem[];
+}
+
+// Content structure for education pages
+export interface EducationContent {
+  title: string;
+  subtitle?: string;
+  lastUpdated?: string;
+  sections: ContentSection[];
+  links?: ResourceLink[];
+}
+
+export interface ContentSection {
+  heading: string;
+  content: string;
+  subsections?: ContentSection[];
+}
+
+export interface ResourceLink {
+  title: string;
+  url: string;
+  description?: string;
+}
+
+// ======================================
 // UTILITY FUNCTIONS
 // ======================================
 
@@ -543,7 +586,7 @@ export const formatTaskFromSupabase = (supabaseTask: any): Task => {
     workspace_id: supabaseTask.workspace_id || null,
     created_at: safeParseDate(supabaseTask.created_at),
     updated_at: safeParseDate(supabaseTask.updated_at),
-    
+
     assignees: (supabaseTask.task_assignees || []).map((ta: any) => ta.user_id),
     tags: (supabaseTask.task_tags || []).map((tt: any) => tt.tag),
     subtasks: supabaseTask.subtasks || [],
@@ -551,7 +594,7 @@ export const formatTaskFromSupabase = (supabaseTask: any): Task => {
       ...comment,
       created_at: safeParseDate(comment.created_at)
     })),
-    
+
     task_assignees: undefined // Will be populated by useTaskStore.fetchTasks()
   };
 };
@@ -629,7 +672,7 @@ export const formatLeadFromSupabase = (supabaseLead: any): Lead => {
 export const calculateFollowUpDate = (responseType: ResponseType): string => {
   const today = new Date();
   let followUpDate = new Date(today);
-  
+
   switch (responseType) {
     case 'interested':
     case 'no_response':
@@ -643,7 +686,7 @@ export const calculateFollowUpDate = (responseType: ResponseType): string => {
     default:
       followUpDate.setDate(today.getDate() + 7);
   }
-  
+
   return followUpDate.toISOString().split('T')[0];
 };
 
@@ -674,15 +717,15 @@ export const getUpcomingFollowUps = (logs: OutreachLog[], days: number = 7): Out
   const today = new Date();
   const futureDate = new Date();
   futureDate.setDate(today.getDate() + days);
-  
+
   const todayString = today.toISOString().split('T')[0];
   const futureDateString = futureDate.toISOString().split('T')[0];
-  
-  return logs.filter(log => 
-    log.follow_up_date && 
-    log.follow_up_date >= todayString && 
+
+  return logs.filter(log =>
+    log.follow_up_date &&
+    log.follow_up_date >= todayString &&
     log.follow_up_date <= futureDateString
-  ).sort((a, b) => 
+  ).sort((a, b) =>
     new Date(a.follow_up_date!).getTime() - new Date(b.follow_up_date!).getTime()
   );
 };
