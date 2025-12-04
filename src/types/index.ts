@@ -522,6 +522,13 @@ export interface EducationContent {
   lastUpdated?: string;
   sections: ContentSection[];
   links?: ResourceLink[];
+  videos?: VideoEmbed[];
+}
+
+export interface VideoEmbed {
+  title: string;
+  url: string;
+  description?: string;
 }
 
 export interface ContentSection {

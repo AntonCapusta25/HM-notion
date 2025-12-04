@@ -147,6 +147,36 @@ const Education = () => {
                         ))}
                     </div>
 
+                    {/* Video Tutorials */}
+                    {content.videos && content.videos.length > 0 && (
+                        <div className="mt-16 pt-12 border-t border-gray-200">
+                            <h2 className="text-3xl font-bold text-gray-900 mb-8">Video Tutorials</h2>
+                            <div className="space-y-8">
+                                {content.videos.map((video, index) => (
+                                    <div key={index} className="space-y-3">
+                                        <h3 className="text-xl font-semibold text-gray-900">
+                                            {video.title}
+                                        </h3>
+                                        {video.description && (
+                                            <p className="text-gray-600 text-sm">
+                                                {video.description}
+                                            </p>
+                                        )}
+                                        <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+                                            <iframe
+                                                src={video.url}
+                                                title={video.title}
+                                                className="absolute top-0 left-0 w-full h-full rounded-lg border border-gray-200"
+                                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                                allowFullScreen
+                                            />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Resource Links */}
                     {content.links && content.links.length > 0 && (
                         <div className="mt-16 pt-12 border-t border-gray-200">

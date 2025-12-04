@@ -21,7 +21,8 @@ import {
   Sparkles,
   MessageSquare,
   Bot,
-  Image
+  Image,
+  Wrench
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -479,7 +480,7 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
                         {hasChildren && isAiTools && aiToolsExpanded && (
                           <div className="ml-6 mt-1 space-y-1 border-l-2 border-gray-200 pl-2">
                             {item.children!.map((child) => {
-                              const ChildIcon = child.icon === 'MessageSquare' ? MessageSquare : child.icon === 'Bot' ? Bot : Image;
+                              const ChildIcon = child.icon === 'MessageSquare' ? MessageSquare : child.icon === 'Bot' ? Bot : child.icon === 'Wrench' ? Wrench : Image;
                               const isChildActive = location.pathname === child.route;
 
                               return (

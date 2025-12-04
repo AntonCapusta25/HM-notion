@@ -38,6 +38,18 @@ const hyperzotContent: EducationContent = {
             content: 'For optimal results, we recommend organizing your work into clear workspaces, using tags consistently, and setting up regular check-ins with your team. Take advantage of keyboard shortcuts to speed up your workflow.'
         }
     ],
+    videos: [
+        {
+            title: 'HyperZot Platform Overview',
+            url: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
+            description: 'Complete walkthrough of HyperZot features'
+        },
+        {
+            title: 'Getting Started Tutorial',
+            url: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
+            description: 'Step-by-step guide for new users'
+        }
+    ],
     links: [
         {
             title: 'HyperZot Documentation',
@@ -92,6 +104,18 @@ const metaContent: EducationContent = {
         {
             heading: 'Future of Meta',
             content: 'Meta is investing heavily in the metaverse, AR/VR technologies, and AI. Stay informed about upcoming features and how they might impact your business strategy.'
+        }
+    ],
+    videos: [
+        {
+            title: 'Meta for Business Introduction',
+            url: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
+            description: 'Learn how to use Meta for business growth'
+        },
+        {
+            title: 'Meta Advertising Masterclass',
+            url: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
+            description: 'Advanced advertising strategies'
         }
     ],
     links: [
@@ -281,6 +305,66 @@ const midjourneyContent: EducationContent = {
     ]
 };
 
+// Custom Tools Content
+const customToolsContent: EducationContent = {
+    title: 'Custom Tools Guide',
+    subtitle: 'Our proprietary tools for streamlining onboarding',
+    lastUpdated: '2024-12-04',
+    sections: [
+        {
+            heading: 'About Our Custom Tools',
+            content: 'We have developed our own proprietary tools specifically designed to streamline the chef onboarding process. These tools automate repetitive tasks and ensure consistency across all menu items, saving hours of manual work.'
+        },
+        {
+            heading: 'Batch Image Generator',
+            content: 'Our Batch Image Generator is a powerful tool that creates up to 20 professional menu item images in one go. This tool integrates with our custom GPT to format menu data and generate beautiful, consistent images for all menu items.',
+            subsections: [
+                {
+                    heading: 'Step 1: Prepare Your Menu',
+                    content: 'Start by taking a photo of the menu or gathering the menu text. Make sure the image is clear and readable, or that the text includes all necessary details (dish names, descriptions, prices).'
+                },
+                {
+                    heading: 'Step 2: Format with Menu Formatter GPT',
+                    content: 'Go to our Menu Formatter GPT and upload your menu image or paste the menu text. The GPT will analyze and format the menu into a structured format that our Batch Image Generator can process. Copy the entire output from the GPT.'
+                },
+                {
+                    heading: 'Step 3: Generate Images',
+                    content: 'Navigate to our Batch Image Generator tool and paste the formatted menu data from Step 2. Click "Generate Images" and wait patiently. The generation process can take 2-3 minutes depending on the number of items. IMPORTANT: Do not reload or close the page during generation!'
+                },
+                {
+                    heading: 'Step 4: Save Generated Images',
+                    content: 'Once all images are generated, save them one by one. On Mac: Press and hold with two fingers on the trackpad (or right-click with mouse) on each image, then select "Save Image As". On Windows: Right-click on each image and select "Save image as". Save all images before closing or reloading the page, as the images will be lost if you navigate away.'
+                }
+            ]
+        },
+        {
+            heading: 'Important Warnings',
+            content: 'DO NOT reload the page before saving all images! The generation process creates images in your browser session, and they will be lost if you refresh or navigate away. Make sure to save each image individually before closing the tool. The entire process (generation + saving) typically takes 5-10 minutes for a full menu.'
+        },
+        {
+            heading: 'Best Practices',
+            content: 'For best results, ensure your menu data is complete and accurate before starting. Review the formatted output from the Menu Formatter GPT before pasting it into the Batch Image Generator. Create a dedicated folder on your computer before starting to save all images in one organized location. If generation fails, check your internet connection and try again - do not attempt to generate the same menu multiple times simultaneously.'
+        }
+    ],
+    links: [
+        {
+            title: 'Menu Formatter GPT',
+            url: 'https://chat.openai.com/g/g-YOUR-GPT-ID',
+            description: 'Format your menu for batch processing'
+        },
+        {
+            title: 'Batch Image Generator',
+            url: 'https://your-tool-url.com/batch-generator',
+            description: 'Generate up to 20 menu images at once'
+        },
+        {
+            title: 'Video Tutorial',
+            url: '#',
+            description: 'Watch the complete workflow walkthrough'
+        }
+    ]
+};
+
 // Education data structure
 export const educationData: EducationItem[] = [
     {
@@ -330,6 +414,14 @@ export const educationData: EducationItem[] = [
                 icon: 'Image',
                 route: '/education/ai-tools/midjourney',
                 content: midjourneyContent
+            },
+            {
+                id: 'custom',
+                title: 'Custom Tools',
+                description: 'Our proprietary tools',
+                icon: 'Wrench',
+                route: '/education/ai-tools/custom',
+                content: customToolsContent
             }
         ]
     }
