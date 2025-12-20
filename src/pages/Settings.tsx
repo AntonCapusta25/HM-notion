@@ -21,7 +21,7 @@ const Settings = () => {
   const { user, signOut } = useAuth();
   const { profile, loading: profileLoading, error: profileError } = useProfile();
   const { tasks } = useTaskContext();
-  
+
   const [isUpdating, setIsUpdating] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [settings, setSettings] = useState({
@@ -42,7 +42,6 @@ const Settings = () => {
     language: 'en'
   });
 
-  // Load user preferences from localStorage on mount (for non-notification settings)
   useEffect(() => {
     const savedPreferences = localStorage.getItem('userPreferences');
     if (savedPreferences) {
@@ -54,19 +53,16 @@ const Settings = () => {
           timezone: prefs.timezone || prev.timezone,
           language: prefs.language || prev.language
         }));
-        console.log('📱 Loaded UI preferences from localStorage:', prefs);
       } catch (error) {
         console.error('Error parsing saved preferences:', error);
       }
     }
   }, []);
 
-  // Load user data when profile loads - using actual schema fields
   useEffect(() => {
     if (user && profile) {
       setSettings(prev => ({
         ...prev,
-        // Use actual fields from your users table
         name: profile.name || user.email?.split('@')[0] || '',
         email: user.email || '',
         department: profile.department || prev.department,
@@ -75,7 +71,6 @@ const Settings = () => {
     }
   }, [user, profile]);
 
-  // Load notification preferences from database when profile loads
   useEffect(() => {
     if (profile?.notification_preferences) {
       setSettings(prev => ({
@@ -87,12 +82,9 @@ const Settings = () => {
           taskUpdated: true,
           comments: true,
           dueSoon: true,
-          ...profile.notification_preferences // Override with database values
+          ...profile.notification_preferences
         }
       }));
-      console.log('📧 Loaded notification preferences from database:', profile.notification_preferences);
-    } else {
-      console.log('📧 No notification preferences found in database, using defaults');
     }
   }, [profile]);
 
@@ -101,12 +93,12 @@ const Settings = () => {
       const keys = path.split('.');
       const updated = { ...prev };
       let current: any = updated;
-      
+
       for (let i = 0; i < keys.length - 1; i++) {
         current[keys[i]] = { ...current[keys[i]] };
         current = current[keys[i]];
       }
-      
+
       current[keys[keys.length - 1]] = value;
       return updated;
     });
@@ -125,10 +117,6 @@ const Settings = () => {
     setIsUpdating(true);
 
     try {
-      console.log('💾 Saving settings to database...');
-      console.log('Notification preferences to save:', settings.notifications);
-
-      // Save profile data AND notification preferences to database
       const { error } = await supabase
         .from('users')
         .upsert({
@@ -137,12 +125,11 @@ const Settings = () => {
           email: settings.email,
           department: settings.department,
           role: settings.role,
-          notification_preferences: settings.notifications, // Save notification preferences to database
+          notification_preferences: settings.notifications,
         });
 
       if (error) throw error;
 
-      // Also save UI preferences to localStorage for frontend use
       const uiPreferences = {
         theme: settings.theme,
         timezone: settings.timezone,
@@ -150,14 +137,12 @@ const Settings = () => {
       };
 
       localStorage.setItem('userPreferences', JSON.stringify(uiPreferences));
-      
-      // Dispatch storage event to notify other components
+
       window.dispatchEvent(new StorageEvent('storage', {
         key: 'userPreferences',
         newValue: JSON.stringify(uiPreferences)
       }));
 
-      console.log('✅ Settings saved successfully');
       toast({
         title: "Settings saved",
         description: "Your notification preferences and profile have been updated successfully.",
@@ -187,9 +172,6 @@ const Settings = () => {
     setIsTesting(true);
 
     try {
-      console.log('🧪 Testing notification system...');
-
-      // Check if notifications table exists and create a test notification
       const { data, error } = await supabase
         .from('notifications')
         .insert({
@@ -203,9 +185,6 @@ const Settings = () => {
         .select();
 
       if (error) {
-        console.error('Error creating test notification:', error);
-        
-        // If notifications table doesn't exist, just show a message
         if (error.code === '42P01') {
           toast({
             title: "Test completed",
@@ -216,7 +195,6 @@ const Settings = () => {
           throw error;
         }
       } else {
-        console.log('✅ Test notification created:', data);
         toast({
           title: "Test notification sent",
           description: "A test notification has been created. Check your notifications and email to verify your settings are working.",
@@ -238,20 +216,16 @@ const Settings = () => {
 
   const exportData = async () => {
     try {
-      console.log('📦 Exporting user data...');
-      
-      // Export user's tasks and related data using actual schema
       const { data: userTasks, error: tasksError } = await supabase
         .from('task_assignees')
         .select(`
-          task_id,
-          tasks (*)
-        `)
+                    task_id,
+                    tasks (*)
+                `)
         .eq('user_id', user?.id);
 
       if (tasksError) throw tasksError;
 
-      // Get user's created tasks
       const { data: createdTasks, error: createdError } = await supabase
         .from('tasks')
         .select('*')
@@ -259,14 +233,13 @@ const Settings = () => {
 
       if (createdError) throw createdError;
 
-      // Get user's notifications (if table exists)
       let notifications = [];
       try {
         const { data: notifData, error: notifError } = await supabase
           .from('notifications')
           .select('*')
           .eq('user_id', user?.id);
-        
+
         if (!notifError) {
           notifications = notifData || [];
         }
@@ -287,7 +260,7 @@ const Settings = () => {
       const dataStr = JSON.stringify(exportData, null, 2);
       const dataBlob = new Blob([dataStr], { type: 'application/json' });
       const url = URL.createObjectURL(dataBlob);
-      
+
       const link = document.createElement('a');
       link.href = url;
       link.download = `homebase-data-${user?.email}-${new Date().toISOString().split('T')[0]}.json`;
@@ -296,7 +269,6 @@ const Settings = () => {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
 
-      console.log('✅ Data export completed');
       toast({
         title: "Export completed",
         description: "Your data has been downloaded successfully.",
@@ -325,7 +297,6 @@ const Settings = () => {
         .eq('user_id', user?.id);
 
       if (error) {
-        // If table doesn't exist, that's fine
         if (error.code === '42P01') {
           toast({
             title: "No notifications to clear",
@@ -358,8 +329,6 @@ const Settings = () => {
     if (!confirmed) return;
 
     try {
-      // Note: In a real app, you'd want to handle this server-side
-      // This is a simplified version
       await signOut();
       toast({
         title: "Account deletion initiated",
@@ -375,7 +344,6 @@ const Settings = () => {
     }
   };
 
-  // Generate user initials
   const getInitials = () => {
     if (settings.name) {
       return settings.name
@@ -386,41 +354,37 @@ const Settings = () => {
     }
     if (user?.email) {
       const emailName = user.email.split('@')[0];
-      return emailName.charAt(0).toUpperCase() + 
-             (emailName.charAt(1) || '').toUpperCase();
+      return emailName.charAt(0).toUpperCase() +
+        (emailName.charAt(1) || '').toUpperCase();
     }
     return 'U';
   };
 
   if (profileLoading) {
     return (
-      <Layout>
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-4 text-muted-foreground">Loading settings...</p>
-          </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Loading settings...</p>
         </div>
-      </Layout>
+      </div>
     );
   }
 
   if (profileError) {
     return (
-      <Layout>
-        <div className="space-y-6">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
-            <p className="text-gray-600 mt-1">Manage your account and preferences</p>
-          </div>
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              Failed to load profile data: {profileError.message}. Some settings may not be available.
-            </AlertDescription>
-          </Alert>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
+          <p className="text-gray-600 mt-1">Manage your account and preferences</p>
         </div>
-      </Layout>
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Failed to load profile data: {profileError.message}. Some settings may not be available.
+          </AlertDescription>
+        </Alert>
+      </div>
     );
   }
 
@@ -512,8 +476,8 @@ const Settings = () => {
                 </div>
               </div>
 
-              <Button 
-                onClick={saveSettings} 
+              <Button
+                onClick={saveSettings}
                 className="bg-homemade-orange hover:bg-homemade-orange-dark"
                 disabled={isUpdating}
               >
@@ -540,7 +504,7 @@ const Settings = () => {
                     onCheckedChange={(checked) => updateSetting('notifications.email', checked)}
                   />
                 </div>
-                
+
                 <div className="flex items-center justify-between">
                   <Label htmlFor="desktop-notif">Desktop notifications</Label>
                   <Switch
@@ -590,9 +554,9 @@ const Settings = () => {
 
                 <Separator />
 
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start" 
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
                   onClick={testNotifications}
                   disabled={isTesting}
                 >
@@ -600,9 +564,9 @@ const Settings = () => {
                   {isTesting ? 'Testing...' : 'Test Notifications'}
                 </Button>
 
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start" 
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
                   onClick={clearAllNotifications}
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
@@ -680,7 +644,7 @@ const Settings = () => {
                 Change Password
               </Button>
               <p className="text-xs text-gray-500 -mt-3">Use your auth provider to change password</p>
-              
+
               <Button variant="outline" className="w-full justify-start" disabled>
                 Two-Factor Authentication
               </Button>

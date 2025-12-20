@@ -16,13 +16,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
-import { 
-  Mail, 
-  Users, 
-  Calendar, 
-  Paperclip, 
-  Eye, 
-  Save, 
+import {
+  Mail,
+  Users,
+  Calendar,
+  Paperclip,
+  Eye,
+  Save,
   Send,
   X,
   Plus,
@@ -34,6 +34,7 @@ import {
 import { useOutreachStore } from '@/hooks/useOutreachStore'
 import { useAuth } from '../../contexts/AuthContext'
 import { useToast } from '@/hooks/use-toast'
+import EmailTemplateEditor from './EmailTemplateEditor'
 
 interface NewCampaignModalProps {
   open: boolean
@@ -91,9 +92,9 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
   })
   const [attachments, setAttachments] = useState<File[]>([])
 
-  const { 
+  const {
     leads,
-    segments, 
+    segments,
     outreachTypes,
     loading,
     createCampaign,
@@ -102,7 +103,7 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
     fetchSegments,
     fetchOutreachTypes
   } = useOutreachStore()
-  
+
   const { user } = useAuth()
   const { toast } = useToast()
 
@@ -189,7 +190,7 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
     };
 
     const dataSource = previewLead || defaultPreviewData;
-    
+
     const allData = {
       name: safeGetString(dataSource.name, 'Jane Doe'),
       company: safeGetString(dataSource.company, 'Example Corp'),
@@ -212,7 +213,7 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
       })
       return false
     }
-    
+
     if (!campaignForm.subject_line.trim()) {
       toast({
         title: "Error",
@@ -221,7 +222,7 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
       })
       return false
     }
-    
+
     if (!campaignForm.email_template.trim()) {
       toast({
         title: "Error",
@@ -230,7 +231,7 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
       })
       return false
     }
-    
+
     if (!campaignForm.segment_id) {
       toast({
         title: "Error",
@@ -239,7 +240,7 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
       })
       return false
     }
-    
+
     return true
   }
 
@@ -264,7 +265,7 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
         await createCampaign(campaignData)
         toast({
           title: launch ? "Campaign launched" : "Campaign saved",
-          description: launch 
+          description: launch
             ? "Your campaign has been launched and emails are being sent"
             : "Your campaign has been saved as a draft",
         })
@@ -290,7 +291,7 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
             {editingCampaign ? 'Edit Campaign' : 'Create New Campaign'}
           </DialogTitle>
           <DialogDescription>
-            {editingCampaign 
+            {editingCampaign
               ? 'Update your email campaign settings and content'
               : 'Create a new email campaign to reach your leads'
             }
@@ -298,8 +299,9 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="basic">Basic Info</TabsTrigger>
+            <TabsTrigger value="design">Design Email</TabsTrigger>
             <TabsTrigger value="content">Email Content</TabsTrigger>
             <TabsTrigger value="targeting">Targeting</TabsTrigger>
             <TabsTrigger value="settings">Settings</TabsTrigger>
@@ -319,7 +321,7 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
 
               <div className="space-y-2">
                 <Label htmlFor="outreach_type">Outreach Type</Label>
-                <Select 
+                <Select
                   value={campaignForm.outreach_type_id}
                   onValueChange={(value) => setCampaignForm(prev => ({ ...prev, outreach_type_id: value }))}
                 >
@@ -383,6 +385,14 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
                 </div>
               )}
             </div>
+          </TabsContent>
+
+          <TabsContent value="design" className="space-y-4 pt-4">
+            <EmailTemplateEditor
+              initialContent={campaignForm.email_template}
+              onSave={(html) => setCampaignForm(prev => ({ ...prev, email_template: html }))}
+              workspaceId={workspaceId}
+            />
           </TabsContent>
 
           <TabsContent value="content" className="space-y-4 pt-4">
@@ -468,7 +478,7 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="segment">Target Segment</Label>
-                <Select 
+                <Select
                   value={campaignForm.segment_id}
                   onValueChange={(value) => setCampaignForm(prev => ({ ...prev, segment_id: value }))}
                 >
@@ -479,8 +489,8 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
                     {segments.map(segment => (
                       <SelectItem key={segment.id} value={segment.id}>
                         <div className="flex items-center gap-2">
-                          <div 
-                            className="w-3 h-3 rounded-full" 
+                          <div
+                            className="w-3 h-3 rounded-full"
                             style={{ backgroundColor: safeGetString(segment.color, '#gray') }}
                           />
                           {safeGetString(segment.name, 'Unnamed Segment')}
@@ -508,8 +518,8 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
                       return selectedSegment ? (
                         <div className="space-y-3">
                           <div className="flex items-center gap-3">
-                            <div 
-                              className="w-4 h-4 rounded-full" 
+                            <div
+                              className="w-4 h-4 rounded-full"
                               style={{ backgroundColor: safeGetString(selectedSegment.color, '#gray') }}
                             />
                             <div>
@@ -519,14 +529,14 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
                               )}
                             </div>
                           </div>
-                          
+
                           <div className="grid grid-cols-2 gap-4 text-sm">
                             <div>
-                              <span className="font-medium">Total Leads:</span> 
+                              <span className="font-medium">Total Leads:</span>
                               <span className="ml-2">{selectedSegment.lead_count || 0}</span>
                             </div>
                             <div>
-                              <span className="font-medium">Active Leads:</span> 
+                              <span className="font-medium">Active Leads:</span>
                               <span className="ml-2">{selectedSegment.active_count || 0}</span>
                             </div>
                           </div>
@@ -545,11 +555,11 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
             <div className="space-y-6">
               <div className="space-y-4">
                 <h4 className="font-medium">Sending Settings</h4>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Delay Between Emails</Label>
-                    <Select 
+                    <Select
                       value={campaignForm.settings.delay_between_emails.toString()}
                       onValueChange={(value) => setCampaignForm(prev => ({
                         ...prev,
@@ -571,7 +581,7 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
 
                   <div className="space-y-2">
                     <Label>Max Emails Per Day</Label>
-                    <Select 
+                    <Select
                       value={campaignForm.settings.max_emails_per_day.toString()}
                       onValueChange={(value) => setCampaignForm(prev => ({
                         ...prev,
@@ -597,7 +607,7 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
 
               <div className="space-y-4">
                 <h4 className="font-medium">Tracking & Analytics</h4>
-                
+
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
@@ -633,7 +643,7 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
 
               <div className="space-y-4">
                 <h4 className="font-medium">Personalization</h4>
-                
+
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
@@ -669,7 +679,7 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
 
               <div className="space-y-4">
                 <h4 className="font-medium">Follow-up Settings</h4>
-                
+
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
@@ -688,7 +698,7 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
                   {campaignForm.settings.follow_up_enabled && (
                     <div className="space-y-2">
                       <Label>Follow-up Delay (Days)</Label>
-                      <Select 
+                      <Select
                         value={campaignForm.settings.follow_up_days.toString()}
                         onValueChange={(value) => setCampaignForm(prev => ({
                           ...prev,
@@ -746,10 +756,10 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          
+
           <div className="flex gap-3">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => handleSave(false)}
               disabled={loading}
               className="flex items-center gap-2"
@@ -757,8 +767,8 @@ export default function NewCampaignModal({ open, onClose, workspaceId, editingCa
               <Save className="h-4 w-4" />
               Save as Draft
             </Button>
-            
-            <Button 
+
+            <Button
               onClick={() => handleSave(true)}
               disabled={loading}
               className="flex items-center gap-2"

@@ -27,7 +27,7 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
   const { users, workspaces, createTask } = useTaskContext();
   const { user } = useAuth();
   const { profile: userProfile } = useProfile();
-  
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [assignees, setAssignees] = useState<string[]>([]);
@@ -36,13 +36,13 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
   const [selectedWorkspace, setSelectedWorkspace] = useState<string>('none');
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
-  
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!user) {
       setError('You must be logged in to create tasks');
       return;
@@ -69,18 +69,18 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
         subtasks: [],
         created_by: userProfile?.id || user.id
       };
-      
+
       console.log('Creating task with workspace:', selectedWorkspace);
-      
+
       if (onCreateTask) {
         await onCreateTask(taskData);
       } else {
         await createTask(taskData);
       }
-      
+
       onOpenChange(false);
       resetForm();
-      
+
     } catch (err) {
       console.error('Error creating task:', err);
       setError('Failed to create task. Please try again.');
@@ -100,13 +100,13 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
     setNewTag('');
     setError(null);
   };
-  
+
   const addAssignee = (userId: string) => {
     if (!assignees.includes(userId)) {
       setAssignees([...assignees, userId]);
     }
   };
-  
+
   const removeAssignee = (userId: string) => {
     setAssignees(assignees.filter(id => id !== userId));
   };
@@ -131,13 +131,13 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
         <DialogHeader>
           <DialogTitle>Create New Task</DialogTitle>
         </DialogHeader>
-        
+
         {error && (
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
-        
+
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
             <Label htmlFor="title">Task Title</Label>
@@ -200,18 +200,18 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
               </SelectContent>
             </Select>
           </div>
-          
+
           <div className="space-y-2">
             <Label>Assignees</Label>
             <div className="flex flex-wrap items-center gap-2 p-2 border rounded-md min-h-[40px]">
               {assignedUsers.map(user => (
                 <Badge key={user.id} variant="secondary" className="gap-1.5 pl-1.5">
                   <Avatar className="h-5 w-5">
-                     <AvatarFallback className="text-xs bg-gray-200">{user.name.charAt(0)}</AvatarFallback>
+                    <AvatarFallback className="text-xs bg-gray-200">{user.name.charAt(0)}</AvatarFallback>
                   </Avatar>
                   {user.name}
-                  <X 
-                    className="h-3 w-3 cursor-pointer" 
+                  <X
+                    className="h-3 w-3 cursor-pointer"
                     onClick={() => removeAssignee(user.id)}
                   />
                 </Badge>
@@ -225,7 +225,7 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
                 <PopoverContent className="w-56 p-0">
                   <div className="p-1">
                     {unassignedUsers.map(user => (
-                      <div 
+                      <div
                         key={user.id}
                         className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-md cursor-pointer"
                         onClick={() => addAssignee(user.id)}
@@ -256,7 +256,7 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div className="space-y-2">
               <Label>Due Date</Label>
               <Popover>
@@ -291,8 +291,8 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
               {tags.map(tag => (
                 <Badge key={tag} variant="secondary" className="gap-1">
                   {tag}
-                  <X 
-                    className="h-3 w-3 cursor-pointer" 
+                  <X
+                    className="h-3 w-3 cursor-pointer"
                     onClick={() => removeTag(tag)}
                   />
                 </Badge>
@@ -306,10 +306,10 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
                 onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
                 disabled={isSubmitting}
               />
-              <Button 
-                type="button" 
-                variant="outline" 
-                size="sm" 
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
                 onClick={addTag}
                 disabled={isSubmitting}
               >
@@ -319,16 +319,16 @@ export const CreateTaskDialog = ({ open, onOpenChange, onCreateTask }: CreateTas
           </div>
 
           <div className="flex gap-3 pt-4">
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="flex-1 bg-homemade-orange hover:bg-homemade-orange-dark"
               disabled={isSubmitting || !title.trim()}
             >
               {isSubmitting ? 'Creating Task...' : 'Create Task'}
             </Button>
-            <Button 
-              type="button" 
-              variant="outline" 
+            <Button
+              type="button"
+              variant="outline"
               onClick={() => onOpenChange(false)}
               disabled={isSubmitting}
             >

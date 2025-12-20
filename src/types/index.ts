@@ -13,6 +13,7 @@ export interface User {
   department: string;
   avatar: string | null;
   created_at: string;
+  notification_preferences?: any;
 }
 
 // From your `workspaces` table - UPDATED to support all workspace types
@@ -377,17 +378,26 @@ export interface OutreachSettings {
   sender_name?: string;
   sender_email?: string;
   reply_to_email?: string;
+  // SendGrid configuration
+  email_provider?: 'apps_script' | 'sendgrid';
+  sendgrid_api_key?: string;
+  sendgrid_from_email?: string;
+  sendgrid_from_name?: string;
+  // Apps Script configuration (legacy)
   apps_script_url?: string;
   apps_script_api_key?: string;
+  // AI Research configuration
   openai_api_key?: string;
   preferred_research_model?: string;
   max_research_cost_per_job?: number;
   default_research_settings?: any;
+  // Automation settings
   auto_follow_up?: boolean;
   follow_up_delay_days?: number;
   max_follow_ups?: number;
   auto_pause_campaigns?: boolean;
   daily_email_limit?: number;
+  // Advanced settings
   webhook_url?: string;
   custom_tracking_domain?: string;
   enable_click_tracking?: boolean;
@@ -395,6 +405,87 @@ export interface OutreachSettings {
   timezone?: string;
   created_at: string;
   updated_at: string;
+}
+
+// ============================================
+// COLLAB OUTREACH TYPES (Internal Team → Chefs)
+// ============================================
+
+export interface CollabSegment {
+  id: string;
+  name: string;
+  description?: string;
+  color: string;
+  workspace_id: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CollabLead {
+  id: string;
+  name: string;
+  email: string;
+  restaurant_name?: string;
+  city?: string;
+  phone?: string;
+  cuisine_type?: string;
+  status: 'new' | 'contacted' | 'interested' | 'converted' | 'not_interested';
+  notes?: string;
+  custom_fields?: any;
+  segment_id?: string;
+  workspace_id: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  last_contacted_at?: string;
+}
+
+export interface CollabCampaign {
+  id: string;
+  name: string;
+  description?: string;
+  segment_id?: string;
+  status: 'draft' | 'scheduled' | 'running' | 'paused' | 'completed';
+  subject_line: string;
+  email_template: string;
+  scheduled_at?: string;
+  workspace_id: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  settings?: any;
+}
+
+export interface CollabEmail {
+  id: string;
+  campaign_id: string;
+  lead_id: string;
+  status: 'pending' | 'sent' | 'delivered' | 'opened' | 'clicked' | 'replied' | 'failed';
+  subject_line?: string;
+  email_content?: string;
+  personalized_content?: any;
+  sent_at?: string;
+  delivered_at?: string;
+  opened_at?: string;
+  clicked_at?: string;
+  replied_at?: string;
+  tracking_data?: any;
+  error_message?: string;
+  workspace_id: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CollabActivity {
+  id: string;
+  lead_id: string;
+  activity_type: string;
+  description?: string;
+  metadata?: any;
+  created_by: string;
+  created_at: string;
 }
 
 // ======================================

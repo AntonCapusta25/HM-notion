@@ -10,21 +10,23 @@ import Index from "./pages/index";
 import MyTasks from "./pages/MyTasks";
 import Team from "./pages/Team";
 import Calendar from "./pages/Calendar";
+import { PremiumCalendar } from "./components/premium/PremiumCalendar";
 import Search from "./pages/Search";
 import Settings from "./pages/Settings";
+import { PremiumSettings } from "./components/premium/PremiumSettings";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
-import LoadingScreen from "./components/LoadingScreen";
 import TestPage from './pages/TestPage';
 import WorkspaceDetail from "./pages/WorkspaceDetail";
 import Education from "./pages/Education";
+import { ThemeRoute } from "./components/ThemeRoute";
 
 // CRITICAL FIX: Move QueryClient creation outside component
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 5 * 60 * 1000, // 5 minutes
-      cacheTime: 10 * 60 * 1000, // 10 minutes
+      gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
       refetchOnWindowFocus: false,
     },
   },
@@ -60,7 +62,10 @@ const App = () => (
               } />
               <Route path="/calendar" element={
                 <ProtectedRoute>
-                  <Calendar />
+                  <ThemeRoute
+                    standard={<Calendar />}
+                    premium={<PremiumCalendar />}
+                  />
                 </ProtectedRoute>
               } />
               <Route path="/search" element={
@@ -70,7 +75,10 @@ const App = () => (
               } />
               <Route path="/settings" element={
                 <ProtectedRoute>
-                  <Settings />
+                  <ThemeRoute
+                    standard={<Settings />}
+                    premium={<PremiumSettings />}
+                  />
                 </ProtectedRoute>
               } />
               <Route path="/workspace/:id" element={

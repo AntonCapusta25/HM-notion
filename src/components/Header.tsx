@@ -23,17 +23,17 @@ export const Header = ({ onToggleSidebar }: HeaderProps) => {
   const { user, logout } = useAuth();
   const { profile, loading: profileLoading } = useProfile();
   const navigate = useNavigate();
-  
+
   // Search functionality
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  
+
   // Get real data from TaskContext
-  const { 
-    tasks, 
+  const {
+    tasks,
     users,
-    workspaces, 
+    workspaces,
     updateTask,
     addComment,
     toggleSubtask
@@ -44,7 +44,7 @@ export const Header = ({ onToggleSidebar }: HeaderProps) => {
     if (!searchQuery.trim()) return { tasks: [], users: [], workspaces: [] };
 
     const query = searchQuery.toLowerCase();
-    
+
     const filteredTasks = tasks.filter(task =>
       task.title.toLowerCase().includes(query) ||
       (task.description && task.description.toLowerCase().includes(query)) ||
@@ -70,7 +70,7 @@ export const Header = ({ onToggleSidebar }: HeaderProps) => {
   }, [searchQuery, tasks, users, workspaces]);
 
   const hasSearchResults = searchResults.tasks.length > 0 || searchResults.users.length > 0 || searchResults.workspaces.length > 0;
-  
+
   const getInitials = () => {
     if (profile?.name) {
       return profile.name
@@ -132,12 +132,12 @@ export const Header = ({ onToggleSidebar }: HeaderProps) => {
       // Get current task to preserve existing assignees (using correct field mapping)
       const currentTask = tasks.find(t => t.id === taskId);
       const currentAssignees = currentTask?.assignees || [];
-      
+
       // Add user if not already assigned
-      const newAssignees = currentAssignees.includes(userId) 
-        ? currentAssignees 
+      const newAssignees = currentAssignees.includes(userId)
+        ? currentAssignees
         : [...currentAssignees, userId];
-      
+
       await updateTask(taskId, { assignees: newAssignees });
     } catch (err) {
       console.error('Failed to assign task:', err);
@@ -146,26 +146,26 @@ export const Header = ({ onToggleSidebar }: HeaderProps) => {
 
   return (
     <>
-      <header className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-40">
+      <header className="sticky top-0 z-40 px-4 py-3 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 transition-all duration-300">
         <div className="flex items-center justify-between">
           {/* Left Side */}
           <div className="flex items-center gap-4 flex-1">
             {onToggleSidebar && (
-              <Button 
-                variant="ghost" 
-                size="sm" 
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={onToggleSidebar}
                 className="md:hidden"
               >
                 <Menu className="h-5 w-5" />
               </Button>
             )}
-            
+
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input 
-                placeholder="Search tasks, users, or workspaces..." 
-                className="pl-10 pr-8 bg-gray-50 border-0 focus:bg-white focus:ring-2 focus:ring-homemade-orange/20"
+              <Input
+                placeholder="Search tasks, users, or workspaces..."
+                className="pl-10 pr-8 bg-gray-50 border-0 focus:bg-white focus:ring-2 focus:ring-homemade-orange/20 dark:bg-white/10 dark:focus:bg-white/20 dark:text-white dark:placeholder:text-white/40"
                 value={searchQuery}
                 onChange={handleSearchInputChange}
               />
@@ -179,7 +179,7 @@ export const Header = ({ onToggleSidebar }: HeaderProps) => {
                   <X className="h-3 w-3" />
                 </Button>
               )}
-              
+
               {/* Search Results Dropdown */}
               {showSearchResults && (
                 <Card className="absolute top-full left-0 right-0 mt-2 z-50 max-h-96 overflow-y-auto shadow-lg">
@@ -208,7 +208,7 @@ export const Header = ({ onToggleSidebar }: HeaderProps) => {
                                     {task.title}
                                   </div>
                                   <div className="flex items-center gap-2">
-                                    <Badge 
+                                    <Badge
                                       variant={task.priority === 'high' ? 'destructive' : 'secondary'}
                                       className="text-xs"
                                     >
@@ -217,7 +217,7 @@ export const Header = ({ onToggleSidebar }: HeaderProps) => {
                                     <span className={cn(
                                       "text-xs px-2 py-1 rounded-full",
                                       task.status === 'todo' && "bg-gray-100 text-gray-600",
-                                      task.status === 'in_progress' && "bg-yellow-100 text-yellow-600", 
+                                      task.status === 'in_progress' && "bg-yellow-100 text-yellow-600",
                                       task.status === 'done' && "bg-green-100 text-green-600"
                                     )}>
                                       {task.status.replace('_', ' ')}
@@ -284,8 +284,8 @@ export const Header = ({ onToggleSidebar }: HeaderProps) => {
                                   onClick={() => handleWorkspaceClick(workspace.id)}
                                   className="w-full text-left p-3 rounded-lg hover:bg-gray-50 border border-gray-100 flex items-center gap-3 transition-colors"
                                 >
-                                  <div 
-                                    className="w-4 h-4 rounded-full flex-shrink-0" 
+                                  <div
+                                    className="w-4 h-4 rounded-full flex-shrink-0"
                                     style={{ backgroundColor: workspace.color }}
                                   />
                                   <div className="flex-1 min-w-0">
@@ -320,11 +320,11 @@ export const Header = ({ onToggleSidebar }: HeaderProps) => {
               )}
             </div>
           </div>
-          
+
           {/* Right Side */}
           <div className="flex items-center gap-2">
             <NotificationCenter />
-            
+
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="ghost" className="flex items-center gap-2 px-2 py-1 h-auto">
@@ -333,7 +333,7 @@ export const Header = ({ onToggleSidebar }: HeaderProps) => {
                       {profileLoading ? '...' : getInitials()}
                     </AvatarFallback>
                   </Avatar>
-                  <span className="text-sm font-medium hidden sm:block text-gray-700">
+                  <span className="text-sm font-medium hidden sm:block text-gray-700 dark:text-gray-200">
                     {profileLoading ? 'Loading...' : displayName}
                   </span>
                 </Button>
@@ -353,20 +353,20 @@ export const Header = ({ onToggleSidebar }: HeaderProps) => {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="p-1">
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     className="w-full justify-start"
                     onClick={() => navigate('/settings')}
                   >
                     <Settings className="h-4 w-4 mr-3" />
                     Settings
                   </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
                     onClick={handleLogout}
                   >
@@ -382,7 +382,7 @@ export const Header = ({ onToggleSidebar }: HeaderProps) => {
 
       {/* Overlay to close search results */}
       {showSearchResults && (
-        <div 
+        <div
           className="fixed inset-0 z-30 bg-transparent"
           onClick={clearSearch}
         />

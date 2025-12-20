@@ -28,6 +28,7 @@ interface TaskCardProps {
   onClick?: () => void;
   onAssign?: (taskId: string, userId: string) => void;
   compact?: boolean;
+  variant?: 'standard' | 'premium';
 }
 
 const safeFormatDate = (dateInput: string | null | undefined, formatStr: string = 'MMM d'): string => {
@@ -54,7 +55,7 @@ const isValidDate = (dateInput: string | null | undefined): boolean => {
   }
 };
 
-export const TaskCard = ({ task, onClick, onAssign, compact = false }: TaskCardProps) => {
+export const TaskCard = ({ task, onClick, onAssign, compact = false, variant = 'standard' }: TaskCardProps) => {
   const { users, updateTask, deleteTask } = useTaskContext();
   const [isEditing, setIsEditing] = useState(false);
   const [editingField, setEditingField] = useState<string | null>(null);
@@ -65,27 +66,29 @@ export const TaskCard = ({ task, onClick, onAssign, compact = false }: TaskCardP
   const assignedUsers = users.filter(u => task.assignees?.includes(u.id));
   const completedSubtasks = task.subtasks.filter(st => st.completed).length;
 
+  const isPremium = variant === 'premium';
+
   const priorityConfig = {
-    low: { color: 'bg-green-100 text-green-700 border-green-200', icon: '🔵', label: 'Low' },
-    medium: { color: 'bg-yellow-100 text-yellow-700 border-yellow-200', icon: '🟡', label: 'Medium' },
-    high: { color: 'bg-red-100 text-red-700 border-red-200', icon: '🔴', label: 'High' }
+    low: { color: isPremium ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-green-100 text-green-700 border-green-200', icon: '🔵', label: 'Low' },
+    medium: { color: isPremium ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' : 'bg-yellow-100 text-yellow-700 border-yellow-200', icon: '🟡', label: 'Medium' },
+    high: { color: isPremium ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-red-100 text-red-700 border-red-200', icon: '🔴', label: 'High' }
   };
 
   const statusConfig = {
-    todo: { color: 'bg-gray-100 text-gray-700', label: 'To Do' },
-    in_progress: { color: 'bg-blue-100 text-blue-700', label: 'In Progress' },
-    done: { color: 'bg-green-100 text-green-700', label: 'Done' }
+    todo: { color: isPremium ? 'bg-white/5 text-white/50 border-white/10' : 'bg-gray-100 text-gray-700', label: 'To Do' },
+    in_progress: { color: isPremium ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-blue-100 text-blue-700', label: 'In Progress' },
+    done: { color: isPremium ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-green-100 text-green-700', label: 'Done' }
   };
 
   const getDueDateStatus = () => {
     if (!task.due_date || !isValidDate(task.due_date)) return null;
 
     const dueDate = new Date(task.due_date);
-    if (task.status === 'done') return { type: 'completed', color: 'text-green-600' };
-    if (isBefore(dueDate, startOfDay(new Date()))) return { type: 'overdue', color: 'text-red-600' };
-    if (isToday(dueDate)) return { type: 'today', color: 'text-orange-600' };
-    if (isTomorrow(dueDate)) return { type: 'tomorrow', color: 'text-yellow-600' };
-    return { type: 'upcoming', color: 'text-gray-600' };
+    if (task.status === 'done') return { type: 'completed', color: isPremium ? 'text-green-400' : 'text-green-600' };
+    if (isBefore(dueDate, startOfDay(new Date()))) return { type: 'overdue', color: isPremium ? 'text-red-400' : 'text-red-600' };
+    if (isToday(dueDate)) return { type: 'today', color: isPremium ? 'text-orange-400' : 'text-orange-600' };
+    if (isTomorrow(dueDate)) return { type: 'tomorrow', color: isPremium ? 'text-yellow-400' : 'text-yellow-600' };
+    return { type: 'upcoming', color: isPremium ? 'text-white/40' : 'text-gray-600' };
   };
 
   const dueDateStatus = getDueDateStatus();
@@ -178,8 +181,13 @@ export const TaskCard = ({ task, onClick, onAssign, compact = false }: TaskCardP
     }
   };
 
+
   return (
-    <Card className="group cursor-pointer hover:shadow-md transition-all duration-200 border hover:border-gray-300">
+    <Card className={`group cursor-pointer hover:shadow-md transition-all duration-200 border 
+      ${isPremium
+        ? 'bg-white/5 hover:bg-white/10 border-white/5 text-white backdrop-blur-md hover:shadow-lg shadow-black/20'
+        : 'bg-white hover:border-gray-300'
+      }`}>
       <CardContent className="p-4">
         <div className="space-y-3">
           {/* Title Row */}
@@ -191,11 +199,11 @@ export const TaskCard = ({ task, onClick, onAssign, compact = false }: TaskCardP
                 onChange={(e) => setTempTitle(e.target.value)}
                 onBlur={saveTitleEdit}
                 onKeyDown={handleKeyPress}
-                className="flex-1 font-medium text-gray-900 bg-transparent border-0 outline-none focus:ring-2 focus:ring-blue-500 rounded px-1"
+                className={`flex-1 font-medium bg-transparent border-0 outline-none focus:ring-2 focus:ring-blue-500 rounded px-1 ${isPremium ? 'text-white' : 'text-gray-900'}`}
               />
             ) : (
               <h3
-                className="flex-1 font-medium text-gray-900 leading-tight hover:text-blue-600 transition-colors"
+                className={`flex-1 font-medium leading-tight hover:text-blue-600 transition-colors ${isPremium ? 'text-white' : 'text-gray-900'}`}
                 onClick={onClick}
                 onDoubleClick={handleTitleEdit}
                 title="Double-click to edit title"
@@ -296,7 +304,7 @@ export const TaskCard = ({ task, onClick, onAssign, compact = false }: TaskCardP
             {/* Due Date - Clickable with instant close */}
             <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
               <PopoverTrigger asChild>
-                <div className={`flex items-center gap-1 text-xs px-2 py-1 rounded-md cursor-pointer hover:bg-gray-100 transition-colors ${dueDateStatus?.color || 'text-gray-500'}`}>
+                <div className={`flex items-center gap-1 text-xs px-2 py-1 rounded-md cursor-pointer transition-colors ${isPremium ? 'hover:bg-white/10' : 'hover:bg-gray-100'} ${dueDateStatus?.color || (isPremium ? 'text-white/40' : 'text-gray-500')}`}>
                   <CalendarIcon className="h-3 w-3" />
                   {task.due_date && isValidDate(task.due_date) ? (
                     <span>
@@ -337,12 +345,12 @@ export const TaskCard = ({ task, onClick, onAssign, compact = false }: TaskCardP
           {task.tags && task.tags.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {task.tags.slice(0, 4).map((tag, index) => (
-                <Badge key={index} variant="secondary" className="text-xs bg-gray-100 text-gray-700 hover:bg-gray-200">
+                <Badge key={index} variant="secondary" className={`text-xs ${isPremium ? 'bg-white/10 text-white/60 hover:bg-white/20' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
                   {tag}
                 </Badge>
               ))}
               {task.tags.length > 4 && (
-                <Badge variant="secondary" className="text-xs bg-gray-100 text-gray-700">
+                <Badge variant="secondary" className={`text-xs ${isPremium ? 'bg-white/10 text-white/60' : 'bg-gray-100 text-gray-700'}`}>
                   +{task.tags.length - 4} more
                 </Badge>
               )}
@@ -359,14 +367,14 @@ export const TaskCard = ({ task, onClick, onAssign, compact = false }: TaskCardP
                     {assignedUsers.length > 0 ? (
                       <div className="flex -space-x-2 cursor-pointer hover:opacity-80 transition-opacity">
                         {assignedUsers.slice(0, 3).map((user, index) => (
-                          <Avatar key={user.id} className="h-6 w-6 border-2 border-white">
+                          <Avatar key={user.id} className={`h-6 w-6 border-2 ${isPremium ? 'border-transparent' : 'border-white'}`}>
                             <AvatarFallback className="text-xs bg-blue-500 text-white">
                               {user.name ? user.name.charAt(0).toUpperCase() : '?'}
                             </AvatarFallback>
                           </Avatar>
                         ))}
                         {assignedUsers.length > 3 && (
-                          <div className="h-6 w-6 bg-gray-200 border-2 border-white rounded-full flex items-center justify-center">
+                          <div className={`h-6 w-6 bg-gray-200 border-2 ${isPremium ? 'border-transparent' : 'border-white'} rounded-full flex items-center justify-center`}>
                             <span className="text-xs text-gray-600">+{assignedUsers.length - 3}</span>
                           </div>
                         )}

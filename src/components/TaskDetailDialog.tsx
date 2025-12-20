@@ -9,13 +9,13 @@ import { Calendar } from '@/components/ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { 
-  Calendar as CalendarIcon, 
-  UserPlus, 
-  X, 
-  MessageCircle, 
-  CheckSquare, 
-  Square, 
+import {
+  Calendar as CalendarIcon,
+  UserPlus,
+  X,
+  MessageCircle,
+  CheckSquare,
+  Square,
   Plus,
   Flag,
   Edit3,
@@ -107,14 +107,14 @@ const isImageFile = (fileType?: string): boolean => {
   return fileType?.startsWith('image/') || false;
 };
 
-export const TaskDetailDialog = ({ 
-  task: initialTask, 
-  users, 
-  open, 
-  onOpenChange, 
-  onUpdateTask, 
-  onAddComment, 
-  onToggleSubtask 
+export const TaskDetailDialog = ({
+  task: initialTask,
+  users,
+  open,
+  onOpenChange,
+  onUpdateTask,
+  onAddComment,
+  onToggleSubtask
 }: TaskDetailDialogProps) => {
   const { user } = useAuth();
   const { refreshTasks, tasks } = useTaskContext();
@@ -129,13 +129,13 @@ export const TaskDetailDialog = ({
   const [isAddingSubtask, setIsAddingSubtask] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  
+
   // ⚡ CRITICAL FIX: Controlled popover states for instant close
   const [statusPopoverOpen, setStatusPopoverOpen] = useState(false);
   const [priorityPopoverOpen, setPriorityPopoverOpen] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [assigneePopoverOpen, setAssigneePopoverOpen] = useState(false);
-  
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
@@ -152,7 +152,7 @@ export const TaskDetailDialog = ({
     if (!task) return [];
     return users.filter(u => task.assignees?.includes(u.id));
   }, [users, task?.assignees]);
-  
+
   const unassignedUsers = useMemo(() => {
     if (!task) return [];
     return users.filter(u => !task.assignees?.includes(u.id));
@@ -161,20 +161,20 @@ export const TaskDetailDialog = ({
   // 🔧 Debounced refresh to prevent multiple simultaneous refreshes
   const debouncedRefresh = async () => {
     if (!initialTask?.id || isRefreshingRef.current) return;
-    
+
     // Clear any pending refresh
     if (refreshTimeoutRef.current) {
       clearTimeout(refreshTimeoutRef.current);
     }
-    
+
     // Schedule new refresh with debounce
     refreshTimeoutRef.current = setTimeout(async () => {
       if (isRefreshingRef.current) return;
-      
+
       isRefreshingRef.current = true;
       setIsRefreshing(true);
       console.log('🔄 Debounced refresh for task:', initialTask.id);
-      
+
       try {
         const { data, error } = await supabase
           .from('tasks')
@@ -188,12 +188,12 @@ export const TaskDetailDialog = ({
           `)
           .eq('id', initialTask.id)
           .single();
-          
+
         if (error) {
           console.error('❌ Refresh error:', error);
           return;
         }
-        
+
         if (data) {
           const formattedTask: TaskWithAttachments = {
             id: data.id,
@@ -212,7 +212,7 @@ export const TaskDetailDialog = ({
             subtasks: data.subtasks || [],
             attachments: data.task_attachments || []
           };
-          
+
           console.log('📝 Formatted fresh task:', formattedTask);
           setCurrentTaskData(formattedTask);
         }
@@ -271,7 +271,7 @@ export const TaskDetailDialog = ({
 
       console.log('✅ Files uploaded successfully');
       await debouncedRefresh();
-      
+
     } catch (err: any) {
       console.error('❌ File upload failed:', err);
       setUploadError(err.message || 'Failed to upload files');
@@ -326,7 +326,7 @@ export const TaskDetailDialog = ({
     if (open && initialTask?.id) {
       debouncedRefresh();
     }
-    
+
     return () => {
       if (refreshTimeoutRef.current) {
         clearTimeout(refreshTimeoutRef.current);
@@ -361,7 +361,7 @@ export const TaskDetailDialog = ({
 
   const getDueDateDisplay = () => {
     if (!task.due_date || !isValidDate(task.due_date)) return null;
-    
+
     const dueDate = new Date(task.due_date);
     if (task.status === 'done') return { text: safeFormatDate(task.due_date, 'MMM d'), color: 'text-green-600', bg: 'bg-green-50' };
     if (isPast(dueDate) && !isToday(dueDate)) return { text: `${safeFormatDate(task.due_date, 'MMM d')} (Overdue)`, color: 'text-red-600', bg: 'bg-red-50' };
@@ -405,9 +405,9 @@ export const TaskDetailDialog = ({
 
   const handleAddSubtask = async () => {
     if (!newSubtask.trim() || isAddingSubtask) return;
-    
+
     setIsAddingSubtask(true);
-    
+
     try {
       const { error } = await supabase
         .from('subtasks')
@@ -422,7 +422,7 @@ export const TaskDetailDialog = ({
 
       setNewSubtask('');
       await debouncedRefresh();
-      
+
     } catch (err) {
       console.error('❌ Error adding subtask:', err);
     } finally {
@@ -434,16 +434,16 @@ export const TaskDetailDialog = ({
     try {
       const subtask = task.subtasks?.find(st => st.id === subtaskId);
       if (!subtask) return;
-      
+
       const { error } = await supabase
         .from('subtasks')
         .update({ completed: !subtask.completed })
         .eq('id', subtaskId);
 
       if (error) throw error;
-      
+
       await debouncedRefresh();
-      
+
     } catch (err) {
       console.error('❌ Error toggling subtask:', err);
     }
@@ -457,9 +457,9 @@ export const TaskDetailDialog = ({
         .eq('id', subtaskId);
 
       if (error) throw error;
-      
+
       await debouncedRefresh();
-      
+
     } catch (err) {
       console.error('❌ Error deleting subtask:', err);
     }
@@ -472,7 +472,7 @@ export const TaskDetailDialog = ({
     // ✅ Force close popover immediately
     setAssigneePopoverOpen(false);
   };
-  
+
   const handleRemoveAssignee = (userId: string) => {
     const newAssignees = (task.assignees || []).filter(id => id !== userId);
     onUpdateTask(task.id, { assignees: newAssignees });
@@ -480,14 +480,14 @@ export const TaskDetailDialog = ({
 
   const updateDueDate = (date: Date | undefined) => {
     let dueDateString: string | null = null;
-    
+
     if (date) {
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const day = String(date.getDate()).padStart(2, '0');
       dueDateString = `${year}-${month}-${day}`;
     }
-    
+
     onUpdateTask(task.id, { due_date: dueDateString });
     setDatePickerOpen(false);
   };
@@ -516,11 +516,10 @@ export const TaskDetailDialog = ({
           {/* Header */}
           <div className="px-6 py-4 border-b bg-gray-50">
             <div className="flex items-center gap-3">
-              <div className={`w-3 h-3 rounded-full ${
-                task.status === 'todo' ? 'bg-gray-400' :
-                task.status === 'in_progress' ? 'bg-blue-500' : 'bg-green-500'
-              }`} />
-              
+              <div className={`w-3 h-3 rounded-full ${task.status === 'todo' ? 'bg-gray-400' :
+                  task.status === 'in_progress' ? 'bg-blue-500' : 'bg-green-500'
+                }`} />
+
               <div className="flex-1">
                 {editingTitle ? (
                   <input
@@ -535,7 +534,7 @@ export const TaskDetailDialog = ({
                     className="text-xl font-semibold bg-transparent border-0 outline-none focus:ring-2 focus:ring-blue-500 rounded w-full"
                   />
                 ) : (
-                  <h2 
+                  <h2
                     className="text-xl font-semibold hover:text-blue-600 cursor-pointer transition-colors"
                     onClick={handleTitleEdit}
                     title="Click to edit title"
@@ -572,8 +571,8 @@ export const TaskDetailDialog = ({
                 <div>
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="font-medium text-gray-900">Description</h3>
-                    <Button 
-                      variant="ghost" 
+                    <Button
+                      variant="ghost"
                       size="sm"
                       onClick={handleDescriptionEdit}
                       className="h-6 w-6 p-0"
@@ -581,7 +580,7 @@ export const TaskDetailDialog = ({
                       <Edit3 className="h-3 w-3" />
                     </Button>
                   </div>
-                  
+
                   {editingDescription ? (
                     <div className="space-y-2">
                       <Textarea
@@ -602,7 +601,7 @@ export const TaskDetailDialog = ({
                       </div>
                     </div>
                   ) : (
-                    <div 
+                    <div
                       className="min-h-[80px] p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
                       onClick={handleDescriptionEdit}
                     >
@@ -629,8 +628,8 @@ export const TaskDetailDialog = ({
                         className="hidden"
                         onChange={(e) => handleFileUpload(e.target.files)}
                       />
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         size="sm"
                         onClick={() => fileInputRef.current?.click()}
                         disabled={isUploading}
@@ -657,7 +656,7 @@ export const TaskDetailDialog = ({
                     {attachments.map(attachment => {
                       const FileIcon = getFileIcon(attachment.file_type);
                       const uploader = users.find(u => u.id === attachment.uploaded_by);
-                      
+
                       return (
                         <div key={attachment.id} className="group flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50">
                           <FileIcon className="h-8 w-8 text-gray-500 flex-shrink-0" />
@@ -666,8 +665,8 @@ export const TaskDetailDialog = ({
                               {attachment.file_name}
                             </div>
                             <div className="text-xs text-gray-500">
-                              {formatFileSize(attachment.file_size)} • 
-                              Uploaded by {uploader?.name || 'Unknown'} • 
+                              {formatFileSize(attachment.file_size)} •
+                              Uploaded by {uploader?.name || 'Unknown'} •
                               {safeFormatDate(attachment.created_at, 'MMM d, h:mm a')}
                             </div>
                           </div>
@@ -705,9 +704,9 @@ export const TaskDetailDialog = ({
                         </div>
                       );
                     })}
-                    
+
                     {attachments.length === 0 && (
-                      <div 
+                      <div
                         className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-gray-400 transition-colors"
                         onClick={() => fileInputRef.current?.click()}
                       >
@@ -731,10 +730,10 @@ export const TaskDetailDialog = ({
                       </div>
                     )}
                   </div>
-                  
+
                   {subtasks.length > 0 && (
                     <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
-                      <div 
+                      <div
                         className="bg-green-500 h-2 rounded-full transition-all duration-300"
                         style={{ width: `${(completedSubtasks / subtasks.length) * 100}%` }}
                       />
@@ -767,7 +766,7 @@ export const TaskDetailDialog = ({
                         </Button>
                       </div>
                     ))}
-                    
+
                     <div className="flex gap-2 mt-3">
                       <Input
                         placeholder="Add a subtask..."
@@ -777,9 +776,9 @@ export const TaskDetailDialog = ({
                         className="flex-1"
                         disabled={isAddingSubtask}
                       />
-                      <Button 
-                        size="sm" 
-                        onClick={handleAddSubtask} 
+                      <Button
+                        size="sm"
+                        onClick={handleAddSubtask}
                         disabled={!newSubtask.trim() || isAddingSubtask}
                       >
                         {isAddingSubtask ? (
@@ -797,7 +796,7 @@ export const TaskDetailDialog = ({
                   <h3 className="font-medium text-gray-900 mb-3">
                     Comments ({comments.length})
                   </h3>
-                  
+
                   <div className="space-y-4">
                     {comments.map(comment => {
                       const author = users.find(u => u.id === comment.author);
@@ -814,7 +813,7 @@ export const TaskDetailDialog = ({
                                 {author?.name || 'Unknown User'}
                               </span>
                               <span className="text-xs text-gray-500">
-                                {isValidDate(comment.created_at) 
+                                {isValidDate(comment.created_at)
                                   ? safeFormatDate(comment.created_at, 'MMM d, h:mm a')
                                   : 'No date'
                                 }
@@ -825,7 +824,7 @@ export const TaskDetailDialog = ({
                         </div>
                       );
                     })}
-                    
+
                     <div className="flex gap-2">
                       <Avatar className="h-8 w-8 flex-shrink-0">
                         <AvatarFallback className="bg-gray-400 text-white text-xs">
@@ -840,9 +839,9 @@ export const TaskDetailDialog = ({
                           rows={2}
                           className="resize-none"
                         />
-                        <Button 
-                          size="sm" 
-                          onClick={handleAddComment} 
+                        <Button
+                          size="sm"
+                          onClick={handleAddComment}
                           disabled={!newComment.trim()}
                           className="bg-blue-600 hover:bg-blue-700"
                         >
@@ -894,10 +893,9 @@ export const TaskDetailDialog = ({
                   <Popover open={priorityPopoverOpen} onOpenChange={setPriorityPopoverOpen}>
                     <PopoverTrigger asChild>
                       <Button variant="outline" className="w-full justify-start">
-                        <Flag className={`h-4 w-4 mr-2 ${
-                          task.priority === 'high' ? 'text-red-500' :
-                          task.priority === 'medium' ? 'text-yellow-500' : 'text-green-500'
-                        }`} />
+                        <Flag className={`h-4 w-4 mr-2 ${task.priority === 'high' ? 'text-red-500' :
+                            task.priority === 'medium' ? 'text-yellow-500' : 'text-green-500'
+                          }`} />
                         {priorityConfig[task.priority].label}
                       </Button>
                     </PopoverTrigger>
@@ -973,9 +971,9 @@ export const TaskDetailDialog = ({
                           </Avatar>
                           <span className="text-sm font-medium">{user.name}</span>
                         </div>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
                           onClick={(e) => {
                             e.preventDefault();
@@ -988,13 +986,13 @@ export const TaskDetailDialog = ({
                         </Button>
                       </div>
                     ))}
-                    
+
                     {/* 🎯 CRITICAL FIX: Controlled popover with forced close */}
                     <Popover open={assigneePopoverOpen} onOpenChange={setAssigneePopoverOpen}>
                       <PopoverTrigger asChild>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
+                        <Button
+                          variant="outline"
+                          size="sm"
                           className="w-full justify-start text-gray-500 border-dashed"
                         >
                           <UserPlus className="h-4 w-4 mr-2" />
@@ -1003,7 +1001,7 @@ export const TaskDetailDialog = ({
                       </PopoverTrigger>
                       <PopoverContent className="w-56 p-1" align="start">
                         {unassignedUsers.map(user => (
-                          <div 
+                          <div
                             key={user.id}
                             className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-md cursor-pointer"
                             onClick={(e) => {
@@ -1055,7 +1053,7 @@ export const TaskDetailDialog = ({
                     <div className="flex items-center gap-2">
                       <Clock className="h-3 w-3" />
                       <span>
-                        Created {isValidDate(task.created_at) 
+                        Created {isValidDate(task.created_at)
                           ? safeFormatDate(task.created_at, 'MMM d, yyyy')
                           : 'unknown date'
                         }
@@ -1065,7 +1063,7 @@ export const TaskDetailDialog = ({
                       <div className="flex items-center gap-2">
                         <Clock className="h-3 w-3" />
                         <span>
-                          Updated {isValidDate(task.updated_at) 
+                          Updated {isValidDate(task.updated_at)
                             ? safeFormatDate(task.updated_at, 'MMM d, yyyy')
                             : 'unknown date'
                           }

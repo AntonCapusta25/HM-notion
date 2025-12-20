@@ -8,11 +8,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { 
-  Play, 
-  Pause, 
-  Edit, 
-  Trash2, 
+import {
+  Play,
+  Pause,
+  Edit,
+  Trash2,
   Copy,
   Plus,
   Search,
@@ -28,12 +28,14 @@ import {
   AlertCircle
 } from 'lucide-react'
 import { useOutreachStore } from '@/hooks/useOutreachStore'
+import { useCollabStore } from '@/hooks/useCollabStore'
 import { useAuth } from '../../contexts/AuthContext'
 import { useToast } from '@/hooks/use-toast'
 import NewCampaignModal from './NewCampaignModal'
 
 interface CampaignsViewProps {
   workspaceId: string
+  outreachType?: 'collab' | 'client'
 }
 
 interface Campaign {
@@ -65,23 +67,27 @@ interface Campaign {
   }
 }
 
-export default function CampaignsView({ workspaceId }: CampaignsViewProps) {
+export default function CampaignsView({ workspaceId, outreachType = 'client' }: CampaignsViewProps) {
   const [activeTab, setActiveTab] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [showCampaignModal, setShowCampaignModal] = useState(false)
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null)
 
-  const { 
-    campaigns, 
+  // Use appropriate store based on outreach type
+  const clientStore = useOutreachStore()
+  const collabStore = useCollabStore()
+  const store = outreachType === 'collab' ? collabStore : clientStore
+
+  const {
+    campaigns,
     loading,
     fetchCampaigns,
     updateCampaign,
     deleteCampaign,
     launchCampaign,
-    pauseCampaign
-  } = useOutreachStore()
-  
+  } = store
+
   const { user } = useAuth()
   const { toast } = useToast()
 
@@ -92,16 +98,16 @@ export default function CampaignsView({ workspaceId }: CampaignsViewProps) {
   }, [workspaceId])
 
   const filteredCampaigns = campaigns.filter(campaign => {
-    const matchesSearch = !searchTerm || 
+    const matchesSearch = !searchTerm ||
       campaign.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       campaign.subject_line.toLowerCase().includes(searchTerm.toLowerCase())
-    
+
     const matchesStatus = statusFilter === 'all' || campaign.status === statusFilter
-    const matchesTab = activeTab === 'all' || 
+    const matchesTab = activeTab === 'all' ||
       (activeTab === 'active' && ['running', 'scheduled'].includes(campaign.status)) ||
       (activeTab === 'draft' && campaign.status === 'draft') ||
       (activeTab === 'completed' && campaign.status === 'completed')
-    
+
     return matchesSearch && matchesStatus && matchesTab
   })
 
@@ -123,7 +129,7 @@ export default function CampaignsView({ workspaceId }: CampaignsViewProps) {
 
   const handlePauseCampaign = async (campaignId: string) => {
     try {
-      await pauseCampaign(campaignId)
+      await updateCampaign(campaignId, { status: 'paused' })
       toast({
         title: "Campaign paused",
         description: "Your email campaign has been paused",
@@ -221,8 +227,8 @@ export default function CampaignsView({ workspaceId }: CampaignsViewProps) {
             Manage and track your outreach campaigns
           </p>
         </div>
-        
-        <Button 
+
+        <Button
           onClick={() => setShowCampaignModal(true)}
           className="flex items-center gap-2"
         >
@@ -280,7 +286,7 @@ export default function CampaignsView({ workspaceId }: CampaignsViewProps) {
                 <Mail className="h-12 w-12 text-gray-400 mb-4" />
                 <h4 className="text-lg font-medium text-gray-900 mb-2">No campaigns found</h4>
                 <p className="text-gray-600 text-center mb-4">
-                  {campaigns.length === 0 
+                  {campaigns.length === 0
                     ? "Create your first email campaign to start reaching out to leads"
                     : "No campaigns match your current filters"
                   }
@@ -330,8 +336,8 @@ export default function CampaignsView({ workspaceId }: CampaignsViewProps) {
                             <div>
                               <Label className="text-sm text-gray-500">Target Segment</Label>
                               <div className="flex items-center gap-2">
-                                <div 
-                                  className="w-3 h-3 rounded-full" 
+                                <div
+                                  className="w-3 h-3 rounded-full"
                                   style={{ backgroundColor: campaign.lead_segments.color }}
                                 />
                                 <span className="font-medium">{campaign.lead_segments.name}</span>
@@ -392,9 +398,9 @@ export default function CampaignsView({ workspaceId }: CampaignsViewProps) {
                                     {campaign.stats.sent} / {campaign.stats.total_emails} emails sent
                                   </span>
                                 </div>
-                                <Progress 
-                                  value={(campaign.stats.sent / campaign.stats.total_emails) * 100} 
-                                  className="w-full" 
+                                <Progress
+                                  value={(campaign.stats.sent / campaign.stats.total_emails) * 100}
+                                  className="w-full"
                                 />
                               </div>
                             )}

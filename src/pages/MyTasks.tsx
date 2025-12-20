@@ -1,3 +1,7 @@
+import { MyTasks as StandardMyTasks } from '../components/MyTasks'; // Assuming we can extract or inline, but cleaner to keep logic here.
+// Wait, I should rename the current export to StandardMyTasks or keep it inline and render based on theme.
+// Let's refactor: I will keep the current code as "StandardMyTasks" inside the file (renamed) and the main export will be the switcher.
+
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Layout } from '../components/Layout';
 import { TaskCard } from '../components/TaskCard';
@@ -16,14 +20,17 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Plus, Calendar, AlertCircle, LayoutGrid, List, RefreshCw, MessageCircle, X, Minimize2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Task } from '../types';
+import { useTheme } from '../contexts/ThemeContext';
+import { PremiumMyTasks } from '../components/premium/PremiumMyTasks';
 
-export const MyTasks = () => {
-  const { 
-    tasks, 
-    users, 
-    workspaces, 
+const StandardMyTasks = () => {
+  // ... (Original logic)
+  const {
+    tasks,
+    users,
+    workspaces,
     createTask,
-    deleteTask, 
+    deleteTask,
     updateTask,
     addComment,
     toggleSubtask,
@@ -34,7 +41,7 @@ export const MyTasks = () => {
 
   const { user } = useAuth();
   const { profile: userProfile } = useProfile();
-  
+
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(null);
@@ -74,10 +81,10 @@ export const MyTasks = () => {
   // Manual refresh function
   const handleManualRefresh = useCallback(async () => {
     if (!refreshTasks) return;
-    
+
     setIsRefreshing(true);
     console.log('🔄 MyTasks - Manual refresh triggered');
-    
+
     try {
       await refreshTasks();
       console.log('✅ MyTasks - Manual refresh completed');
@@ -111,7 +118,7 @@ export const MyTasks = () => {
   const handleDeleteTask = useCallback(async (taskId: string) => {
     const confirmed = window.confirm('Are you sure you want to delete this task?');
     if (!confirmed) return;
-    
+
     try {
       console.log('🗑️ MyTasks - Deleting task:', taskId);
       await deleteTask(taskId);
@@ -139,10 +146,10 @@ export const MyTasks = () => {
   // FIXED: Properly filter tasks assigned TO the current user ONLY
   const myTasks = useMemo(() => {
     if (!user) return [];
-    
+
     console.log('🔍 MyTasks - Filtering tasks for user:', user.id);
     console.log('📋 MyTasks - Total tasks available:', tasks.length);
-    
+
     // Debug: Log the first task structure and current user info
     if (tasks.length > 0) {
       console.log('📄 MyTasks - Sample task structure (first task):', {
@@ -152,7 +159,7 @@ export const MyTasks = () => {
         task_assignees: tasks[0].task_assignees,
         has_assignments: tasks[0].task_assignees?.length > 0
       });
-      
+
       console.log('👤 Current user ID:', user.id);
       console.log('📧 Current user email:', user.email);
     }
@@ -161,19 +168,19 @@ export const MyTasks = () => {
     let personalTasks = tasks.filter(task => {
       // Check if task is assigned to current user via task_assignees relationship
       let isAssignedToMe = false;
-      
+
       if (task.task_assignees && Array.isArray(task.task_assignees)) {
         isAssignedToMe = task.task_assignees.some((assignment: any) => assignment.user_id === user.id);
       }
-      
+
       console.log(`🔍 Task "${task.title}": assigned=${isAssignedToMe}, created_by=${task.created_by}`);
-      
+
       if (isAssignedToMe) {
         console.log(`✅ Including task "${task.title}" - assigned to me`);
       } else {
         console.log(`❌ Excluding task "${task.title}" - not assigned to me`);
       }
-      
+
       // ONLY show tasks assigned to me (strict filtering)
       return isAssignedToMe;
     });
@@ -223,386 +230,388 @@ export const MyTasks = () => {
   const stats = useMemo(() => {
     const todayRaw = new Date();
     const today = new Date(todayRaw.getFullYear(), todayRaw.getMonth(), todayRaw.getDate());
-    
+
     console.log('📈 MyTasks - Calculating stats for filtered tasks:', myTasks.length);
-    
+
     const stats = {
       total: myTasks.length,
       overdue: myTasks.filter(t => t.due_date && new Date(t.due_date) < today && t.status !== 'done').length,
       dueToday: myTasks.filter(t => t.due_date && new Date(t.due_date).toDateString() === today.toDateString() && t.status !== 'done').length
     };
-    
+
     console.log('📊 MyTasks - Final stats:', stats);
     return stats;
   }, [myTasks]);
 
   if (tasksLoading) {
     return (
-      <Layout>
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-4 text-muted-foreground">Loading your tasks...</p>
-          </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Loading your tasks...</p>
         </div>
-      </Layout>
+      </div>
     );
   }
 
   // Only show error alert if still loading (not for optimistic update errors during normal operation)
   if (error && tasksLoading) {
     return (
-      <Layout>
-        <Alert variant="destructive" className="m-6">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            Error loading tasks: {error}
-          </AlertDescription>
-        </Alert>
-      </Layout>
+      <Alert variant="destructive" className="m-6">
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>
+          Error loading tasks: {error}
+        </AlertDescription>
+      </Alert>
     );
   }
 
   if (!user) {
     return (
-      <Layout>
-        <Alert className="m-6">
-          <AlertDescription>
-            Please log in to view your tasks.
-          </AlertDescription>
-        </Alert>
-      </Layout>
+      <Alert className="m-6">
+        <AlertDescription>
+          Please log in to view your tasks.
+        </AlertDescription>
+      </Alert>
     );
   }
 
   return (
-    <Layout>
-      <div className="space-y-6">
-        {/* Error Toast for Optimistic Update Failures */}
-        {error && !tasksLoading && (
-          <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-top-2 duration-300">
-            <Alert variant="destructive" className="max-w-md shadow-lg">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription className="flex items-center justify-between">
-                <span>{error}</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {/* Error will auto-clear after 5s */}}
-                  className="h-6 w-6 p-0 ml-2"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </AlertDescription>
-            </Alert>
-          </div>
-        )}
-
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">My Tasks</h1>
-            <p className="text-gray-600 mt-1">
-              {stats.overdue > 0 ? `${stats.overdue} overdue tasks` : 'You\'re up to date!'} 
-              {stats.dueToday > 0 && ` • ${stats.dueToday} due today`}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            {refreshTasks && (
-              <Button 
-                onClick={handleManualRefresh} 
-                variant="outline" 
+    <div className="space-y-6">
+      {/* Error Toast for Optimistic Update Failures */}
+      {error && !tasksLoading && (
+        <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-top-2 duration-300">
+          <Alert variant="destructive" className="max-w-md shadow-lg">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="flex items-center justify-between">
+              <span>{error}</span>
+              <Button
+                variant="ghost"
                 size="sm"
-                disabled={isRefreshing}
-                className="flex items-center gap-2"
+                onClick={() => {/* Error will auto-clear after 5s */ }}
+                className="h-6 w-6 p-0 ml-2"
               >
-                <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                {isRefreshing ? 'Refreshing...' : 'Refresh'}
+                <X className="h-4 w-4" />
               </Button>
-            )}
-            <Button 
-              onClick={toggleChatbot}
-              variant="outline" 
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">My Tasks</h1>
+          <p className="text-gray-600 mt-1">
+            {stats.overdue > 0 ? `${stats.overdue} overdue tasks` : 'You\'re up to date!'}
+            {stats.dueToday > 0 && ` • ${stats.dueToday} due today`}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {refreshTasks && (
+            <Button
+              onClick={handleManualRefresh}
+              variant="outline"
               size="sm"
+              disabled={isRefreshing}
               className="flex items-center gap-2"
             >
-              <MessageCircle className="h-4 w-4" />
-              AI Assistant
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              {isRefreshing ? 'Refreshing...' : 'Refresh'}
             </Button>
-            <div className="flex border rounded-lg p-1 bg-gray-50">
-              <Button 
-                variant={viewMode === 'kanban' ? 'default' : 'ghost'} 
-                size="sm" 
-                onClick={() => setViewMode('kanban')} 
-                className={viewMode === 'kanban' ? 'bg-homemade-orange hover:bg-homemade-orange-dark' : ''}
-              >
-                <LayoutGrid className="h-4 w-4 mr-2" />
-                Kanban
-              </Button>
-              <Button 
-                variant={viewMode === 'list' ? 'default' : 'ghost'} 
-                size="sm" 
-                onClick={() => setViewMode('list')} 
-                className={viewMode === 'list' ? 'bg-homemade-orange hover:bg-homemade-orange-dark' : ''}
-              >
-                <List className="h-4 w-4 mr-2" />
-                List
-              </Button>
-            </div>
-            <Button 
-              onClick={() => setShowCreateTask(true)} 
-              className="bg-homemade-orange hover:bg-homemade-orange-dark"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              New Task
-            </Button>
-          </div>
-        </div>
-
-        {viewMode === 'kanban' && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600">My Tasks</p>
-                    <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
-                  </div>
-                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <Calendar className="h-6 w-6 text-blue-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600">Due Today</p>
-                    <p className="text-2xl font-bold text-yellow-600">{stats.dueToday}</p>
-                  </div>
-                  <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                    <Calendar className="h-6 w-6 text-yellow-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600">Overdue</p>
-                    <p className="text-2xl font-bold text-red-600">{stats.overdue}</p>
-                  </div>
-                  <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-                    <AlertCircle className="h-6 w-6 text-red-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="flex-1">
-            <WorkspaceSelector 
-              workspaces={workspaces}
-              selectedWorkspace={selectedWorkspace}
-              onWorkspaceChange={setSelectedWorkspace}
-            />
-          </div>
-          <div className="flex gap-2">
-            <Button 
-              variant={filter === 'all' ? 'default' : 'outline'} 
-              size="sm" 
-              onClick={() => setFilter('all')} 
-              className={filter === 'all' ? 'bg-homemade-orange hover:bg-homemade-orange-dark' : ''}
-            >
-              All
-            </Button>
-            <Button 
-              variant={filter === 'today' ? 'default' : 'outline'} 
-              size="sm" 
-              onClick={() => setFilter('today')} 
-              className={filter === 'today' ? 'bg-homemade-orange hover:bg-homemade-orange-dark' : ''}
-            >
-              Due Today
-            </Button>
-            <Button 
-              variant={filter === 'week' ? 'default' : 'outline'} 
-              size="sm" 
-              onClick={() => setFilter('week')} 
-              className={filter === 'week' ? 'bg-homemade-orange hover:bg-homemade-orange-dark' : ''}
-            >
-              This Week
-            </Button>
-            <Button 
-              variant={filter === 'overdue' ? 'default' : 'outline'} 
-              size="sm" 
-              onClick={() => setFilter('overdue')} 
-              className={filter === 'overdue' ? 'bg-homemade-orange hover:bg-homemade-orange-dark' : ''}
-            >
-              Overdue
-            </Button>
-          </div>
-        </div>
-
-        {viewMode === 'list' ? (
-<ListView
-  tasks={myTasks}
-  users={users}
-  onCreateTask={handleCreateTask}
-  onUpdateTask={handleUpdateTask}
-  onDeleteTask={handleDeleteTask}
-  onAssignTask={(taskId, userIds) => handleUpdateTask(taskId, { assignees: userIds })}
-/>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center justify-between text-base">
-                  <span className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-gray-400 rounded-full" />
-                    To Do
-                  </span>
-                  <Badge variant="secondary">{tasksByStatus.todo.length}</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {tasksByStatus.todo.map(task => (
-                  <TaskCard 
-                    key={task.id} 
-                    task={task} 
-                    onClick={() => setSelectedTask(task)}
-                  />
-                ))}
-                {tasksByStatus.todo.length === 0 && (
-                  <div className="text-center py-8 text-gray-400">
-                    <p className="text-sm">No tasks to do</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center justify-between text-base">
-                  <span className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-yellow-400 rounded-full" />
-                    In Progress
-                  </span>
-                  <Badge variant="secondary">{tasksByStatus.in_progress.length}</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {tasksByStatus.in_progress.map(task => (
-                  <TaskCard 
-                    key={task.id} 
-                    task={task}
-                    onClick={() => setSelectedTask(task)}
-                  />
-                ))}
-                {tasksByStatus.in_progress.length === 0 && (
-                  <div className="text-center py-8 text-gray-400">
-                    <p className="text-sm">No tasks in progress</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center justify-between text-base">
-                  <span className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-green-400 rounded-full" />
-                    Done
-                  </span>
-                  <Badge variant="secondary">{tasksByStatus.done.length}</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {tasksByStatus.done.map(task => (
-                  <TaskCard 
-                    key={task.id} 
-                    task={task}
-                    onClick={() => setSelectedTask(task)}
-                  />
-                ))}
-                {tasksByStatus.done.length === 0 && (
-                  <div className="text-center py-8 text-gray-400">
-                    <p className="text-sm">No completed tasks</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Enhanced Floating Chatbot */}
-        <div className="fixed bottom-6 right-6 z-50">
-          {!showChatbot ? (
-            <Button
-              onClick={toggleChatbot}
-              className="bg-homemade-orange hover:bg-homemade-orange-dark rounded-full w-14 h-14 shadow-lg hover:shadow-xl transition-all duration-200"
-              title="Open AI Assistant"
-            >
-              <MessageCircle className="h-6 w-6" />
-            </Button>
-          ) : isChatbotMinimized ? (
-            <Button
-              onClick={() => setIsChatbotMinimized(false)}
-              className="bg-homemade-orange hover:bg-homemade-orange-dark rounded-full w-14 h-14 shadow-lg"
-              title="Expand AI Assistant"
-            >
-              <MessageCircle className="h-6 w-6" />
-            </Button>
-          ) : (
-            <div className="relative">
-              <div className="absolute top-2 right-2 z-10 flex gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={minimizeChatbot}
-                  className="h-6 w-6 p-0 text-gray-500 hover:text-gray-700 bg-white/80 hover:bg-white rounded-full"
-                  title="Minimize"
-                >
-                  <Minimize2 className="h-3 w-3" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={closeChatbot}
-                  className="h-6 w-6 p-0 text-gray-500 hover:text-gray-700 bg-white/80 hover:bg-white rounded-full"
-                  title="Close"
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              </div>
-              {authToken && userProfile && (
-                <EnhancedChatbot 
-                  userAuthToken={authToken}
-                  userId={userProfile.id}
-                />
-              )}
-            </div>
           )}
+          <Button
+            onClick={toggleChatbot}
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-2"
+          >
+            <MessageCircle className="h-4 w-4" />
+            AI Assistant
+          </Button>
+          <div className="flex border rounded-lg p-1 bg-gray-50">
+            <Button
+              variant={viewMode === 'kanban' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('kanban')}
+              className={viewMode === 'kanban' ? 'bg-homemade-orange hover:bg-homemade-orange-dark' : ''}
+            >
+              <LayoutGrid className="h-4 w-4 mr-2" />
+              Kanban
+            </Button>
+            <Button
+              variant={viewMode === 'list' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('list')}
+              className={viewMode === 'list' ? 'bg-homemade-orange hover:bg-homemade-orange-dark' : ''}
+            >
+              <List className="h-4 w-4 mr-2" />
+              List
+            </Button>
+          </div>
+          <Button
+            onClick={() => setShowCreateTask(true)}
+            className="bg-homemade-orange hover:bg-homemade-orange-dark"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            New Task
+          </Button>
         </div>
-
-        <CreateTaskDialog 
-          open={showCreateTask} 
-          onOpenChange={setShowCreateTask}
-          onCreateTask={handleCreateTask}
-        />
-
-        <TaskDetailDialog
-          task={selectedTask}
-          users={users}
-          open={!!selectedTask}
-          onOpenChange={(open) => !open && setSelectedTask(null)}
-          onUpdateTask={handleUpdateTask}
-          onAddComment={handleAddComment}
-          onToggleSubtask={handleToggleSubtask}
-        />
       </div>
+
+      {viewMode === 'kanban' && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">My Tasks</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+                </div>
+                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <Calendar className="h-6 w-6 text-blue-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Due Today</p>
+                  <p className="text-2xl font-bold text-yellow-600">{stats.dueToday}</p>
+                </div>
+                <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+                  <Calendar className="h-6 w-6 text-yellow-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Overdue</p>
+                  <p className="text-2xl font-bold text-red-600">{stats.overdue}</p>
+                </div>
+                <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+                  <AlertCircle className="h-6 w-6 text-red-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex-1">
+          <WorkspaceSelector
+            workspaces={workspaces}
+            selectedWorkspace={selectedWorkspace}
+            onWorkspaceChange={setSelectedWorkspace}
+          />
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant={filter === 'all' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setFilter('all')}
+            className={filter === 'all' ? 'bg-homemade-orange hover:bg-homemade-orange-dark' : ''}
+          >
+            All
+          </Button>
+          <Button
+            variant={filter === 'today' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setFilter('today')}
+            className={filter === 'today' ? 'bg-homemade-orange hover:bg-homemade-orange-dark' : ''}
+          >
+            Due Today
+          </Button>
+          <Button
+            variant={filter === 'week' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setFilter('week')}
+            className={filter === 'week' ? 'bg-homemade-orange hover:bg-homemade-orange-dark' : ''}
+          >
+            This Week
+          </Button>
+          <Button
+            variant={filter === 'overdue' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setFilter('overdue')}
+            className={filter === 'overdue' ? 'bg-homemade-orange hover:bg-homemade-orange-dark' : ''}
+          >
+            Overdue
+          </Button>
+        </div>
+      </div>
+
+      {viewMode === 'list' ? (
+        <ListView
+          tasks={myTasks}
+          users={users}
+          onCreateTask={handleCreateTask}
+          onUpdateTask={handleUpdateTask}
+          onDeleteTask={handleDeleteTask}
+          onAssignTask={(taskId, userIds) => handleUpdateTask(taskId, { assignees: userIds })}
+        />
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center justify-between text-base">
+                <span className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-gray-400 rounded-full" />
+                  To Do
+                </span>
+                <Badge variant="secondary">{tasksByStatus.todo.length}</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {tasksByStatus.todo.map(task => (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  onClick={() => setSelectedTask(task)}
+                />
+              ))}
+              {tasksByStatus.todo.length === 0 && (
+                <div className="text-center py-8 text-gray-400">
+                  <p className="text-sm">No tasks to do</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center justify-between text-base">
+                <span className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-yellow-400 rounded-full" />
+                  In Progress
+                </span>
+                <Badge variant="secondary">{tasksByStatus.in_progress.length}</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {tasksByStatus.in_progress.map(task => (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  onClick={() => setSelectedTask(task)}
+                />
+              ))}
+              {tasksByStatus.in_progress.length === 0 && (
+                <div className="text-center py-8 text-gray-400">
+                  <p className="text-sm">No tasks in progress</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center justify-between text-base">
+                <span className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-green-400 rounded-full" />
+                  Done
+                </span>
+                <Badge variant="secondary">{tasksByStatus.done.length}</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {tasksByStatus.done.map(task => (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  onClick={() => setSelectedTask(task)}
+                />
+              ))}
+              {tasksByStatus.done.length === 0 && (
+                <div className="text-center py-8 text-gray-400">
+                  <p className="text-sm">No completed tasks</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Enhanced Floating Chatbot */}
+      <div className="fixed bottom-6 right-6 z-50">
+        {!showChatbot ? (
+          <Button
+            onClick={toggleChatbot}
+            className="bg-homemade-orange hover:bg-homemade-orange-dark rounded-full w-14 h-14 shadow-lg hover:shadow-xl transition-all duration-200"
+            title="Open AI Assistant"
+          >
+            <MessageCircle className="h-6 w-6" />
+          </Button>
+        ) : isChatbotMinimized ? (
+          <Button
+            onClick={() => setIsChatbotMinimized(false)}
+            className="bg-homemade-orange hover:bg-homemade-orange-dark rounded-full w-14 h-14 shadow-lg"
+            title="Expand AI Assistant"
+          >
+            <MessageCircle className="h-6 w-6" />
+          </Button>
+        ) : (
+          <div className="relative">
+            <div className="absolute top-2 right-2 z-10 flex gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={minimizeChatbot}
+                className="h-6 w-6 p-0 text-gray-500 hover:text-gray-700 bg-white/80 hover:bg-white rounded-full"
+                title="Minimize"
+              >
+                <Minimize2 className="h-3 w-3" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={closeChatbot}
+                className="h-6 w-6 p-0 text-gray-500 hover:text-gray-700 bg-white/80 hover:bg-white rounded-full"
+                title="Close"
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+            {authToken && userProfile && (
+              <EnhancedChatbot
+                userAuthToken={authToken}
+                userId={userProfile.id}
+              />
+            )}
+          </div>
+        )}
+      </div>
+
+      <CreateTaskDialog
+        open={showCreateTask}
+        onOpenChange={setShowCreateTask}
+        onCreateTask={handleCreateTask}
+      />
+
+      <TaskDetailDialog
+        task={selectedTask}
+        users={users}
+        open={!!selectedTask}
+        onOpenChange={(open) => !open && setSelectedTask(null)}
+        onUpdateTask={handleUpdateTask}
+        onAddComment={handleAddComment}
+        onToggleSubtask={handleToggleSubtask}
+      />
+    </div>
+  );
+};
+
+const MyTasks = () => {
+  const { theme } = useTheme();
+
+  return (
+    <Layout>
+      {theme === 'dark' ? <PremiumMyTasks /> : <StandardMyTasks />}
     </Layout>
   );
 };

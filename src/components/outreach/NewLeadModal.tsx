@@ -1,4 +1,4 @@
-// NewLeadModal.tsx - Fixed UUID validation
+// NewLeadModal.tsx - Simplified for email outreach
 import React, { useState, useEffect } from 'react'
 import {
   Dialog,
@@ -14,36 +14,16 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useAuth } from '../../contexts/AuthContext'
 import { useOutreachStore } from '@/hooks/useOutreachStore'
+import { useCollabStore } from '@/hooks/useCollabStore'
 import { useToast } from '@/hooks/use-toast'
-
-interface Lead {
-  id?: string
-  name: string
-  email: string
-  company?: string
-  position?: string
-  industry?: string
-  phone?: string
-  website?: string
-  linkedin_url?: string
-  twitter_url?: string
-  location?: string
-  company_size?: string
-  revenue_range?: string
-  lead_score: number
-  status: 'new' | 'contacted' | 'responded' | 'qualified' | 'converted' | 'dead'
-  source: string
-  notes?: string
-  segment_id?: string
-  workspace_id: string
-  created_by: string
-}
+import { Lead, CollabLead } from '@/types'
 
 interface NewLeadModalProps {
   open: boolean
   onClose: () => void
   workspaceId: string
-  lead?: Lead | null
+  lead?: Lead | CollabLead | null
+  outreachType?: 'collab' | 'client'
 }
 
 const LEAD_STATUSES = [
@@ -55,82 +35,53 @@ const LEAD_STATUSES = [
   { value: 'dead', label: 'Dead' }
 ]
 
-const COMPANY_SIZES = [
-  { value: '1-10', label: '1-10 employees' },
-  { value: '11-50', label: '11-50 employees' },
-  { value: '51-200', label: '51-200 employees' },
-  { value: '201-500', label: '201-500 employees' },
-  { value: '501-1000', label: '501-1000 employees' },
-  { value: '1000+', label: '1000+ employees' }
-]
-
-const REVENUE_RANGES = [
-  { value: '0-1M', label: '$0-1M' },
-  { value: '1M-10M', label: '$1M-10M' },
-  { value: '10M-50M', label: '$10M-50M' },
-  { value: '50M-100M', label: '$50M-100M' },
-  { value: '100M+', label: '$100M+' }
-]
-
-export default function NewLeadModal({ open, onClose, workspaceId, lead }: NewLeadModalProps) {
+export default function NewLeadModal({ open, onClose, workspaceId, lead, outreachType = 'client' }: NewLeadModalProps) {
   const { user } = useAuth()
-  const { createLead, updateLead, segments } = useOutreachStore()
+
+  // Use appropriate store based on outreach type
+  const clientStore = useOutreachStore()
+  const collabStore = useCollabStore()
+  const store = outreachType === 'collab' ? collabStore : clientStore
+
+  const { createLead, updateLead, segments } = store
   const { toast } = useToast()
-  
+
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [formData, setFormData] = useState<Partial<Lead>>({
+
+  // Initialize form data with correct type
+  const [formData, setFormData] = useState<Partial<Lead & CollabLead>>({
     name: '',
     email: '',
-    company: '',
-    position: '',
-    industry: '',
     phone: '',
-    website: '',
-    linkedin_url: '',
-    twitter_url: '',
-    location: '',
-    company_size: '',
-    revenue_range: '',
-    lead_score: 50,
     status: 'new',
-    source: 'manual',
     notes: '',
-    segment_id: ''
+    segment_id: '',
+    // Just initialize common fields, specific ones handled conditionally
   })
 
   // Populate form when editing existing lead
   useEffect(() => {
     if (lead) {
-      setFormData({
-        ...lead
-      })
+      // Create a clean copy of the lead data for the form
+      const initialData: any = { ...lead }
+      setFormData(initialData)
     } else {
       // Reset form for new lead
       setFormData({
         name: '',
         email: '',
-        company: '',
-        position: '',
-        industry: '',
         phone: '',
-        website: '',
-        linkedin_url: '',
-        twitter_url: '',
-        location: '',
-        company_size: '',
-        revenue_range: '',
-        lead_score: 50,
         status: 'new',
-        source: 'manual',
         notes: '',
-        segment_id: ''
+        segment_id: '',
+        // Initialize lead_score only for client outreach if needed, but not strictly required here as it's partial
       })
     }
   }, [lead, open])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!formData.name || !formData.email) {
       toast({
         title: "Validation Error",
@@ -161,35 +112,34 @@ export default function NewLeadModal({ open, onClose, workspaceId, lead }: NewLe
     setIsSubmitting(true)
 
     try {
-      const leadData = {
-        ...formData,
+      const baseData = {
+        name: formData.name,
+        email: formData.email,
         workspace_id: workspaceId,
         created_by: user.id,
-        lead_score: Number(formData.lead_score),
-        // Fix UUID fields - convert empty strings to null
         segment_id: formData.segment_id && formData.segment_id.trim() !== '' ? formData.segment_id : null,
-        company: formData.company?.trim() || null,
-        position: formData.position?.trim() || null,
-        industry: formData.industry?.trim() || null,
         phone: formData.phone?.trim() || null,
-        website: formData.website?.trim() || null,
-        linkedin_url: formData.linkedin_url?.trim() || null,
-        twitter_url: formData.twitter_url?.trim() || null,
-        location: formData.location?.trim() || null,
-        company_size: formData.company_size?.trim() || null,
-        revenue_range: formData.revenue_range?.trim() || null,
-        notes: formData.notes?.trim() || null
+        notes: formData.notes?.trim() || null,
+        status: formData.status
+      }
+
+      // Add specific fields based on outreach type
+      const leadData: any = { ...baseData }
+
+      if (outreachType === 'client') {
+        leadData.source = 'manual'
+        leadData.lead_score = (formData as any).lead_score || 50
       }
 
       if (lead) {
-        // Update existing lead
+        // @ts-ignore - updateLead expects specific type but we're passing correct data structure
         await updateLead(lead.id!, leadData)
         toast({
           title: "Lead Updated",
           description: "Lead has been updated successfully."
         })
       } else {
-        // Create new lead
+        // @ts-ignore
         await createLead(leadData)
         toast({
           title: "Lead Created",
@@ -210,7 +160,7 @@ export default function NewLeadModal({ open, onClose, workspaceId, lead }: NewLe
     }
   }
 
-  const handleInputChange = (field: keyof Lead, value: any) => {
+  const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -219,7 +169,7 @@ export default function NewLeadModal({ open, onClose, workspaceId, lead }: NewLe
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>{lead ? 'Edit Lead' : 'Add New Lead'}</DialogTitle>
           <DialogDescription>
@@ -228,214 +178,74 @@ export default function NewLeadModal({ open, onClose, workspaceId, lead }: NewLe
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Basic Information */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="name">Name *</Label>
-              <Input
-                id="name"
-                value={formData.name || ''}
-                onChange={(e) => handleInputChange('name', e.target.value)}
-                placeholder="John Doe"
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="email">Email *</Label>
-              <Input
-                id="email"
-                type="email"
-                value={formData.email || ''}
-                onChange={(e) => handleInputChange('email', e.target.value)}
-                placeholder="john@company.com"
-                required
-              />
-            </div>
+          {/* Name */}
+          <div>
+            <Label htmlFor="name">Name *</Label>
+            <Input
+              id="name"
+              value={formData.name || ''}
+              onChange={(e) => handleInputChange('name', e.target.value)}
+              placeholder="John Doe"
+              required
+            />
           </div>
 
-          {/* Company Information */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="company">Company</Label>
-              <Input
-                id="company"
-                value={formData.company || ''}
-                onChange={(e) => handleInputChange('company', e.target.value)}
-                placeholder="Acme Inc"
-              />
-            </div>
-            <div>
-              <Label htmlFor="position">Position</Label>
-              <Input
-                id="position"
-                value={formData.position || ''}
-                onChange={(e) => handleInputChange('position', e.target.value)}
-                placeholder="CEO"
-              />
-            </div>
+          {/* Email */}
+          <div>
+            <Label htmlFor="email">Email *</Label>
+            <Input
+              id="email"
+              type="email"
+              value={formData.email || ''}
+              onChange={(e) => handleInputChange('email', e.target.value)}
+              placeholder="john@example.com"
+              required
+            />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="industry">Industry</Label>
-              <Input
-                id="industry"
-                value={formData.industry || ''}
-                onChange={(e) => handleInputChange('industry', e.target.value)}
-                placeholder="Technology"
-              />
-            </div>
-            <div>
-              <Label htmlFor="location">Location</Label>
-              <Input
-                id="location"
-                value={formData.location || ''}
-                onChange={(e) => handleInputChange('location', e.target.value)}
-                placeholder="New York, NY"
-              />
-            </div>
+          {/* Phone (Optional) */}
+          <div>
+            <Label htmlFor="phone">Phone (Optional)</Label>
+            <Input
+              id="phone"
+              value={formData.phone || ''}
+              onChange={(e) => handleInputChange('phone', e.target.value)}
+              placeholder="+1 (555) 123-4567"
+            />
           </div>
 
-          {/* Contact Information */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="phone">Phone</Label>
-              <Input
-                id="phone"
-                value={formData.phone || ''}
-                onChange={(e) => handleInputChange('phone', e.target.value)}
-                placeholder="+1 (555) 123-4567"
-              />
-            </div>
-            <div>
-              <Label htmlFor="website">Website</Label>
-              <Input
-                id="website"
-                value={formData.website || ''}
-                onChange={(e) => handleInputChange('website', e.target.value)}
-                placeholder="https://company.com"
-              />
-            </div>
+          {/* Status */}
+          <div>
+            <Label htmlFor="status">Status</Label>
+            <Select
+              value={formData.status || 'new'}
+              onValueChange={(value) => handleInputChange('status', value)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {LEAD_STATUSES.map(status => (
+                  <SelectItem key={status.value} value={status.value}>
+                    {status.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="linkedin">LinkedIn URL</Label>
-              <Input
-                id="linkedin"
-                value={formData.linkedin_url || ''}
-                onChange={(e) => handleInputChange('linkedin_url', e.target.value)}
-                placeholder="https://linkedin.com/in/johndoe"
-              />
-            </div>
-            <div>
-              <Label htmlFor="twitter">Twitter URL</Label>
-              <Input
-                id="twitter"
-                value={formData.twitter_url || ''}
-                onChange={(e) => handleInputChange('twitter_url', e.target.value)}
-                placeholder="https://twitter.com/johndoe"
-              />
-            </div>
-          </div>
-
-          {/* Company Details */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="company_size">Company Size</Label>
-              <Select 
-                value={formData.company_size || ''} 
-                onValueChange={(value) => handleInputChange('company_size', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select size" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">No selection</SelectItem>
-                  {COMPANY_SIZES.map(size => (
-                    <SelectItem key={size.value} value={size.value}>
-                      {size.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="revenue_range">Revenue Range</Label>
-              <Select 
-                value={formData.revenue_range || ''} 
-                onValueChange={(value) => handleInputChange('revenue_range', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select range" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">No selection</SelectItem>
-                  {REVENUE_RANGES.map(range => (
-                    <SelectItem key={range.value} value={range.value}>
-                      {range.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {/* Lead Details */}
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <Label htmlFor="status">Status</Label>
-              <Select 
-                value={formData.status || 'new'} 
-                onValueChange={(value) => handleInputChange('status', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {LEAD_STATUSES.map(status => (
-                    <SelectItem key={status.value} value={status.value}>
-                      {status.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="source">Source</Label>
-              <Input
-                id="source"
-                value={formData.source || 'manual'}
-                onChange={(e) => handleInputChange('source', e.target.value)}
-                placeholder="manual, website, referral"
-              />
-            </div>
-            <div>
-              <Label htmlFor="lead_score">Lead Score (0-100)</Label>
-              <Input
-                id="lead_score"
-                type="number"
-                min="0"
-                max="100"
-                value={formData.lead_score || 50}
-                onChange={(e) => handleInputChange('lead_score', parseInt(e.target.value))}
-              />
-            </div>
-          </div>
-
-          {/* Segment Assignment */}
+          {/* Segment (Optional) */}
           {segments.length > 0 && (
             <div>
-              <Label htmlFor="segment">Segment</Label>
-              <Select 
-                value={formData.segment_id || ''} 
+              <Label htmlFor="segment">Segment (Optional)</Label>
+              <Select
+                value={formData.segment_id || ''}
                 onValueChange={(value) => handleInputChange('segment_id', value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select segment (optional)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No segment</SelectItem>
                   {segments.map(segment => (
                     <SelectItem key={segment.id} value={segment.id}>
                       {segment.name}
@@ -448,7 +258,7 @@ export default function NewLeadModal({ open, onClose, workspaceId, lead }: NewLe
 
           {/* Notes */}
           <div>
-            <Label htmlFor="notes">Notes</Label>
+            <Label htmlFor="notes">Notes (Optional)</Label>
             <Textarea
               id="notes"
               value={formData.notes || ''}

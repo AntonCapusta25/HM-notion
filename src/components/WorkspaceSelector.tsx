@@ -21,7 +21,7 @@ export interface Workspace {
   id: string;
   name: string;
   color: string;
-  type?: 'chef_outreach' | 'task_management';
+  type?: 'chef_outreach' | 'task_management' | 'outreach';
 }
 
 interface WorkspaceSelectorProps {
@@ -34,6 +34,8 @@ const getWorkspaceTypeIcon = (type?: string) => {
   switch (type) {
     case 'chef_outreach':
       return Users;
+    case 'outreach':
+      return Users; // Using Users icon for outreach as well, or maybe Mail if imported
     case 'task_management':
     default:
       return CheckSquare;
@@ -46,7 +48,7 @@ export const WorkspaceSelector = ({
   onWorkspaceChange,
 }: WorkspaceSelectorProps) => {
   const [open, setOpen] = useState(false);
-  
+
   // This state helps track if the prop has changed
   const [internalSelected, setInternalSelected] = useState(selectedWorkspace);
 

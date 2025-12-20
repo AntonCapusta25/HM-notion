@@ -12,7 +12,7 @@ import { Task } from '../types';
 export const CalendarPage = () => {
   // FIX: Switched to the central TaskContext
   const { tasks, users, updateTask, addComment, updateAssignees, toggleSubtask } = useTaskContext();
-  
+
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
 
@@ -26,7 +26,7 @@ export const CalendarPage = () => {
   }, [tasks]);
 
   const getTasksForDay = (day: Date) => {
-    return tasksWithDueDates.filter(task => 
+    return tasksWithDueDates.filter(task =>
       isSameDay(new Date(task.due_date!), day)
     );
   };
@@ -53,7 +53,7 @@ export const CalendarPage = () => {
     const task = tasks.find(t => t.id === taskId);
     const subtask = task?.subtasks.find(s => s.id === subtaskId);
     if (subtask) {
-      toggleSubtask(subtaskId, !subtask.completed);
+      toggleSubtask(taskId, subtaskId);
     }
   };
 
@@ -160,7 +160,6 @@ export const CalendarPage = () => {
           onOpenChange={(open) => !open && setSelectedTask(null)}
           onUpdateTask={updateTask}
           onAddComment={addComment}
-          updateAssignees={updateAssignees}
           onToggleSubtask={handleToggleSubtask}
         />
       </div>

@@ -38,6 +38,7 @@ import { EditWorkspaceDialog } from '../components/EditWorkspaceDialog';
 import { CreateTaskDialog } from '../components/CreateTaskDialog';
 import { TaskDetailDialog } from '../components/TaskDetailDialog';
 import { Workspace, Task } from '../types';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { educationData } from '../data/education-data';
 
 interface SidebarProps {
@@ -188,23 +189,23 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
   return (
     <>
       <div className={cn(
-        "fixed left-0 top-0 z-40 h-screen bg-white border-r border-gray-200 transition-all duration-300",
-        collapsed ? "w-16" : "w-64"
+        "fixed left-0 top-0 z-40 h-screen bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 transition-all duration-300 md:translate-x-0",
+        collapsed ? "w-16" : "w-64",
       )}>
         <div className="flex flex-col h-full">
           {/* Header */}
-          <div className="p-4 border-b border-gray-200">
+          <div className="p-4 border-b border-gray-200 dark:border-gray-800">
             <div className="flex items-center justify-between">
               {!collapsed && (
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 bg-homemade-orange rounded-lg flex items-center justify-center">
                     <span className="text-white font-bold text-sm">H</span>
                   </div>
-                  <span className="font-bold text-xl text-gray-900">Homebase</span>
+                  <span className="font-bold text-xl text-gray-900 dark:text-white">Homebase</span>
                 </div>
               )}
               <Button variant="ghost" size="sm" onClick={onToggle}>
-                <ChevronLeft className={cn("h-4 w-4 transition-transform", collapsed && "rotate-180")} />
+                <ChevronLeft className={cn("h-4 w-4 transition-transform text-gray-500 dark:text-gray-400", collapsed && "rotate-180")} />
               </Button>
             </div>
           </div>
@@ -403,8 +404,8 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
                     className={cn(
                       "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
                       isActive
-                        ? "bg-homemade-orange text-white"
-                        : "text-gray-700 hover:bg-gray-100",
+                        ? "bg-homemade-orange text-white dark:bg-white dark:text-black shadow-lg shadow-orange-500/20 dark:shadow-white/10"
+                        : "text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white",
                       collapsed && "justify-center px-2"
                     )}
                   >
@@ -453,8 +454,8 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
                             className={cn(
                               "flex items-center gap-2 px-2 py-2 rounded-lg text-sm flex-1 transition-colors",
                               isActive
-                                ? "bg-homemade-orange/10 text-homemade-orange font-medium"
-                                : "text-gray-700 hover:bg-gray-100"
+                                ? "bg-homemade-orange/10 text-homemade-orange font-medium dark:bg-white/20 dark:text-white"
+                                : "text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white"
                             )}
                           >
                             <Icon className="h-4 w-4 flex-shrink-0" />
@@ -622,13 +623,21 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
                 </div>
               )}
               {!collapsed && (
-                <Link to="/settings">
-                  <Button variant="ghost" size="sm">
-                    <Settings className="h-4 w-4" />
-                  </Button>
-                </Link>
+                <div className="flex items-center gap-1">
+                  <ThemeToggle />
+                  <Link to="/settings">
+                    <Button variant="ghost" size="sm">
+                      <Settings className="h-4 w-4" />
+                    </Button>
+                  </Link>
+                </div>
               )}
             </div>
+            {collapsed && (
+              <div className="mt-2 flex justify-center">
+                <ThemeToggle />
+              </div>
+            )}
           </div>
         </div>
       </div>

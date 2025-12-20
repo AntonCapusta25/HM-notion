@@ -248,7 +248,7 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
     try {
       set({ loading: true, error: null })
       console.log('🔄 OutreachStore - Initializing workspace:', workspaceId)
-      
+
       // Load all essential data in parallel (removed deep research)
       const results = await Promise.allSettled([
         get().fetchLeads(workspaceId),
@@ -259,16 +259,16 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
         get().fetchCSVImports(workspaceId),
         get().fetchSettings(workspaceId)
       ])
-      
+
       // Check for any failures
       const failures = results.filter(result => result.status === 'rejected')
       if (failures.length > 0) {
         console.warn('⚠️ OutreachStore - Some data failed to load:', failures)
       }
-      
+
       // Generate analytics after data is loaded
       await get().fetchAnalytics(workspaceId)
-      
+
       console.log('✅ OutreachStore - Workspace initialization completed')
     } catch (error: any) {
       console.error('❌ OutreachStore - Initialization failed:', error)
@@ -298,7 +298,7 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
   createLead: async (lead: Partial<Lead>) => {
     try {
       set({ loading: true, error: null })
-      
+
       const { data, error } = await supabase
         .from('leads')
         .insert(lead)
@@ -306,7 +306,7 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
         .single()
 
       if (error) throw error
-      
+
       set(state => ({ leads: [data, ...state.leads] }))
       return data
     } catch (error: any) {
@@ -320,16 +320,16 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
   updateLead: async (id: string, updates: Partial<Lead>) => {
     try {
       set({ loading: true, error: null })
-      
+
       const { error } = await supabase
         .from('leads')
         .update(updates)
         .eq('id', id)
 
       if (error) throw error
-      
+
       set(state => ({
-        leads: state.leads.map(lead => 
+        leads: state.leads.map(lead =>
           lead.id === id ? { ...lead, ...updates } : lead
         )
       }))
@@ -343,14 +343,14 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
   deleteLead: async (id: string) => {
     try {
       set({ loading: true, error: null })
-      
+
       const { error } = await supabase
         .from('leads')
         .delete()
         .eq('id', id)
 
       if (error) throw error
-      
+
       set(state => ({
         leads: state.leads.filter(lead => lead.id !== id)
       }))
@@ -364,16 +364,16 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
   bulkUpdateLeads: async (ids: string[], updates: Partial<Lead>) => {
     try {
       set({ loading: true, error: null })
-      
+
       const { error } = await supabase
         .from('leads')
         .update(updates)
         .in('id', ids)
 
       if (error) throw error
-      
+
       set(state => ({
-        leads: state.leads.map(lead => 
+        leads: state.leads.map(lead =>
           ids.includes(lead.id) ? { ...lead, ...updates } : lead
         )
       }))
@@ -410,7 +410,7 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
         .single()
 
       if (error) throw error
-      
+
       set(state => ({ segments: [data, ...state.segments] }))
       return data
     } catch (error: any) {
@@ -427,9 +427,9 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
         .eq('id', id)
 
       if (error) throw error
-      
+
       set(state => ({
-        segments: state.segments.map(segment => 
+        segments: state.segments.map(segment =>
           segment.id === id ? { ...segment, ...updates } : segment
         )
       }))
@@ -446,7 +446,7 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
         .eq('id', id)
 
       if (error) throw error
-      
+
       set(state => ({
         segments: state.segments.filter(segment => segment.id !== id)
       }))
@@ -481,7 +481,7 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
         .single()
 
       if (error) throw error
-      
+
       set(state => ({ outreachTypes: [data, ...state.outreachTypes] }))
       return data
     } catch (error: any) {
@@ -498,9 +498,9 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
         .eq('id', id)
 
       if (error) throw error
-      
+
       set(state => ({
-        outreachTypes: state.outreachTypes.map(type => 
+        outreachTypes: state.outreachTypes.map(type =>
           type.id === id ? { ...type, ...updates } : type
         )
       }))
@@ -517,7 +517,7 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
         .eq('id', id)
 
       if (error) throw error
-      
+
       set(state => ({
         outreachTypes: state.outreachTypes.filter(type => type.id !== id)
       }))
@@ -551,7 +551,7 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
   createCampaign: async (campaign: Partial<OutreachCampaign>) => {
     try {
       set({ loading: true, error: null })
-      
+
       const { data, error } = await supabase
         .from('outreach_campaigns')
         .insert(campaign)
@@ -559,7 +559,7 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
         .single()
 
       if (error) throw error
-      
+
       set(state => ({ campaigns: [data, ...state.campaigns] }))
       return data
     } catch (error: any) {
@@ -578,9 +578,9 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
         .eq('id', id)
 
       if (error) throw error
-      
+
       set(state => ({
-        campaigns: state.campaigns.map(campaign => 
+        campaigns: state.campaigns.map(campaign =>
           campaign.id === id ? { ...campaign, ...updates } : campaign
         )
       }))
@@ -597,7 +597,7 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
         .eq('id', id)
 
       if (error) throw error
-      
+
       set(state => ({
         campaigns: state.campaigns.filter(campaign => campaign.id !== id)
       }))
@@ -609,31 +609,41 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
   launchCampaign: async (id: string) => {
     try {
       set({ loading: true, error: null })
-      
+
       // Update campaign status to running
       await get().updateCampaign(id, { status: 'running' })
-      
-      // Call Apps Script to start sending emails
-      const { settings } = get()
-      if (settings?.apps_script_url) {
-        const response = await fetch(settings.apps_script_url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            action: 'send_campaign_emails',
-            campaign_id: id,
-            api_key: settings.apps_script_api_key
-          })
-        })
-        
-        if (!response.ok) {
-          throw new Error('Failed to start email sending')
-        }
+
+      // Get current user from Supabase
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        throw new Error('User not authenticated')
       }
+
+      // Get campaign to find workspace_id
+      const campaign = get().campaigns.find(c => c.id === id)
+      if (!campaign) {
+        throw new Error('Campaign not found')
+      }
+
+      // Call SendGrid Edge Function to send campaign emails
+      const { data, error } = await supabase.functions.invoke('send-email', {
+        body: {
+          action: 'send_campaign',
+          campaign_id: id,
+          workspace_id: campaign.workspace_id,
+          user_id: user.id
+        }
+      })
+
+      if (error) {
+        throw new Error(error.message || 'Failed to send campaign emails')
+      }
+
+      console.log('Campaign emails sent:', data)
     } catch (error: any) {
       set({ error: error.message })
+      // Revert campaign status on error
+      await get().updateCampaign(id, { status: 'paused' })
     } finally {
       set({ loading: false })
     }
@@ -672,27 +682,33 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
   sendTestEmail: async (emailData: any) => {
     try {
       set({ loading: true, error: null })
-      
-      const { settings } = get()
-      if (!settings?.apps_script_url) {
-        throw new Error('Apps Script URL not configured')
+
+      // Get current user from Supabase
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        throw new Error('User not authenticated')
       }
 
-      const response = await fetch(settings.apps_script_url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'send_single_email',
-          ...emailData,
-          api_key: settings.apps_script_api_key
-        })
+      // Call SendGrid Edge Function to send test email
+      const { data, error } = await supabase.functions.invoke('send-email', {
+        body: {
+          action: 'send_single',
+          to: emailData.to,
+          subject: emailData.subject,
+          content: emailData.content,
+          html: emailData.html,
+          from_email: emailData.from_email,
+          from_name: emailData.from_name,
+          workspace_id: emailData.workspace_id,
+          user_id: user.id
+        }
       })
 
-      if (!response.ok) {
-        throw new Error('Failed to send test email')
+      if (error) {
+        throw new Error(error.message || 'Failed to send test email')
       }
+
+      console.log('Test email sent:', data)
     } catch (error: any) {
       set({ error: error.message })
       throw error
@@ -721,15 +737,15 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
   uploadCSV: async (file: File, workspaceId: string) => {
     try {
       set({ loading: true, error: null })
-      
+
       const fileName = `${workspaceId}/${Date.now()}-${file.name}`
-      
+
       const { data, error } = await supabase.storage
         .from('csv-imports')
         .upload(fileName, file)
 
       if (error) throw error
-      
+
       const { data: urlData } = supabase.storage
         .from('csv-imports')
         .getPublicUrl(fileName)
@@ -746,7 +762,7 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
   processCSVImport: async (importData: any) => {
     try {
       set({ loading: true, error: null })
-      
+
       const { data, error } = await supabase
         .from('csv_imports')
         .insert(importData)
@@ -754,7 +770,7 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
         .single()
 
       if (error) throw error
-      
+
       set(state => ({ csvImports: [data, ...state.csvImports] }))
       return data
     } catch (error: any) {
@@ -785,7 +801,7 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
   updateSettings: async (workspaceId: string, updates: Partial<OutreachSettings>) => {
     try {
       set({ loading: true, error: null })
-      
+
       const { data, error } = await supabase
         .from('outreach_settings')
         .upsert({ workspace_id: workspaceId, ...updates })
@@ -805,7 +821,7 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
   fetchAnalytics: async (workspaceId: string) => {
     try {
       const { leads, campaigns, emails } = get()
-      
+
       const analytics: Analytics = {
         total_leads: leads.length,
         leads_by_status: leads.reduce((acc, lead) => {
@@ -819,17 +835,17 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
         campaigns_count: campaigns.length,
         active_campaigns: campaigns.filter(c => c.status === 'running').length,
         total_emails_sent: emails.filter(e => e.status === 'sent').length,
-        overall_open_rate: emails.length > 0 ? 
+        overall_open_rate: emails.length > 0 ?
           (emails.filter(e => e.opened_at).length / emails.filter(e => e.status === 'sent').length) * 100 : 0,
-        overall_click_rate: emails.length > 0 ? 
+        overall_click_rate: emails.length > 0 ?
           (emails.filter(e => e.clicked_at).length / emails.filter(e => e.status === 'sent').length) * 100 : 0,
-        overall_response_rate: emails.length > 0 ? 
+        overall_response_rate: emails.length > 0 ?
           (emails.filter(e => e.replied_at).length / emails.filter(e => e.status === 'sent').length) * 100 : 0,
-        conversion_rate: leads.length > 0 ? 
+        conversion_rate: leads.length > 0 ?
           (leads.filter(l => l.status === 'converted').length / leads.length) * 100 : 0,
         recent_activity: []
       }
-      
+
       set({ analytics })
     } catch (error: any) {
       console.warn('Failed to fetch analytics:', error.message)
