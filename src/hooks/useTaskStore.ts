@@ -119,7 +119,12 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
 
   const fetchUsers = useCallback(async () => {
     try {
-      const { data, error } = await supabase.from('users').select('*');
+      // OPTIMIZED: Only select columns we actually use
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, name, email, role, department, avatar, created_at')
+        .order('name');
+
       if (error) throw error;
 
       console.log('👥 Users response:', data?.length || 0, 'users');
@@ -132,7 +137,12 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
 
   const fetchWorkspaces = useCallback(async () => {
     try {
-      const { data, error } = await supabase.from('workspaces').select('*');
+      // OPTIMIZED: Select specific columns and order by name
+      const { data, error } = await supabase
+        .from('workspaces')
+        .select('id, name, department, description, created_by, color, type, created_at, updated_at')
+        .order('name');
+
       if (error) throw error;
 
       console.log('🏢 Workspaces response:', data?.length || 0, 'workspaces');
@@ -221,7 +231,7 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
             clearTimeout(existingTimeout);
           }
 
-          // Batch multiple events: wait 50ms before fetching (reduced from 100ms)
+          // OPTIMIZED: Batch multiple events with 200ms window for better grouping
           const timeoutId = setTimeout(() => {
             pendingRealtimeFetches.current.delete(taskId);
 
@@ -231,7 +241,7 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
               return;
             }
 
-            // Fetch this task's assignments
+            // Fetch this task's assignments with optimized query
             supabase
               .from('task_assignees')
               .select('user_id')
@@ -248,7 +258,7 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
                 ));
                 console.log('✅ Batched assignee update applied for task:', taskId);
               });
-          }, 50); // Reduced from 100ms to 50ms for snappier updates
+          }, 200); // Increased from 50ms to 200ms for better batching
 
           pendingRealtimeFetches.current.set(taskId, timeoutId);
         })
