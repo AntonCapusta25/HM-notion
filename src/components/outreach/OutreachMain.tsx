@@ -13,6 +13,7 @@ import { useCollabStore } from '@/hooks/useCollabStore'
 import LeadsView from './LeadsView'
 import CampaignsView from './CampaignsView'
 import SegmentsView from './SegmentsView'
+import SegmentDetailView from './SegmentDetailView'
 import OutreachSettings from './OutreachSettings'
 import AnalyticsView from './AnalyticsView'
 import CSVImportModal from './CSVImportModal'
@@ -27,6 +28,7 @@ export default function OutreachMain({ workspaceId }: OutreachMainProps) {
   const [activeTab, setActiveTab] = useState('leads')
   const [showCSVImport, setShowCSVImport] = useState(false)
   const [showNewCampaign, setShowNewCampaign] = useState(false)
+  const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null)
 
   const { user } = useAuth()
   const clientStore = useOutreachStore()
@@ -208,7 +210,19 @@ export default function OutreachMain({ workspaceId }: OutreachMainProps) {
                       <CampaignsView workspaceId={workspaceId} outreachType="collab" />
                     </TabsContent>
                     <TabsContent value="segments" className="mt-0 focus-visible:outline-none">
-                      <SegmentsView workspaceId={workspaceId} />
+                      {selectedSegmentId ? (
+                        <SegmentDetailView
+                          segmentId={selectedSegmentId}
+                          workspaceId={workspaceId}
+                          onBack={() => setSelectedSegmentId(null)}
+                          outreachType="collab"
+                        />
+                      ) : (
+                        <SegmentsView
+                          workspaceId={workspaceId}
+                          onSegmentClick={setSelectedSegmentId}
+                        />
+                      )}
                     </TabsContent>
                     <TabsContent value="analytics" className="mt-0 focus-visible:outline-none">
                       <AnalyticsView workspaceId={workspaceId} />
@@ -283,7 +297,19 @@ export default function OutreachMain({ workspaceId }: OutreachMainProps) {
                       <CampaignsView workspaceId={workspaceId} outreachType="client" />
                     </TabsContent>
                     <TabsContent value="segments" className="mt-0 focus-visible:outline-none">
-                      <SegmentsView workspaceId={workspaceId} />
+                      {selectedSegmentId ? (
+                        <SegmentDetailView
+                          segmentId={selectedSegmentId}
+                          workspaceId={workspaceId}
+                          onBack={() => setSelectedSegmentId(null)}
+                          outreachType="client"
+                        />
+                      ) : (
+                        <SegmentsView
+                          workspaceId={workspaceId}
+                          onSegmentClick={setSelectedSegmentId}
+                        />
+                      )}
                     </TabsContent>
                     <TabsContent value="analytics" className="mt-0 focus-visible:outline-none">
                       <AnalyticsView workspaceId={workspaceId} />

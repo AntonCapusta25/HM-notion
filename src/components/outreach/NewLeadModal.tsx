@@ -234,27 +234,39 @@ export default function NewLeadModal({ open, onClose, workspaceId, lead, outreac
             </Select>
           </div>
 
-          {/* Segment (Optional) */}
-          {segments.length > 0 && (
-            <div>
-              <Label htmlFor="segment">Segment (Optional)</Label>
-              <Select
-                value={formData.segment_id || ''}
-                onValueChange={(value) => handleInputChange('segment_id', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select segment (optional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  {segments.map(segment => (
-                    <SelectItem key={segment.id} value={segment.id}>
-                      {segment.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+          {/* Segment (Optional) - Enhanced with color indicators */}
+          <div>
+            <Label htmlFor="segment">Segment (Optional)</Label>
+            <Select
+              value={formData.segment_id || 'none'}
+              onValueChange={(value) => handleInputChange('segment_id', value === 'none' ? '' : value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select segment (optional)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">
+                  <span className="text-gray-500">No Segment</span>
+                </SelectItem>
+                {segments.map(segment => (
+                  <SelectItem key={segment.id} value={segment.id}>
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-3 h-3 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: segment.color }}
+                      />
+                      <span>{segment.name}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {segments.length === 0 && (
+              <p className="text-xs text-gray-500 mt-1">
+                Create segments in the Segments tab to organize your leads
+              </p>
+            )}
+          </div>
 
           {/* Notes */}
           <div>

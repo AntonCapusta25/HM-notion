@@ -7,11 +7,11 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Users, 
+import {
+  Plus,
+  Edit,
+  Trash2,
+  Users,
   Tag,
   Palette,
   Search,
@@ -23,6 +23,7 @@ import { useToast } from '@/hooks/use-toast'
 
 interface SegmentsViewProps {
   workspaceId: string
+  onSegmentClick?: (segmentId: string) => void
 }
 
 interface LeadSegment {
@@ -45,7 +46,7 @@ const PRESET_COLORS = [
   '#06B6D4', '#EAB308', '#DC2626', '#7C3AED', '#DB2777'
 ]
 
-export default function SegmentsView({ workspaceId }: SegmentsViewProps) {
+export default function SegmentsView({ workspaceId, onSegmentClick }: SegmentsViewProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [showSegmentModal, setShowSegmentModal] = useState(false)
   const [editingSegment, setEditingSegment] = useState<LeadSegment | null>(null)
@@ -55,8 +56,8 @@ export default function SegmentsView({ workspaceId }: SegmentsViewProps) {
     color: PRESET_COLORS[0]
   })
 
-  const { 
-    segments, 
+  const {
+    segments,
     leads,
     loading,
     fetchSegments,
@@ -65,7 +66,7 @@ export default function SegmentsView({ workspaceId }: SegmentsViewProps) {
     updateSegment,
     deleteSegment
   } = useOutreachStore()
-  
+
   const { user } = useAuth()
   const { toast } = useToast()
 
@@ -77,7 +78,7 @@ export default function SegmentsView({ workspaceId }: SegmentsViewProps) {
   }, [workspaceId])
 
   const filteredSegments = segments.filter(segment =>
-    !searchTerm || 
+    !searchTerm ||
     segment.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (segment.description && segment.description.toLowerCase().includes(searchTerm.toLowerCase()))
   )
@@ -107,7 +108,7 @@ export default function SegmentsView({ workspaceId }: SegmentsViewProps) {
 
       setSegmentForm({ name: '', description: '', color: PRESET_COLORS[0] })
       setShowSegmentModal(false)
-      
+
       toast({
         title: "Success",
         description: "Segment created successfully",
@@ -134,7 +135,7 @@ export default function SegmentsView({ workspaceId }: SegmentsViewProps) {
       setEditingSegment(null)
       setSegmentForm({ name: '', description: '', color: PRESET_COLORS[0] })
       setShowSegmentModal(false)
-      
+
       toast({
         title: "Success",
         description: "Segment updated successfully",
@@ -150,7 +151,7 @@ export default function SegmentsView({ workspaceId }: SegmentsViewProps) {
 
   const handleDeleteSegment = async (segmentId: string) => {
     const leadCount = getSegmentLeadCount(segmentId)
-    
+
     if (leadCount > 0) {
       if (!confirm(`This segment contains ${leadCount} leads. Deleting it will remove the segment assignment from these leads. Are you sure you want to continue?`)) {
         return
@@ -163,7 +164,7 @@ export default function SegmentsView({ workspaceId }: SegmentsViewProps) {
 
     try {
       await deleteSegment(segmentId)
-      
+
       toast({
         title: "Success",
         description: "Segment deleted successfully",
@@ -211,8 +212,8 @@ export default function SegmentsView({ workspaceId }: SegmentsViewProps) {
             Organize your leads into targeted segments for better campaign management
           </p>
         </div>
-        
-        <Button 
+
+        <Button
           onClick={openCreateModal}
           className="flex items-center gap-2"
         >
@@ -245,7 +246,7 @@ export default function SegmentsView({ workspaceId }: SegmentsViewProps) {
               {segments.length === 0 ? 'No segments yet' : 'No segments match your search'}
             </h4>
             <p className="text-gray-600 text-center mb-4">
-              {segments.length === 0 
+              {segments.length === 0
                 ? "Create segments to organize your leads by industry, company size, or any other criteria"
                 : "Try adjusting your search terms"
               }
@@ -260,12 +261,16 @@ export default function SegmentsView({ workspaceId }: SegmentsViewProps) {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredSegments.map((segment) => (
-            <Card key={segment.id} className="hover:shadow-md transition-shadow">
+            <Card
+              key={segment.id}
+              className="hover:shadow-lg transition-all cursor-pointer border-2 hover:border-blue-200"
+              onClick={() => onSegmentClick?.(segment.id)}
+            >
               <CardContent className="p-6">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <div 
-                      className="w-4 h-4 rounded-full flex-shrink-0" 
+                    <div
+                      className="w-4 h-4 rounded-full flex-shrink-0"
                       style={{ backgroundColor: segment.color }}
                     />
                     <div>
@@ -275,19 +280,25 @@ export default function SegmentsView({ workspaceId }: SegmentsViewProps) {
                       )}
                     </div>
                   </div>
-                  
-                  <div className="flex items-center gap-1">
+
+                  <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => openEditModal(segment)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        openEditModal(segment)
+                      }}
                     >
                       <Edit className="h-4 w-4" />
                     </Button>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleDeleteSegment(segment.id)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDeleteSegment(segment.id)
+                      }}
                       className="text-red-600 hover:text-red-800"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -309,6 +320,12 @@ export default function SegmentsView({ workspaceId }: SegmentsViewProps) {
                   <div className="text-xs text-gray-500">
                     Created {new Date(segment.created_at).toLocaleDateString()}
                   </div>
+
+                  <div className="pt-2 border-t border-gray-100">
+                    <span className="text-sm text-blue-600 font-medium flex items-center gap-1 hover:gap-2 transition-all">
+                      View Details →
+                    </span>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -324,7 +341,7 @@ export default function SegmentsView({ workspaceId }: SegmentsViewProps) {
               {editingSegment ? 'Edit Segment' : 'Create New Segment'}
             </DialogTitle>
             <DialogDescription>
-              {editingSegment 
+              {editingSegment
                 ? 'Update your segment details below'
                 : 'Create a new segment to organize your leads'
               }
@@ -356,8 +373,8 @@ export default function SegmentsView({ workspaceId }: SegmentsViewProps) {
             <div className="space-y-2">
               <Label>Color</Label>
               <div className="flex items-center gap-2">
-                <div 
-                  className="w-8 h-8 rounded-full border-2 border-gray-300" 
+                <div
+                  className="w-8 h-8 rounded-full border-2 border-gray-300"
                   style={{ backgroundColor: segmentForm.color }}
                 />
                 <div className="flex flex-wrap gap-2">
@@ -366,9 +383,8 @@ export default function SegmentsView({ workspaceId }: SegmentsViewProps) {
                       key={color}
                       type="button"
                       onClick={() => setSegmentForm(prev => ({ ...prev, color }))}
-                      className={`w-6 h-6 rounded-full border-2 ${
-                        segmentForm.color === color ? 'border-gray-900' : 'border-gray-300'
-                      }`}
+                      className={`w-6 h-6 rounded-full border-2 ${segmentForm.color === color ? 'border-gray-900' : 'border-gray-300'
+                        }`}
                       style={{ backgroundColor: color }}
                     />
                   ))}
@@ -377,13 +393,13 @@ export default function SegmentsView({ workspaceId }: SegmentsViewProps) {
             </div>
 
             <div className="flex justify-end gap-3 pt-4">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => setShowSegmentModal(false)}
               >
                 Cancel
               </Button>
-              <Button 
+              <Button
                 onClick={editingSegment ? handleUpdateSegment : handleCreateSegment}
               >
                 {editingSegment ? 'Update Segment' : 'Create Segment'}
