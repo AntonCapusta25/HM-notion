@@ -63,7 +63,7 @@ export default function SegmentDetailView({
             fetchSegments(workspaceId)
             fetchLeads(workspaceId)
         }
-    }, [workspaceId])
+    }, [workspaceId, fetchSegments, fetchLeads])
 
     const segment = segments.find(s => s.id === segmentId)
     const segmentLeads = useMemo(() =>
