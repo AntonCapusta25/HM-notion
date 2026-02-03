@@ -1,10 +1,26 @@
 # This file configures your deployment settings for Netlify.
 
 [[headers]]
-  # This rule applies to all pages on your site.
   for = "/*"
   [headers.values]
-    # This is the Content Security Policy (CSP) header.
-    # It allows your site's own scripts ('self') and also allows the
-    # Supabase library to function correctly ('unsafe-eval').
-    Content-Security-Policy = "script-src 'self' 'unsafe-eval'; object-src 'self'"
+    # Allow WebAssembly and blob URLs for @imgly/background-removal
+    Content-Security-Policy = """
+      default-src 'self';
+      script-src 'self' 'unsafe-eval' 'unsafe-inline' blob:;
+      script-src-elem 'self' 'unsafe-inline' blob:;
+      worker-src 'self' blob:;
+      child-src 'self' blob:;
+      img-src 'self' data: blob: https:;
+      style-src 'self' 'unsafe-inline';
+      font-src 'self' data:;
+      connect-src 'self' https://*.supabase.co https://generativelanguage.googleapis.com;
+    """
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
