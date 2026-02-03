@@ -20,6 +20,7 @@ import TestPage from './pages/TestPage';
 import WorkspaceDetail from "./pages/WorkspaceDetail";
 import Education from "./pages/Education";
 import { ThemeRoute } from "./components/ThemeRoute";
+import LaunchPosts from "./pages/LaunchPosts";
 
 // CRITICAL FIX: Move QueryClient creation outside component
 const queryClient = new QueryClient({
@@ -66,6 +67,11 @@ const App = () => (
                     standard={<Calendar />}
                     premium={<PremiumCalendar />}
                   />
+                </ProtectedRoute>
+              } />
+              <Route path="/launch-posts" element={
+                <ProtectedRoute>
+                  <LaunchPosts />
                 </ProtectedRoute>
               } />
               <Route path="/search" element={

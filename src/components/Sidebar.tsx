@@ -22,7 +22,8 @@ import {
   MessageSquare,
   Bot,
   Image,
-  Wrench
+  Wrench,
+  Rocket
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -51,6 +52,7 @@ const navigation = [
   { name: 'My Tasks', href: '/my-tasks', icon: CheckSquare },
   { name: 'Team', href: '/team', icon: Users },
   { name: 'Calendar', href: '/calendar', icon: Calendar },
+  { name: 'Launch Posts', href: '/launch-posts', icon: Rocket },
   { name: 'Search', href: '/search', icon: Search },
 ];
 

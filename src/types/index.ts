@@ -827,3 +827,6 @@ export const getUpcomingFollowUps = (logs: OutreachLog[], days: number = 7): Out
     new Date(a.follow_up_date!).getTime() - new Date(b.follow_up_date!).getTime()
   );
 };
+
+// Export launch posts types
+export * from './launchPosts';
