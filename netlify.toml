@@ -13,7 +13,7 @@
       img-src 'self' data: blob: https:;
       style-src 'self' 'unsafe-inline';
       font-src 'self' data:;
-      connect-src 'self' https://*.supabase.co https://generativelanguage.googleapis.com;
+      connect-src 'self' data: blob: https://*.supabase.co https://generativelanguage.googleapis.com;
     """
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
