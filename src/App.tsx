@@ -17,6 +17,7 @@ import { PremiumSettings } from "./components/premium/PremiumSettings";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import TestPage from './pages/TestPage';
+import TestTemplate from './pages/TestTemplate';
 import WorkspaceDetail from "./pages/WorkspaceDetail";
 import Education from "./pages/Education";
 import { ThemeRoute } from "./components/ThemeRoute";
@@ -109,6 +110,12 @@ const App = () => (
               <Route path="/test" element={
                 <ProtectedRoute>
                   <TestPage />
+                </ProtectedRoute>
+              } />
+
+              <Route path="/test-template" element={
+                <ProtectedRoute>
+                  <TestTemplate />
                 </ProtectedRoute>
               } />
 

@@ -22,7 +22,9 @@ export interface TextElement extends BaseElement {
     fontSize: number;
     fontFamily: string;
     color: string;
-    fontWeight: string;
+    fontWeight?: 'normal' | 'bold' | number;
+    fontStyle?: 'normal' | 'italic';
+    textDecoration?: 'none' | 'underline' | 'line-through';
     width?: number;
     height?: number;
 }

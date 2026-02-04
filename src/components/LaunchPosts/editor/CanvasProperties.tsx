@@ -4,8 +4,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
-import { Trash2, MousePointer2 } from 'lucide-react';
+import { Trash2, MousePointer2, Sparkles } from 'lucide-react';
 import { CanvasElement } from './types';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface CanvasPropertiesProps {
     selectedElement: CanvasElement | undefined;
@@ -43,7 +49,46 @@ export function CanvasProperties({ selectedElement, updateElement, deleteSelecte
                 {selectedElement.type === 'text' ? (
                     <>
                         <div className="space-y-2">
-                            <Label>Content</Label>
+                            <div className="flex justify-between items-center mb-1">
+                                <Label>Content</Label>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button size="sm" variant="ghost" className="h-6 text-purple-600 hover:text-purple-700 hover:bg-purple-50 px-2 rounded-full">
+                                            <Sparkles className="w-3 h-3 mr-1" /> Magic Write
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-48">
+                                        <DropdownMenuItem onClick={() => {
+                                            // Mock AI Latency
+                                            const original = selectedElement.content;
+                                            updateElement(selectedElement.id, { content: '✨ Writing...' });
+                                            setTimeout(() => {
+                                                updateElement(selectedElement.id, { content: `Generic Professional: ${original}` });
+                                            }, 800);
+                                        }}>
+                                            <Sparkles className="w-3 h-3 mr-2 text-purple-500" /> Rewrite Professional
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => {
+                                            const original = selectedElement.content;
+                                            updateElement(selectedElement.id, { content: '✨ Writing...' });
+                                            setTimeout(() => {
+                                                updateElement(selectedElement.id, { content: `${original} 🚀✨` });
+                                            }, 800);
+                                        }}>
+                                            <Sparkles className="w-3 h-3 mr-2 text-pink-500" /> Rewrite Fun
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => {
+                                            const original = selectedElement.content;
+                                            updateElement(selectedElement.id, { content: '✨ Checking...' });
+                                            setTimeout(() => {
+                                                updateElement(selectedElement.id, { content: original.trim() }); // Mock valid
+                                            }, 800);
+                                        }}>
+                                            <Sparkles className="w-3 h-3 mr-2 text-blue-500" /> Fix Spelling
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </div>
                             <Input
                                 value={selectedElement.content}
                                 onChange={(e) => updateElement(selectedElement.id, { content: e.target.value })}
@@ -78,6 +123,39 @@ export function CanvasProperties({ selectedElement, updateElement, deleteSelecte
                                     onChange={(e) => updateElement(selectedElement.id, { color: e.target.value })}
                                     className="h-10 w-full"
                                 />
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Style</Label>
+                            <div className="flex gap-2">
+                                <Button
+                                    variant={selectedElement.fontWeight === 'bold' ? 'default' : 'outline'}
+                                    size="icon"
+                                    onClick={() => updateElement(selectedElement.id, {
+                                        fontWeight: selectedElement.fontWeight === 'bold' ? 'normal' : 'bold'
+                                    })}
+                                >
+                                    <span className="font-bold">B</span>
+                                </Button>
+                                <Button
+                                    variant={selectedElement.fontStyle === 'italic' ? 'default' : 'outline'}
+                                    size="icon"
+                                    onClick={() => updateElement(selectedElement.id, {
+                                        fontStyle: selectedElement.fontStyle === 'italic' ? 'normal' : 'italic'
+                                    })}
+                                >
+                                    <span className="italic">I</span>
+                                </Button>
+                                <Button
+                                    variant={selectedElement.textDecoration === 'underline' ? 'default' : 'outline'}
+                                    size="icon"
+                                    onClick={() => updateElement(selectedElement.id, {
+                                        textDecoration: selectedElement.textDecoration === 'underline' ? 'none' : 'underline'
+                                    })}
+                                >
+                                    <span className="underline">U</span>
+                                </Button>
                             </div>
                         </div>
 

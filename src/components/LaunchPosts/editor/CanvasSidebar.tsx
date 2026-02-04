@@ -13,8 +13,7 @@ interface CanvasSidebarProps {
     isRemovingBg: boolean;
     isExporting: boolean;
     handleExport: (format: 'png' | 'jpg') => void;
-    backgroundColor: string;
-    setBackgroundColor: (color: string) => void;
+
     selectedElement: CanvasElement | undefined;
     undo: () => void;
     redo: () => void;
@@ -30,8 +29,7 @@ export function CanvasSidebar({
     isRemovingBg,
     isExporting,
     handleExport,
-    backgroundColor,
-    setBackgroundColor,
+
     selectedElement,
     undo,
     redo,
@@ -95,7 +93,7 @@ export function CanvasSidebar({
                     <div className="space-y-2 pt-4 border-t">
                         <Label>Background</Label>
                         <div className="grid grid-cols-2 gap-2">
-                            <div className="relative">
+                            <div className="relative col-span-2">
                                 <Button variant="ghost" className="w-full relative justify-start px-2 border">
                                     <ImageIcon className="w-4 h-4 mr-2" />
                                     Image
@@ -106,14 +104,6 @@ export function CanvasSidebar({
                                         className="absolute inset-0 opacity-0 cursor-pointer"
                                     />
                                 </Button>
-                            </div>
-                            <div className="flex gap-1">
-                                <Input
-                                    type="color"
-                                    value={backgroundColor}
-                                    onChange={(e) => setBackgroundColor(e.target.value)}
-                                    className="w-full h-10 p-1 cursor-pointer"
-                                />
                             </div>
                         </div>
                     </div>

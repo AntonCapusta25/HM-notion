@@ -1,355 +1,309 @@
 import { useState } from 'react';
 import { Layout } from '../components/Layout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Rocket, Sparkles, Image, Palette, Download, Save, Loader2 } from 'lucide-react';
-import { LaunchPostTemplate, LaunchPostPrompt } from '@/types/launchPosts';
-import { TemplateManager } from '@/components/LaunchPosts/TemplateManager';
-import { PromptEditor } from '@/components/LaunchPosts/PromptEditor';
-import { ImageGenerator } from '@/components/LaunchPosts/ImageGenerator';
-import { SimplePromptEditor } from '@/components/LaunchPosts/SimplePromptEditor';
-import { CanvasEditor } from '@/components/LaunchPosts/CanvasEditor';
-import { createTemplate } from '@/utils/launchPostsApi';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { JustDoItView } from '@/components/LaunchPosts/JustDoItView';
+import ForNerdsView from '@/components/LaunchPosts/ForNerdsView';
+import { Sparkles, Code2 } from 'lucide-react';
+import { SlotFillingView } from '@/components/LaunchPosts/SlotFillingView';
+import { STYLE_PRESETS } from '@/components/LaunchPosts/styles';
+import { SUBJECT_TYPES } from '@/components/LaunchPosts/subjectTypes';
+import { generateImage, uploadGeneratedImage } from '@/utils/launchPostsApi';
+import { LaunchPostPrompt } from '@/types/launchPosts';
 import { useToast } from '@/hooks/use-toast';
+import { BrewingLoading } from '@/components/LaunchPosts/BrewingLoading';
+import { Button } from '@/components/ui/button';
+import { TemplateRenderer } from '@/components/LaunchPosts/TemplateRenderer';
+import { cn } from '@/lib/utils';
 
 export default function LaunchPosts() {
-    // Default prompt structure
-    const DEFAULT_PROMPT: LaunchPostPrompt = {
-        camera: {
-            model: 'Canon EOS R5',
-            lens: '50mm',
-            aperture: 'f/5.6',
-            shutter: '1/200',
-            iso: '100',
-            framing: 'Medium shot',
-            angle: 'Eye-level',
-            movement: 'Static'
-        },
-        subject: {
-            primary: '',
-            secondary: 'Clean background',
-            pose: 'Centered',
-            expression: 'N/A',
-            build: 'N/A'
-        },
-        character: {
-            hair: 'N/A',
-            wardrobeNotes: 'N/A',
-            props: []
-        },
-        materialPhysics: {
-            fabricBehavior: 'N/A',
-            surfaceQuality: 'High quality texture',
-            lightInteraction: 'Natural reflection'
-        },
-        skinRendering: {
-            textureDetail: 'N/A',
-            finish: 'N/A',
-            retouchingStyle: 'N/A'
-        },
-        composition: {
-            theory: 'Rule of thirds',
-            depth: 'Medium depth of field',
-            focus: 'Sharp focus on subject'
-        },
-        setting: {
-            environment: 'Studio setting',
-            timeOfDay: 'Daytime',
-            atmosphere: 'Bright and airy',
-            shadowPlay: 'Soft shadows'
-        },
-        lighting: {
-            source: 'Natural light',
-            direction: 'Side lighting',
-            quality: 'Soft diffused',
-            colorTemperature: 'Neutral'
-        },
-        style: {
-            artDirection: 'Professional food photography',
-            mood: 'Appetizing',
-            references: []
-        },
-        rendering: {
-            engine: 'Photorealistic',
-            fidelitySpec: 'High resolution',
-            postProcessing: 'Color correction'
-        },
-        colorPlate: {
-            primaryColors: ['#FFFFFF', '#E67E22'],
-            accentColors: ['#000000']
-        },
-        negative_prompt: 'text, watermark, low quality, blurry, distorted'
-    };
-
-    const [currentStep, setCurrentStep] = useState(2); // Start at Customize step
-    const [isAdvancedMode, setIsAdvancedMode] = useState(false);
-    const [selectedTemplate, setSelectedTemplate] = useState<LaunchPostTemplate | null>(null);
-    const [currentPrompt, setCurrentPrompt] = useState<LaunchPostPrompt | null>(DEFAULT_PROMPT);
-    const [generatedImage, setGeneratedImage] = useState<string | null>(null);
-    const [isSavingTemplate, setIsSavingTemplate] = useState(false);
-    const [refreshTemplatesTrigger, setRefreshTemplatesTrigger] = useState(0);
+    // Top-level state for Just-Do-It flow
+    const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [isBrewing, setIsBrewing] = useState(false);
+    const [generatedCanvasState, setGeneratedCanvasState] = useState<any[] | null>(null);
     const { toast } = useToast();
 
-    const steps = [
-        { id: 1, name: 'Template', icon: Sparkles, description: 'Choose or create a template' },
-        { id: 2, name: 'Customize', icon: Image, description: 'Customize your prompt' },
-        { id: 3, name: 'Generate', icon: Rocket, description: 'Generate your image' },
-        { id: 4, name: 'Design', icon: Palette, description: 'Design & Export' },
-    ];
-
-    const handleSelectTemplate = (template: LaunchPostTemplate) => {
-        setSelectedTemplate(template);
-        setCurrentPrompt(template.prompt);
-        setCurrentStep(2); // Go to Customize step after selection
+    // Default empty prompt structure to start from
+    const basePrompt: LaunchPostPrompt = {
+        camera: { model: 'Canon EOS R5', lens: '50mm', aperture: 'f/5.6', shutter: '1/200', iso: '100', framing: 'Medium shot', angle: 'Eye-level', movement: 'Static' },
+        subject: { primary: '', secondary: 'Clean background', pose: 'Centered', expression: 'N/A', build: 'N/A' },
+        character: { hair: 'N/A', wardrobeNotes: 'N/A', props: [] },
+        materialPhysics: { fabricBehavior: 'N/A', surfaceQuality: 'High quality', lightInteraction: 'Natural' },
+        skinRendering: { textureDetail: 'N/A', finish: 'N/A', retouchingStyle: 'N/A' },
+        composition: { theory: 'Rule of thirds', depth: 'Medium', focus: 'Sharp' },
+        setting: { environment: 'Studio', timeOfDay: 'Day', atmosphere: 'Clean', shadowPlay: 'Soft' },
+        lighting: { source: 'Natural', direction: 'Side', quality: 'Soft', colorTemperature: 'Neutral' },
+        style: { artDirection: 'Photo', mood: 'Neutral', references: [] },
+        rendering: { engine: 'Photorealistic', fidelitySpec: 'High', postProcessing: 'Color correction' },
+        colorPlate: { primaryColors: [], accentColors: [] },
+        negative_prompt: 'text, watermark, low quality'
     };
 
-    const handleNext = () => {
-        if (currentStep === 1 && !selectedTemplate) {
-            toast({
-                title: "No template selected",
-                description: "Please select a template to continue.",
-                variant: "destructive"
-            });
-            return;
-        }
-        if (currentStep === 3 && !generatedImage) {
-            toast({
-                title: "No image generated",
-                description: "Please generate an image first.",
-                variant: "destructive"
-            });
-            return;
-        }
-        setCurrentStep(Math.min(4, currentStep + 1));
-    };
+    const handleGenerate = async (slotPrompts: Record<string, string | LaunchPostPrompt>, styleId: string | null) => {
+        console.log("Starting generation...", { slotPrompts, styleId });
+        setIsGenerating(true);
+        setIsBrewing(true);
 
-    const handlePrevious = () => {
-        setCurrentStep(Math.max(1, currentStep - 1));
-    };
+        // NOTE: We REMOVED the timeout. Brewing stays ON until generation completes.
 
-    const saveAsTemplate = async () => {
-        if (!currentPrompt) return;
-
-        const templateName = prompt('Enter template name:');
-        if (!templateName) return;
-
-        setIsSavingTemplate(true);
         try {
-            await createTemplate({
-                name: templateName,
-                description: 'Custom template',
-                prompt: currentPrompt,
-                isDefault: false
-            });
+            if (!selectedTemplate.slots_config || selectedTemplate.slots_config.length === 0) {
+                console.warn("No slots configured for this template");
+                toast({ title: "Configuration Error", description: "This template has no slots defined.", variant: "destructive" });
+                setIsGenerating(false);
+                setIsBrewing(false);
+                return;
+            }
 
-            toast({
-                title: "Template saved",
-                description: "Your custom template has been saved to the database."
-            });
+            // Clone the canvas state so we can mutate it with new images
+            let newCanvasState = JSON.parse(JSON.stringify(selectedTemplate.canvas_state));
 
-            // Trigger refresh in TemplateManager
-            setRefreshTemplatesTrigger(prev => prev + 1);
+            // Find selected style
+            const selectedStyle = STYLE_PRESETS.find(s => s.id === styleId);
+            // Default subject type (could be inferred from template category in future)
+            const defaultSubject = SUBJECT_TYPES.find(s => s.id === 'food') || SUBJECT_TYPES[0];
+
+            console.log("Processing slots...", selectedTemplate.slots_config.length);
+
+            // Iterate through slots and generate images SEQUENTIALLY to avoid rate limits
+            for (const slot of selectedTemplate.slots_config || []) {
+                const userInputValue = slotPrompts[slot.id];
+
+                if (!userInputValue) {
+                    console.log(`Skipping slot ${slot.id}: No input provided`);
+                    continue;
+                }
+
+                // --- TEXT SLOT HANDLE ---
+                if (slot.type === 'text') {
+                    const targetElementIndex = newCanvasState.findIndex((el: any) => el.id === slot.targetElementId);
+                    if (targetElementIndex !== -1) {
+                        newCanvasState[targetElementIndex].content = userInputValue;
+                        console.log(`Updated text element ${slot.targetElementId} with: "${userInputValue}"`);
+                    } else {
+                        console.warn(`Target text element ${slot.targetElementId} not found`);
+                    }
+                    continue; // Done for text slot
+                }
+
+                // --- IMAGE SLOT HANDLE ---
+
+                let prompt = { ...basePrompt };
+
+                // CHECK: Is this an advanced prompt object?
+                if (typeof userInputValue === 'object' && userInputValue !== null) {
+                    console.log(`Using advanced prompt for slot ${slot.id}`);
+                    prompt = userInputValue as LaunchPostPrompt;
+                } else {
+                    // Standard String Input
+                    console.log(`Generating for slot ${slot.id}: "${userInputValue}"`);
+
+                    // Apply Subject Type defaults
+                    if (defaultSubject) {
+                        prompt = { ...prompt, ...defaultSubject.apply(prompt) };
+                    }
+
+                    // Apply Selected Style
+                    if (selectedStyle) {
+                        prompt = { ...prompt, ...selectedStyle.apply(prompt) };
+                    }
+
+                    // Apply User Input
+                    prompt.subject.primary = userInputValue as string;
+                }
+
+                // 2. Generate Image
+                try {
+                    const result = await generateImage(prompt);
+                    console.log(`Generation result for ${slot.id}:`, result);
+
+                    if (result.success && result.imageData) {
+                        // Success! Now attempt to upload to Storage
+
+                        let imageUrl = `data:${result.mimeType || 'image/png'};base64,${result.imageData}`;
+
+                        try {
+                            const storageUrl = await uploadGeneratedImage(result.imageData, result.mimeType || 'image/png');
+                            if (storageUrl) {
+                                console.log(`Uploaded image to storage: ${storageUrl}`);
+                                imageUrl = storageUrl;
+                            } else {
+                                console.warn("Failed to upload to storage, falling back to base64");
+                            }
+                        } catch (uploadInfo) {
+                            console.warn("Upload exception, falling back to base64", uploadInfo);
+                        }
+
+                        // 3. Update Canvas State
+                        const targetElementIndex = newCanvasState.findIndex((el: any) => el.id === slot.targetElementId);
+                        if (targetElementIndex !== -1) {
+                            newCanvasState[targetElementIndex].src = imageUrl;
+                            console.log(`Updated element ${slot.targetElementId} with new image`);
+                        } else {
+                            console.warn(`Target element ${slot.targetElementId} not found in canvas state`);
+                        }
+                    } else {
+                        console.error(`Failed to generate for slot ${slot.id}:`, result.error);
+                        toast({
+                            title: `Generation Failed for ${slot.description}`,
+                            description: result.error || "Unknown error",
+                            variant: "destructive"
+                        });
+                    }
+                } catch (err) {
+                    console.error(`Exception generating slot ${slot.id}:`, err);
+                }
+            }
+
+            console.log("All generations complete. Updating state.");
+            setGeneratedCanvasState(newCanvasState);
+
         } catch (error) {
-            console.error('Failed to save template:', error);
+            console.error("Generation failed:", error);
             toast({
-                title: "Error saving template",
-                description: "Failed to save to database. Please try again.",
+                title: "Generation Failed",
+                description: "Something went wrong while creating your images.",
                 variant: "destructive"
             });
+            setIsGenerating(false); // Go back if failed
         } finally {
-            setIsSavingTemplate(false);
+            // Stop brewing ONLY after everything is done
+            setIsBrewing(false);
         }
     };
 
-    const handleImageGenerated = (imageUrl: string) => {
-        setGeneratedImage(imageUrl);
+    // --- NEW: Handle single image regeneration ---
+    const handleRegenerateImage = async (elementId: string) => {
+        // Find which slot maps to this element
+        const slot = selectedTemplate.slots_config.find((s: any) => s.targetElementId === elementId);
+        if (!slot) {
+            console.warn("No slot found for element", elementId);
+            return;
+        }
+
+        // Find the *last used prompt* for this slot? 
+        // We might need to store the prompts map in state or just ask user?
+        // For now, let's re-use the default logic or ask user for new prompt?
+        // Simpler: Just re-run the generation logic for this ONE slot using the SAME prompt logic as before.
+        // Problem: We don't have the original `slotPrompts` here easily unless we stored them.
+
+        // MVP: Ask user for new prompt or confirmation?
+        // Let's just assume we want to "try again" with the same subject if we had it.
+        // better: Open a prompt dialog?
+        // For "Just Do It" speed, let's just re-roll with same prompt if possible, or generic.
+
+        // ACTUAL MVP: Prompt input for new subject
+        const newSubject = prompt(`Enter new subject for ${slot.description}:`, "Delicious food");
+        if (!newSubject) return;
+
+        setIsBrewing(true); // Short brew for single item
+
+        try {
+            // Re-construct prompt
+            let promptObj = { ...basePrompt };
+            // Apply defaults/styles if we had them stored... 
+            // We lost `styleId` context. Ideally handleGenerate should save it.
+            // Fallback: Just basic prompt with new subject
+            promptObj.subject.primary = newSubject;
+
+            const result = await generateImage(promptObj);
+
+            if (result.success && result.imageData) {
+                const storageUrl = await uploadGeneratedImage(result.imageData);
+                const finalUrl = storageUrl || `data:image/png;base64,${result.imageData}`;
+
+                // Update State
+                setGeneratedCanvasState(prev => {
+                    if (!prev) return null;
+                    return prev.map((el: any) =>
+                        el.id === elementId ? { ...el, src: finalUrl } : el
+                    );
+                });
+            } else {
+                toast({ title: "Failed", description: "Could not regenerate image", variant: "destructive" });
+            }
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsBrewing(false);
+        }
     };
 
-    const handleCreateTemplate = () => {
-        setCurrentPrompt(DEFAULT_PROMPT);
-        setSelectedTemplate(null);
-        setCurrentStep(2);
+    // --- NEW: Handle text editing ---
+    const handleEditText = (elementId: string) => {
+        const currentEl = generatedCanvasState?.find((el: any) => el.id === elementId);
+        if (!currentEl) return;
+
+        const newText = prompt("Edit Text:", currentEl.content);
+        if (newText !== null) {
+            setGeneratedCanvasState(prev => {
+                if (!prev) return null;
+                return prev.map((el: any) =>
+                    el.id === elementId ? { ...el, content: newText } : el
+                );
+            });
+        }
     };
 
     return (
         <Layout>
-            <div className="space-y-6">
-                {/* Header */}
-                <div>
-                    <div className="flex items-center gap-3 mb-2">
-                        <div className="w-12 h-12 bg-homemade-orange rounded-xl flex items-center justify-center">
-                            <Rocket className="h-6 w-6 text-white" />
-                        </div>
-                        <div>
-                            <h1 className="text-3xl font-bold text-gray-900">Launch Post Generator</h1>
-                            <p className="text-sm text-gray-500">Create stunning launch posts with AI-powered image generation</p>
-                        </div>
-                    </div>
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <div className="mb-8">
+                    <h1 className="text-3xl font-bold text-gray-900">Launch Posts</h1>
+                    <p className="mt-2 text-sm text-gray-600">Create stunning visuals for your product launch.</p>
                 </div>
 
-                {/* Progress Steps */}
-                <div className="flex items-center justify-between">
-                    {steps.map((step, index) => (
-                        <div key={step.id} className="flex items-center flex-1">
-                            <div className="flex flex-col items-center flex-1">
-                                <div
-                                    className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${currentStep >= step.id
-                                        ? 'bg-homemade-orange text-white'
-                                        : 'bg-gray-200 text-gray-400'
-                                        }`}
-                                >
-                                    <step.icon className="h-5 w-5" />
-                                </div>
-                                <div className="mt-2 text-center">
-                                    <p
-                                        className={`text-sm font-medium ${currentStep >= step.id ? 'text-gray-900' : 'text-gray-400'
-                                            }`}
-                                    >
-                                        {step.name}
-                                    </p>
-                                    <p className="text-xs text-gray-500 hidden sm:block">{step.description}</p>
-                                </div>
-                            </div>
-                            {index < steps.length - 1 && (
-                                <div
-                                    className={`h-1 flex-1 mx-4 transition-colors ${currentStep > step.id ? 'bg-homemade-orange' : 'bg-gray-200'
-                                        }`}
-                                />
-                            )}
-                        </div>
-                    ))}
-                </div>
+                <Tabs defaultValue="images" className="space-y-6">
+                    <TabsList className="grid w-full grid-cols-2 max-w-[400px]">
+                        <TabsTrigger value="templator" className="flex items-center gap-2">
+                            <Sparkles className="w-4 h-4 text-purple-500" />
+                            Templator
+                        </TabsTrigger>
+                        <TabsTrigger value="images" className="flex items-center gap-2">
+                            <Code2 className="w-4 h-4 text-blue-500" />
+                            Images
+                        </TabsTrigger>
+                    </TabsList>
 
-                {/* Main Content Area */}
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <CardTitle>{steps[currentStep - 1].name}</CardTitle>
-                                <CardDescription>{steps[currentStep - 1].description}</CardDescription>
-                            </div>
-                            {currentStep === 2 && (
-                                <div className="flex gap-2">
-                                    <Button
-                                        variant="outline"
-                                        onClick={() => setCurrentStep(1)}
-                                    >
-                                        <Sparkles className="h-4 w-4 mr-2" />
-                                        Templates
-                                    </Button>
-                                    {currentPrompt && (
-                                        <Button
-                                            variant="outline"
-                                            onClick={saveAsTemplate}
-                                            disabled={isSavingTemplate}
-                                        >
-                                            {isSavingTemplate ? (
-                                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                            ) : (
-                                                <Save className="h-4 w-4 mr-2" />
-                                            )}
-                                            Save as Template
+                    <TabsContent value="templator">
+                        {selectedTemplate ? (
+                            isGenerating ? (
+                                <div className="h-[calc(100vh-250px)] animate-in fade-in slide-in-from-bottom-4 relative overflow-hidden">
+                                    {isBrewing && <BrewingLoading />}
+
+                                    <div className={cn("transition-all duration-1000", isBrewing ? "blur-xl" : "blur-0")}>
+                                        <Button variant="ghost" onClick={() => setIsGenerating(false)} className="mb-4">
+                                            ← Back to Customization
                                         </Button>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        {/* Step 1: Template Selection */}
-                        {currentStep === 1 && (
-                            <TemplateManager
-                                onSelectTemplate={handleSelectTemplate}
-                                selectedTemplateId={selectedTemplate?.id}
-                                refreshTrigger={refreshTemplatesTrigger}
-                                onCreateTemplate={handleCreateTemplate}
-                            />
-                        )}
-
-                        {/* Step 2: Customize Prompt */}
-                        {currentStep === 2 && currentPrompt && (
-                            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                {isAdvancedMode ? (
-                                    <div className="space-y-4">
-                                        <div className="flex justify-end">
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => setIsAdvancedMode(false)}
-                                            >
-                                                Back to Simple Mode
-                                            </Button>
-                                        </div>
-                                        <PromptEditor
-                                            prompt={currentPrompt}
-                                            onChange={setCurrentPrompt}
+                                        <TemplateRenderer
+                                            templateId={selectedTemplate.id}
+                                            canvasState={generatedCanvasState || selectedTemplate.canvas_state}
+                                            onBack={() => {
+                                                setIsGenerating(false);
+                                                setGeneratedCanvasState(null);
+                                            }}
+                                            onRegenerateImage={handleRegenerateImage}
+                                            onEditText={handleEditText}
                                         />
                                     </div>
-                                ) : (
-                                    <SimplePromptEditor
-                                        prompt={currentPrompt}
-                                        onChange={setCurrentPrompt}
-                                        onToggleAdvanced={() => setIsAdvancedMode(true)}
-                                    />
-                                )}
-                            </div>
-                        )}
-
-                        {/* Step 3: Generate Image */}
-                        {currentStep === 3 && currentPrompt && (
-                            <ImageGenerator
-                                prompt={currentPrompt}
-                                onImageGenerated={handleImageGenerated}
-                            />
-                        )}
-
-                        {/* Step 4: Design & Export */}
-                        {currentStep === 4 && generatedImage && (
-                            <CanvasEditor
-                                mainImage={generatedImage}
-                                onSave={(url) => console.log('Design saved:', url)}
-                            />
-                        )}
-
-                        {/* Navigation Buttons */}
-                        <div className="flex gap-2 justify-between mt-8 pt-6 border-t">
-                            <Button
-                                variant="outline"
-                                onClick={handlePrevious}
-                                disabled={currentStep <= 2}
-                            >
-                                Previous
-                            </Button>
-                            <Button
-                                onClick={handleNext}
-                                disabled={currentStep === 4}
-                                className="bg-homemade-orange hover:bg-homemade-orange-dark"
-                            >
-                                {currentStep === 4 ? 'Done' : 'Next'}
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Selected Template Info */}
-                {selectedTemplate && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">Selected Template</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-gradient-to-br from-homemade-orange to-orange-600 rounded-lg flex items-center justify-center">
-                                    <Sparkles className="h-5 w-5 text-white" />
                                 </div>
-                                <div>
-                                    <p className="font-medium">{selectedTemplate.name}</p>
-                                    <p className="text-sm text-gray-500">{selectedTemplate.description}</p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
+                            ) : (
+                                <SlotFillingView
+                                    template={selectedTemplate}
+                                    onBack={() => setSelectedTemplate(null)}
+                                    // @ts-ignore - Updating signature next
+                                    onGenerate={handleGenerate}
+                                />
+                            )
+                        ) : (
+                            <JustDoItView onTemplateSelect={setSelectedTemplate} />
+                        )}
+                    </TabsContent>
+
+                    <TabsContent value="images">
+                        <ForNerdsView />
+                    </TabsContent>
+                </Tabs>
             </div>
         </Layout>
     );

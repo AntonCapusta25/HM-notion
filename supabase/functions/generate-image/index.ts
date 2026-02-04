@@ -62,6 +62,7 @@ serve(async (req) => {
         }
 
         const data = await response.json()
+        console.log('Gemini API Response:', JSON.stringify(data))
 
         // Extract the image from the response
         if (data.candidates && data.candidates[0]?.content?.parts) {

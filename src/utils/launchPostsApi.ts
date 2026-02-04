@@ -74,7 +74,6 @@ export async function deleteTemplate(id: string): Promise<void> {
 
 /**
  * Generate an image using the Supabase Edge Function
- * This calls the secure server-side function that uses the Gemini API
  */
 export async function generateImage(prompt: LaunchPostPrompt): Promise<GenerateImageResponse> {
     try {
@@ -104,25 +103,55 @@ export async function generateImage(prompt: LaunchPostPrompt): Promise<GenerateI
 }
 
 /**
+ * Upload a generated base64 image to Supabase Storage
+ */
+export async function uploadGeneratedImage(base64Data: string, mimeType: string = 'image/png'): Promise<string | null> {
+    try {
+        // Convert base64 to Blob
+        const byteCharacters = atob(base64Data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: mimeType });
+
+        const fileName = `gen_${Date.now()}_${Math.random().toString(36).substring(7)}.${mimeType.split('/')[1]}`;
+        const filePath = `${fileName}`;
+
+        // Upload to 'generated-launch-posts' bucket (ensure this bucket exists!)
+        const { data, error } = await supabase.storage
+            .from('generated-launch-posts')
+            .upload(filePath, blob, {
+                contentType: mimeType,
+                upsert: false
+            });
+
+        if (error) {
+            console.error('Upload failed:', error);
+            return null;
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+            .from('generated-launch-posts')
+            .getPublicUrl(filePath);
+
+        return publicUrl;
+    } catch (err) {
+        console.error('Error uploading image:', err);
+        return null; // Fallback to base64 if upload fails?
+    }
+}
+
+/**
  * Convert JSON prompt to human-readable text for display
  */
 export function promptToText(prompt: LaunchPostPrompt): string {
     const sections: string[] = [];
-
-    // Camera
     sections.push(`📷 Camera: ${prompt.camera.model} with ${prompt.camera.lens}`);
-
-    // Subject
     sections.push(`🎯 Subject: ${prompt.subject.primary}`);
-
-    // Lighting
     sections.push(`💡 Lighting: ${prompt.lighting.source} - ${prompt.lighting.quality}`);
-
-    // Style
     sections.push(`🎨 Style: ${prompt.style.artDirection}`);
-
-    // Colors
     sections.push(`🌈 Colors: ${prompt.colorPlate.primaryColors.join(', ')}`);
-
     return sections.join('\n');
 }

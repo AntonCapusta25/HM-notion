@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Download, Type, Image as ImageIcon, Palette, Trash2, Scissors, Loader2, Move, MousePointer2, Copy, Layers, ChevronUp, ChevronDown, RotateCw, Undo, Redo, Grid } from 'lucide-react';
+import { Download, Type, Image as ImageIcon, Palette, Trash2, Scissors, Loader2, Move, MousePointer2, Copy, Layers, ChevronUp, ChevronDown, RotateCw, Undo, Redo, Grid, ArrowLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import html2canvas from 'html2canvas';
 import { removeImageBackground } from '@/utils/backgroundRemoval';
@@ -14,6 +14,7 @@ import { CanvasProperties } from './editor/CanvasProperties';
 import { CanvasSidebar } from './editor/CanvasSidebar';
 import { LayersPanel } from './editor/LayersPanel';
 import { AlignmentTools } from './editor/AlignmentTools';
+import { BrandPanel } from './editor/BrandPanel';
 import { CanvasElement, ImageElement, TextElement } from './editor/types';
 import {
     ContextMenu,
@@ -27,11 +28,11 @@ import {
 } from "@/components/ui/context-menu"
 
 interface CanvasEditorProps {
-    mainImage: string;
+    initialImage?: string; // Made optional to support templates with no bg image
+    initialState?: CanvasElement[]; // For loading templates
     onSave?: (imageUrl: string) => void;
+    onBack?: () => void;
 }
-
-
 
 // Expanded Font List
 const FONTS = [
@@ -41,19 +42,35 @@ const FONTS = [
     { name: 'Montserrat', value: '"Montserrat", sans-serif' },
     { name: 'Lobster', value: '"Lobster", cursive' },
     { name: 'Oswald', value: '"Oswald", sans-serif' },
-    { name: 'New Spirit (Serif)', value: 'ui-serif, Georgia, Cambria, "Times New Roman", Times, serif' },
+    { name: 'Oswald', value: '"Oswald", sans-serif' },
+    { name: 'New Spirit (Custom)', value: 'NewSpirit, serif' },
     { name: 'Canela (Display)', value: 'ui-serif, Georgia, serif' }, // Simulated
     { name: 'Editorial New', value: '"Times New Roman", Times, serif' }, // Simulated
     { name: 'Geist (Sans)', value: 'ui-sans-serif, system-ui, sans-serif' }
 ];
 
-export function CanvasEditor({ mainImage, onSave }: CanvasEditorProps) {
-    const [elements, setElements] = useState<CanvasElement[]>([]);
+export function CanvasEditor({ initialImage, initialState, onSave, onBack }: CanvasEditorProps) {
+    const [elements, setElements] = useState<CanvasElement[]>(initialState || []);
     const [selectedId, setSelectedId] = useState<string | null>(null);
-    const [backgroundColor, setBackgroundColor] = useState('#ffffff');
-    const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
+
+    const [backgroundImage, setBackgroundImage] = useState<string | null>(initialImage || null);
     const [history, setHistory] = useState<CanvasElement[][]>([]);
     const [historyIndex, setHistoryIndex] = useState(-1);
+
+    // If initialImage or initialState changes, update (useful for template switching)
+    useEffect(() => {
+        if (initialState) {
+            setElements(initialState);
+            setHistory([initialState]);
+            setHistoryIndex(0);
+        }
+    }, [initialState]);
+
+    useEffect(() => {
+        if (initialImage) {
+            setBackgroundImage(initialImage);
+        }
+    }, [initialImage]);
 
     // Save history
     const addToHistory = (newElements: CanvasElement[]) => {
@@ -101,7 +118,9 @@ export function CanvasEditor({ mainImage, onSave }: CanvasEditorProps) {
 
     // Initialize Main Image as a Layer
     useEffect(() => {
-        if (mainImage) {
+        // Only add initialImage if we started with NO state (i.e. fresh blank canvas with just an image)
+        // If we loaded a template (initialState has items), respect that instead.
+        if (initialImage && (!initialState || initialState.length === 0)) {
             const img = new Image();
             img.onload = () => {
                 // Calculate fit within 600x600 canvas while maintaining aspect ratio
@@ -128,7 +147,7 @@ export function CanvasEditor({ mainImage, onSave }: CanvasEditorProps) {
                     const newEl: ImageElement = {
                         id: 'main-image',
                         type: 'image',
-                        src: mainImage,
+                        src: initialImage,
                         x: (600 - width) / 2,
                         y: (600 - height) / 2,
                         width,
@@ -140,9 +159,9 @@ export function CanvasEditor({ mainImage, onSave }: CanvasEditorProps) {
                     return [newEl, ...prev];
                 });
             };
-            img.src = mainImage;
+            img.src = initialImage;
         }
-    }, [mainImage]);
+    }, [initialImage, initialState]);
 
     // --- Actions ---
 
@@ -228,14 +247,46 @@ export function CanvasEditor({ mainImage, onSave }: CanvasEditorProps) {
         }
     };
 
-    const updateElement = (id: string, updates: Partial<CanvasElement>, saveHistory = true) => {
-        setElements(prev => {
-            const next = prev.map(el => el.id === id ? { ...el, ...updates } as CanvasElement : el);
-            if (saveHistory) {
-                // De-bouncing handled by caller or simpler history stack logic if needed
-                // For now, simpler: we'll call addToHistory from a specific 'save' point or just let it be.
-                // Actually, let's just update local state here, and use a separate 'saveSnapshot' for history.
+    // --- Brand Kit Handlers ---
+
+    const handleApplyBrandColor = (color: string) => {
+        if (!selectedId) return;
+        updateElement(selectedId, { color });
+    };
+
+    const handleApplyBrandFont = (fontFamily: string) => {
+        if (!selectedId) return;
+        updateElement(selectedId, { fontFamily });
+    };
+
+    const handleShuffleBrand = (colors: string[]) => {
+        // Randomly assign colors to all text elements
+        const shuffled = elements.map(el => {
+            if (el.type === 'text') {
+                const randomColor = colors[Math.floor(Math.random() * colors.length)];
+                return { ...el, color: randomColor };
             }
+            return el;
+        });
+        setElements(shuffled);
+        addToHistory(shuffled);
+    };
+
+    const updateElement = (id: string, updates: Partial<CanvasElement>, saveHistory = true) => {
+        // console.log('DEBUG: updateElement', id, updates);
+        setElements(prev => {
+            const next = prev.map(el => {
+                if (el.id === id) {
+                    const newEl = { ...el, ...updates } as CanvasElement;
+                    // console.log('DEBUG: updating element', newEl);
+                    if (Number.isNaN(newEl.x) || Number.isNaN(newEl.y)) {
+                        console.error('DEBUG: NaN coordinates detected! Aborting update.', updates, el);
+                        return el;
+                    }
+                    return newEl;
+                }
+                return el;
+            });
             return next;
         });
     };
@@ -289,10 +340,14 @@ export function CanvasEditor({ mainImage, onSave }: CanvasEditorProps) {
     // Mouse Down on Element (Drag Start)
     const handleElementMouseDown = (e: React.MouseEvent, id: string) => {
         e.stopPropagation(); // Prevent canvas background click
+        console.log('DEBUG: MouseDown', id);
         setSelectedId(id);
 
         const el = elements.find(e => e.id === id);
-        if (!el) return;
+        if (!el) {
+            console.error('DEBUG: Element not found on MouseDown', id);
+            return;
+        }
 
         dragItem.current = {
             id,
@@ -301,6 +356,7 @@ export function CanvasEditor({ mainImage, onSave }: CanvasEditorProps) {
             initialX: el.x,
             initialY: el.y
         };
+        console.log('DEBUG: Drag Start', dragItem.current);
     };
 
     // Rotate Start
@@ -463,7 +519,7 @@ export function CanvasEditor({ mainImage, onSave }: CanvasEditorProps) {
     useEffect(() => {
         window.addEventListener('mouseup', handleMouseUp);
         return () => window.removeEventListener('mouseup', handleMouseUp);
-    }, []);
+    }, [handleMouseUp]);
 
     // --- Export ---
 
@@ -504,7 +560,7 @@ export function CanvasEditor({ mainImage, onSave }: CanvasEditorProps) {
                     className="relative w-[600px] h-[600px] shadow-2xl overflow-hidden bg-white"
                     onClick={() => setSelectedId(null)}
                     style={{
-                        backgroundColor: backgroundColor,
+                        backgroundColor: '#ffffff',
                         backgroundImage: backgroundImage ? `url(${backgroundImage})` : undefined,
                         backgroundSize: 'cover',
                         backgroundPosition: 'center'
@@ -512,7 +568,7 @@ export function CanvasEditor({ mainImage, onSave }: CanvasEditorProps) {
                 >
                     {elements.map(el => (
                         <ContextMenu key={el.id}>
-                            <ContextMenuTrigger>
+                            <ContextMenuTrigger asChild>
                                 <div
                                     className={cn(
                                         "absolute group",
@@ -548,13 +604,15 @@ export function CanvasEditor({ mainImage, onSave }: CanvasEditorProps) {
                                             <div
                                                 className={cn(
                                                     "p-2 border-2 text-nowrap",
-                                                    selectedId === el.id ? "border-homemade-orange" : "border-transparent group-hover:border-blue-300"
+                                                    selectedId === el.id ? "border-orange-500" : "border-transparent group-hover:border-blue-300"
                                                 )}
                                                 style={{
                                                     fontSize: `${el.fontSize}px`,
                                                     fontFamily: el.fontFamily,
                                                     color: el.color,
-                                                    fontWeight: el.fontWeight,
+                                                    fontWeight: el.fontWeight || 'normal',
+                                                    fontStyle: el.fontStyle || 'normal',
+                                                    textDecoration: el.textDecoration || 'none',
                                                 }}
                                                 onDoubleClick={(e) => {
                                                     e.stopPropagation();
@@ -568,19 +626,19 @@ export function CanvasEditor({ mainImage, onSave }: CanvasEditorProps) {
                                             {selectedId === el.id && (
                                                 <>
                                                     <div
-                                                        className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border border-homemade-orange rounded-full cursor-nw-resize"
+                                                        className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border border-orange-500 rounded-full cursor-nw-resize"
                                                         onMouseDown={(e) => handleResizeMouseDown(e, el.id, 'nw')}
                                                     />
                                                     <div
-                                                        className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-white border border-homemade-orange rounded-full cursor-ne-resize"
+                                                        className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-white border border-orange-500 rounded-full cursor-ne-resize"
                                                         onMouseDown={(e) => handleResizeMouseDown(e, el.id, 'ne')}
                                                     />
                                                     <div
-                                                        className="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white border border-homemade-orange rounded-full cursor-sw-resize"
+                                                        className="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white border border-orange-500 rounded-full cursor-sw-resize"
                                                         onMouseDown={(e) => handleResizeMouseDown(e, el.id, 'sw')}
                                                     />
                                                     <div
-                                                        className="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-white border border-homemade-orange rounded-full cursor-se-resize"
+                                                        className="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-white border border-orange-500 rounded-full cursor-se-resize"
                                                         onMouseDown={(e) => handleResizeMouseDown(e, el.id, 'se')}
                                                     />
                                                 </>
@@ -593,26 +651,26 @@ export function CanvasEditor({ mainImage, onSave }: CanvasEditorProps) {
                                                 alt="element"
                                                 className={cn(
                                                     "w-full h-full object-fill pointer-events-none border-2",
-                                                    selectedId === el.id ? "border-homemade-orange" : "border-transparent group-hover:border-blue-300"
+                                                    selectedId === el.id ? "border-orange-500" : "border-transparent group-hover:border-blue-300"
                                                 )}
                                             />
                                             {/* Resize Handles for Image */}
                                             {selectedId === el.id && (
                                                 <>
                                                     <div
-                                                        className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border border-homemade-orange rounded-full cursor-nw-resize"
+                                                        className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border border-orange-500 rounded-full cursor-nw-resize"
                                                         onMouseDown={(e) => handleResizeMouseDown(e, el.id, 'nw')}
                                                     />
                                                     <div
-                                                        className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-white border border-homemade-orange rounded-full cursor-ne-resize"
+                                                        className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-white border border-orange-500 rounded-full cursor-ne-resize"
                                                         onMouseDown={(e) => handleResizeMouseDown(e, el.id, 'ne')}
                                                     />
                                                     <div
-                                                        className="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white border border-homemade-orange rounded-full cursor-sw-resize"
+                                                        className="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white border border-orange-500 rounded-full cursor-sw-resize"
                                                         onMouseDown={(e) => handleResizeMouseDown(e, el.id, 'sw')}
                                                     />
                                                     <div
-                                                        className="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-white border border-homemade-orange rounded-full cursor-se-resize"
+                                                        className="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-white border border-orange-500 rounded-full cursor-se-resize"
                                                         onMouseDown={(e) => handleResizeMouseDown(e, el.id, 'se')}
                                                     />
                                                 </>
@@ -648,18 +706,22 @@ export function CanvasEditor({ mainImage, onSave }: CanvasEditorProps) {
                             </ContextMenuContent>
                         </ContextMenu>
                     ))}
+
+
                 </div>
             </div>
 
             {/* Controls sidebar */}
             <div className="space-y-6 overflow-y-auto pr-2 h-full flex flex-col">
                 <Tabs defaultValue="design" className="w-full">
-                    <TabsList className="grid w-full grid-cols-2">
+                    <TabsList className="grid w-full grid-cols-3">
                         <TabsTrigger value="design">Design</TabsTrigger>
+                        <TabsTrigger value="brand">Brand</TabsTrigger>
                         <TabsTrigger value="layers">Position</TabsTrigger>
                     </TabsList>
 
-                    <TabsContent value="design" className="space-y-6 mt-4">
+                    <TabsContent value="design" className="h-[calc(100%-40px)] m-0 pb-10 space-y-6">
+                        {/* Sidebar Tools */}
                         <CanvasSidebar
                             addText={addText}
                             handleLogoUpload={handleLogoUpload}
@@ -668,8 +730,7 @@ export function CanvasEditor({ mainImage, onSave }: CanvasEditorProps) {
                             isRemovingBg={isRemovingBg}
                             isExporting={isExporting}
                             handleExport={handleExport}
-                            backgroundColor={backgroundColor}
-                            setBackgroundColor={setBackgroundColor}
+
                             selectedElement={selectedElement}
                             undo={undo}
                             redo={redo}
@@ -682,6 +743,15 @@ export function CanvasEditor({ mainImage, onSave }: CanvasEditorProps) {
                             selectedElement={selectedElement}
                             updateElement={updateElement}
                             deleteSelected={deleteSelected}
+                            FONTS={FONTS}
+                        />
+                    </TabsContent>
+
+                    <TabsContent value="brand" className="h-[calc(100%-40px)] m-0 pt-4">
+                        <BrandPanel
+                            onApplyColor={handleApplyBrandColor}
+                            onApplyFont={handleApplyBrandFont}
+                            onShuffle={handleShuffleBrand}
                             FONTS={FONTS}
                         />
                     </TabsContent>

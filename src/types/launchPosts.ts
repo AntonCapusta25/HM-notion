@@ -93,11 +93,13 @@ export interface LaunchPostTemplate {
     id: string;
     name: string;
     description: string;
-    thumbnail?: string;
-    prompt: LaunchPostPrompt;
-    createdAt: Date;
-    isDefault: boolean;
+    thumbnail_url?: string;
+    prompt?: LaunchPostPrompt;
+    createdAt?: Date;
+    isDefault?: boolean;
     userId?: string;
+    canvas_state?: any[];
+    slots_config?: { id: string; targetElementId: string; description: string }[];
 }
 
 export interface GeneratedImage {
