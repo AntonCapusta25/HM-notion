@@ -2,13 +2,15 @@ import { useState } from 'react';
 import { Layout } from '../components/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Rocket, Sparkles, Image, Layers, Download, Save } from 'lucide-react';
+import { Rocket, Sparkles, Image, Layers, Download, Save, Loader2 } from 'lucide-react';
 import { LaunchPostTemplate, LaunchPostPrompt } from '@/types/launchPosts';
 import { TemplateManager } from '@/components/LaunchPosts/TemplateManager';
 import { PromptEditor } from '@/components/LaunchPosts/PromptEditor';
 import { ImageGenerator } from '@/components/LaunchPosts/ImageGenerator';
 import { BackgroundProcessor } from '@/components/LaunchPosts/BackgroundProcessor';
 import { ExportPanel } from '@/components/LaunchPosts/ExportPanel';
+import { createTemplate } from '@/utils/launchPostsApi';
+import { useToast } from '@/hooks/use-toast';
 
 export default function LaunchPosts() {
     const [currentStep, setCurrentStep] = useState(1);
@@ -16,6 +18,9 @@ export default function LaunchPosts() {
     const [currentPrompt, setCurrentPrompt] = useState<LaunchPostPrompt | null>(null);
     const [generatedImage, setGeneratedImage] = useState<string | null>(null);
     const [processedImage, setProcessedImage] = useState<string | null>(null);
+    const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+    const [refreshTemplatesTrigger, setRefreshTemplatesTrigger] = useState(0);
+    const { toast } = useToast();
 
     const steps = [
         { id: 1, name: 'Template', icon: Sparkles, description: 'Choose or create a template' },
@@ -32,15 +37,27 @@ export default function LaunchPosts() {
 
     const handleNext = () => {
         if (currentStep === 1 && !selectedTemplate) {
-            alert('Please select a template first');
+            toast({
+                title: "No template selected",
+                description: "Please select a template to continue.",
+                variant: "destructive"
+            });
             return;
         }
         if (currentStep === 3 && !generatedImage) {
-            alert('Please generate an image first');
+            toast({
+                title: "No image generated",
+                description: "Please generate an image first.",
+                variant: "destructive"
+            });
             return;
         }
         if (currentStep === 4 && !processedImage) {
-            alert('Please process the image first');
+            toast({
+                title: "Image not processed",
+                description: "Please process the image first.",
+                variant: "destructive"
+            });
             return;
         }
         setCurrentStep(Math.min(5, currentStep + 1));
@@ -50,27 +67,38 @@ export default function LaunchPosts() {
         setCurrentStep(Math.max(1, currentStep - 1));
     };
 
-    const saveAsTemplate = () => {
+    const saveAsTemplate = async () => {
         if (!currentPrompt) return;
 
         const templateName = prompt('Enter template name:');
         if (!templateName) return;
 
-        const newTemplate: LaunchPostTemplate = {
-            id: `custom-${Date.now()}`,
-            name: templateName,
-            description: 'Custom template',
-            isDefault: false,
-            createdAt: new Date(),
-            prompt: currentPrompt
-        };
+        setIsSavingTemplate(true);
+        try {
+            await createTemplate({
+                name: templateName,
+                description: 'Custom template',
+                prompt: currentPrompt,
+                isDefault: false
+            });
 
-        const savedTemplates = localStorage.getItem('launchPostTemplates');
-        const customTemplates = savedTemplates ? JSON.parse(savedTemplates) : [];
-        customTemplates.push(newTemplate);
-        localStorage.setItem('launchPostTemplates', JSON.stringify(customTemplates));
+            toast({
+                title: "Template saved",
+                description: "Your custom template has been saved to the database."
+            });
 
-        alert('Template saved successfully!');
+            // Trigger refresh in TemplateManager
+            setRefreshTemplatesTrigger(prev => prev + 1);
+        } catch (error) {
+            console.error('Failed to save template:', error);
+            toast({
+                title: "Error saving template",
+                description: "Failed to save to database. Please try again.",
+                variant: "destructive"
+            });
+        } finally {
+            setIsSavingTemplate(false);
+        }
     };
 
     const handleImageGenerated = (imageUrl: string) => {
@@ -79,6 +107,80 @@ export default function LaunchPosts() {
 
     const handleImageProcessed = (imageUrl: string) => {
         setProcessedImage(imageUrl);
+    };
+
+    const handleCreateTemplate = () => {
+        // Initialize with default empty/skeleton prompt
+        const defaultPrompt: LaunchPostPrompt = {
+            camera: {
+                model: 'Canon EOS R5',
+                lens: '50mm',
+                aperture: 'f/5.6',
+                shutter: '1/200',
+                iso: '100',
+                framing: 'Medium shot',
+                angle: 'Eye-level',
+                movement: 'Static'
+            },
+            subject: {
+                primary: 'A delicious food item',
+                secondary: 'Clean background',
+                pose: 'Centered',
+                expression: 'N/A',
+                build: 'N/A'
+            },
+            character: {
+                hair: 'N/A',
+                wardrobeNotes: 'N/A',
+                props: []
+            },
+            materialPhysics: {
+                fabricBehavior: 'N/A',
+                surfaceQuality: 'High quality texture',
+                lightInteraction: 'Natural reflection'
+            },
+            skinRendering: {
+                textureDetail: 'N/A',
+                finish: 'N/A',
+                retouchingStyle: 'N/A'
+            },
+            composition: {
+                theory: 'Rule of thirds',
+                depth: 'Medium depth of field',
+                focus: 'Sharp focus on subject'
+            },
+            setting: {
+                environment: 'Studio setting',
+                timeOfDay: 'Daytime',
+                atmosphere: 'Bright and airy',
+                shadowPlay: 'Soft shadows'
+            },
+            lighting: {
+                source: 'Natural light',
+                direction: 'Side lighting',
+                quality: 'Soft diffused',
+                colorTemperature: 'Neutral'
+            },
+            style: {
+                artDirection: 'Professional food photography',
+                mood: 'Appetizing',
+                references: []
+            },
+            rendering: {
+                engine: 'Photorealistic',
+                fidelitySpec: 'High resolution',
+                postProcessing: 'Color correction'
+            },
+            colorPlate: {
+                primaryColors: ['#FFFFFF', '#E67E22'],
+                accentColors: ['#000000']
+            },
+            negative_prompt: 'text, watermark, low quality, blurry, distorted'
+        };
+
+        setCurrentPrompt(defaultPrompt);
+        setSelectedTemplate(null); // Clear selected template since this is new
+        setCurrentStep(2); // Go to Customize step
     };
 
     return (
@@ -104,8 +206,8 @@ export default function LaunchPosts() {
                             <div className="flex flex-col items-center flex-1">
                                 <div
                                     className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${currentStep >= step.id
-                                            ? 'bg-homemade-orange text-white'
-                                            : 'bg-gray-200 text-gray-400'
+                                        ? 'bg-homemade-orange text-white'
+                                        : 'bg-gray-200 text-gray-400'
                                         }`}
                                 >
                                     <step.icon className="h-5 w-5" />
@@ -139,8 +241,16 @@ export default function LaunchPosts() {
                                 <CardDescription>{steps[currentStep - 1].description}</CardDescription>
                             </div>
                             {currentStep === 2 && currentPrompt && (
-                                <Button variant="outline" onClick={saveAsTemplate}>
-                                    <Save className="h-4 w-4 mr-2" />
+                                <Button
+                                    variant="outline"
+                                    onClick={saveAsTemplate}
+                                    disabled={isSavingTemplate}
+                                >
+                                    {isSavingTemplate ? (
+                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    ) : (
+                                        <Save className="h-4 w-4 mr-2" />
+                                    )}
                                     Save as Template
                                 </Button>
                             )}
@@ -152,6 +262,8 @@ export default function LaunchPosts() {
                             <TemplateManager
                                 onSelectTemplate={handleSelectTemplate}
                                 selectedTemplateId={selectedTemplate?.id}
+                                refreshTrigger={refreshTemplatesTrigger}
+                                onCreateTemplate={handleCreateTemplate}
                             />
                         )}
 

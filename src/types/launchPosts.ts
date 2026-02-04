@@ -97,6 +97,7 @@ export interface LaunchPostTemplate {
     prompt: LaunchPostPrompt;
     createdAt: Date;
     isDefault: boolean;
+    userId?: string;
 }
 
 export interface GeneratedImage {

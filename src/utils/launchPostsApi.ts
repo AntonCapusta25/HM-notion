@@ -1,11 +1,75 @@
 import { supabase } from '@/lib/supabase';
-import { LaunchPostPrompt } from '@/types/launchPosts';
+import { LaunchPostPrompt, LaunchPostTemplate } from '@/types/launchPosts';
 
 export interface GenerateImageResponse {
     success: boolean;
     imageUrl?: string;
     imageData?: string;
     error?: string;
+    prompt?: string;
+    mimeType?: string;
+}
+
+// Template API
+export async function fetchTemplates(): Promise<LaunchPostTemplate[]> {
+    const { data, error } = await supabase
+        .from('launch_post_templates')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+    if (error) {
+        console.error('Error fetching templates:', error);
+        throw error;
+    }
+
+    return (data || []).map(t => ({
+        id: t.id,
+        name: t.name,
+        description: t.description,
+        prompt: t.prompt,
+        isDefault: t.is_default,
+        createdAt: new Date(t.created_at),
+        userId: t.user_id
+    }));
+}
+
+export async function createTemplate(template: Omit<LaunchPostTemplate, 'id' | 'createdAt'>): Promise<LaunchPostTemplate> {
+    const { data, error } = await supabase
+        .from('launch_post_templates')
+        .insert({
+            name: template.name,
+            description: template.description,
+            prompt: template.prompt,
+            is_default: template.isDefault || false
+        })
+        .select()
+        .single();
+
+    if (error) {
+        console.error('Error creating template:', error);
+        throw error;
+    }
+
+    return {
+        id: data.id,
+        name: data.name,
+        description: data.description,
+        prompt: data.prompt,
+        isDefault: data.is_default,
+        createdAt: new Date(data.created_at),
+        userId: data.user_id
+    };
+}
+
+export async function deleteTemplate(id: string): Promise<void> {
+    const { error } = await supabase
+        .from('launch_post_templates')
+        .delete()
+        .eq('id', id);
+
+    if (error) {
+        throw error;
+    }
 }
 
 /**
