@@ -565,6 +565,12 @@ export function CanvasEditor({ initialImage, initialState, onSave, onBack }: Can
                         backgroundSize: 'cover',
                         backgroundPosition: 'center'
                     }}
+                    onMouseDown={(e) => {
+                        // Only deselect if clicking the background, not an element
+                        if (e.target === e.currentTarget) {
+                            setSelectedId(null);
+                        }
+                    }}
                 >
                     {elements.map(el => (
                         <ContextMenu key={el.id}>
