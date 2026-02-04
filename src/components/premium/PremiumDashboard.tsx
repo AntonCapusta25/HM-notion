@@ -4,6 +4,15 @@ import { Plus, Calendar, BarChart3, TrendingUp, Users, ArrowUpRight, CheckCircle
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import {
+    Pagination,
+    PaginationContent,
+    PaginationEllipsis,
+    PaginationItem,
+    PaginationLink,
+    PaginationNext,
+    PaginationPrevious,
+} from '@/components/ui/pagination';
 import { useTaskContext } from '../../contexts/TaskContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useProfile } from '../../hooks/useProfile';
@@ -55,7 +64,7 @@ interface DashboardStats {
 export const PremiumDashboard = () => {
     const { user } = useAuth();
     const { profile } = useProfile();
-    const { tasks, users, createTask, updateTask, deleteTask, addComment, toggleSubtask } = useTaskContext();
+    const { tasks, users, createTask, updateTask, deleteTask, addComment, toggleSubtask, page, totalTasks, TASKS_PER_PAGE, setPage } = useTaskContext();
     const navigate = useNavigate();
     const [showCreateTask, setShowCreateTask] = useState(false);
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -206,7 +215,7 @@ export const PremiumDashboard = () => {
                 </div>
 
                 {/* Content */}
-                <div className="min-h-[500px]">
+                <div className="min-h-[500px] mb-8">
                     {viewMode === 'list' ? (
                         <div className="rounded-2xl overflow-hidden border border-white/5 bg-black/20 backdrop-blur-sm min-h-[500px]">
                             <PremiumListView
@@ -244,6 +253,53 @@ export const PremiumDashboard = () => {
                                     </div>
                                 );
                             })}
+                        </div>
+                    )}
+
+                    {/* Pagination Controls */}
+                    {totalTasks > TASKS_PER_PAGE && (
+                        <div className="flex justify-center mt-8 pb-8">
+                            <Pagination>
+                                <PaginationContent>
+                                    <PaginationItem>
+                                        <PaginationPrevious
+                                            href="#"
+                                            onClick={(e) => { e.preventDefault(); if (page > 1) setPage(page - 1); }}
+                                            className={page === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                                        />
+                                    </PaginationItem>
+
+                                    {/* Generate page numbers */}
+                                    {Array.from({ length: Math.ceil(totalTasks / TASKS_PER_PAGE) }, (_, i) => i + 1)
+                                        .filter(p => p === 1 || p === Math.ceil(totalTasks / TASKS_PER_PAGE) || (p >= page - 1 && p <= page + 1))
+                                        .map((p, i, arr) => {
+                                            // Handle ellipsis logic (simplified)
+                                            const showEllipsisBefore = i > 0 && p > arr[i - 1] + 1;
+                                            return (
+                                                <div key={p} className="flex items-center">
+                                                    {showEllipsisBefore && <PaginationEllipsis />}
+                                                    <PaginationItem>
+                                                        <PaginationLink
+                                                            href="#"
+                                                            isActive={page === p}
+                                                            onClick={(e) => { e.preventDefault(); setPage(p); }}
+                                                        >
+                                                            {p}
+                                                        </PaginationLink>
+                                                    </PaginationItem>
+                                                </div>
+                                            );
+                                        })}
+
+                                    <PaginationItem>
+                                        <PaginationNext
+                                            href="#"
+                                            onClick={(e) => { e.preventDefault(); if (page < Math.ceil(totalTasks / TASKS_PER_PAGE)) setPage(page + 1); }}
+                                            className={page >= Math.ceil(totalTasks / TASKS_PER_PAGE) ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                                        />
+                                    </PaginationItem>
+                                </PaginationContent>
+                            </Pagination>
                         </div>
                     )}
                 </div>

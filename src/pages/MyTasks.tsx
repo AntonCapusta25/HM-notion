@@ -1,4 +1,4 @@
-import { MyTasks as StandardMyTasks } from '../components/MyTasks'; // Assuming we can extract or inline, but cleaner to keep logic here.
+
 // Wait, I should rename the current export to StandardMyTasks or keep it inline and render based on theme.
 // Let's refactor: I will keep the current code as "StandardMyTasks" inside the file (renamed) and the main export will be the switcher.
 
@@ -19,14 +19,12 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Plus, Calendar, AlertCircle, LayoutGrid, List, RefreshCw, MessageCircle, X, Minimize2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { Task } from '../types';
+import { Task, formatTaskFromSupabase } from '../types';
 import { useTheme } from '../contexts/ThemeContext';
 import { PremiumMyTasks } from '../components/premium/PremiumMyTasks';
 
 const StandardMyTasks = () => {
-  // ... (Original logic)
   const {
-    tasks,
     users,
     workspaces,
     createTask,
@@ -34,13 +32,15 @@ const StandardMyTasks = () => {
     updateTask,
     addComment,
     toggleSubtask,
-    refreshTasks,
-    loading: tasksLoading,
-    error
+    error: contextError
   } = useTaskContext();
 
   const { user } = useAuth();
   const { profile: userProfile } = useProfile();
+
+  const [allTasks, setAllTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -63,6 +63,44 @@ const StandardMyTasks = () => {
     getAuthToken();
   }, []);
 
+  // FETCH ALL TASKS (No Pagination)
+  const fetchAllTasks = useCallback(async () => {
+    if (!user) return;
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('tasks')
+        .select(`
+          *,
+          comments(id, content, author, created_at),
+          subtasks(id, title, completed, created_at),
+          task_tags(tag),
+          task_assignees(user_id)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const formatted = (data || []).map(t => {
+        const ft = formatTaskFromSupabase(t);
+        ft.task_assignees = t.task_assignees || [];
+        return ft;
+      });
+
+      setAllTasks(formatted);
+      setError(null);
+    } catch (err: any) {
+      console.error('Failed to fetch tasks:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchAllTasks();
+  }, [fetchAllTasks]);
+
   // Chatbot toggle functions
   const toggleChatbot = () => {
     setShowChatbot(!showChatbot);
@@ -80,39 +118,34 @@ const StandardMyTasks = () => {
 
   // Manual refresh function
   const handleManualRefresh = useCallback(async () => {
-    if (!refreshTasks) return;
-
     setIsRefreshing(true);
     console.log('🔄 MyTasks - Manual refresh triggered');
-
-    try {
-      await refreshTasks();
-      console.log('✅ MyTasks - Manual refresh completed');
-    } catch (err) {
-      console.error('❌ MyTasks - Manual refresh failed:', err);
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [refreshTasks]);
+    await fetchAllTasks();
+    setIsRefreshing(false);
+  }, [fetchAllTasks]);
 
   // ⚡ OPTIMIZED: Non-blocking task operations
   const handleCreateTask = useCallback(async (taskData: any) => {
     try {
       console.log('📝 MyTasks - Creating task:', taskData.title);
       await createTask(taskData);
+      // Refresh local list after create
+      await fetchAllTasks();
       setShowCreateTask(false);
       console.log('✅ MyTasks - Task creation completed');
     } catch (err) {
       console.error('❌ MyTasks - Failed to create task:', err);
       throw err;
     }
-  }, [createTask]);
+  }, [createTask, fetchAllTasks]);
 
   // ⚡ OPTIMIZED: Instant updates - no await needed (optimistic update handles it)
-  const handleUpdateTask = useCallback((taskId: string, updates: any) => {
+  const handleUpdateTask = useCallback(async (taskId: string, updates: any) => {
     console.log('⚡ MyTasks - Instant update for task:', taskId);
-    // 🚀 Fire without waiting - optimistic update handles UI
+    // 🚀 Fire without waiting
     updateTask(taskId, updates);
+    // Optimistic local update
+    setAllTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
   }, [updateTask]);
 
   const handleDeleteTask = useCallback(async (taskId: string) => {
@@ -122,6 +155,7 @@ const StandardMyTasks = () => {
     try {
       console.log('🗑️ MyTasks - Deleting task:', taskId);
       await deleteTask(taskId);
+      setAllTasks(prev => prev.filter(t => t.id !== taskId));
       console.log('✅ MyTasks - Task deletion completed');
     } catch (err) {
       console.error('❌ MyTasks - Failed to delete task:', err);
@@ -147,25 +181,10 @@ const StandardMyTasks = () => {
   const myTasks = useMemo(() => {
     if (!user) return [];
 
-    console.log('🔍 MyTasks - Filtering tasks for user:', user.id);
-    console.log('📋 MyTasks - Total tasks available:', tasks.length);
-
-    // Debug: Log the first task structure and current user info
-    if (tasks.length > 0) {
-      console.log('📄 MyTasks - Sample task structure (first task):', {
-        id: tasks[0].id,
-        title: tasks[0].title,
-        created_by: tasks[0].created_by,
-        task_assignees: tasks[0].task_assignees,
-        has_assignments: tasks[0].task_assignees?.length > 0
-      });
-
-      console.log('👤 Current user ID:', user.id);
-      console.log('📧 Current user email:', user.email);
-    }
+    const sourceTasks = allTasks || []; // Use local state
 
     // Filter tasks based ONLY on assignment data from task_assignees
-    let personalTasks = tasks.filter(task => {
+    let personalTasks = sourceTasks.filter(task => {
       // Check if task is assigned to current user via task_assignees relationship
       let isAssignedToMe = false;
 
@@ -173,24 +192,13 @@ const StandardMyTasks = () => {
         isAssignedToMe = task.task_assignees.some((assignment: any) => assignment.user_id === user.id);
       }
 
-      console.log(`🔍 Task "${task.title}": assigned=${isAssignedToMe}, created_by=${task.created_by}`);
-
-      if (isAssignedToMe) {
-        console.log(`✅ Including task "${task.title}" - assigned to me`);
-      } else {
-        console.log(`❌ Excluding task "${task.title}" - not assigned to me`);
-      }
-
       // ONLY show tasks assigned to me (strict filtering)
       return isAssignedToMe;
     });
 
-    console.log('📊 MyTasks - Personal tasks found:', personalTasks.length);
-
     // Apply workspace filter
     if (selectedWorkspace) {
       personalTasks = personalTasks.filter(task => task.workspace_id === selectedWorkspace);
-      console.log('🏢 MyTasks - After workspace filter:', personalTasks.length);
     }
 
     // Apply date filters
@@ -218,7 +226,7 @@ const StandardMyTasks = () => {
       default:
         return personalTasks;
     }
-  }, [tasks, user, selectedWorkspace, filter]);
+  }, [allTasks, user, selectedWorkspace, filter]);
 
   const tasksByStatus = useMemo(() => ({
     todo: myTasks.filter(t => t.status === 'todo'),
@@ -231,19 +239,16 @@ const StandardMyTasks = () => {
     const todayRaw = new Date();
     const today = new Date(todayRaw.getFullYear(), todayRaw.getMonth(), todayRaw.getDate());
 
-    console.log('📈 MyTasks - Calculating stats for filtered tasks:', myTasks.length);
-
     const stats = {
       total: myTasks.length,
       overdue: myTasks.filter(t => t.due_date && new Date(t.due_date) < today && t.status !== 'done').length,
       dueToday: myTasks.filter(t => t.due_date && new Date(t.due_date).toDateString() === today.toDateString() && t.status !== 'done').length
     };
 
-    console.log('📊 MyTasks - Final stats:', stats);
     return stats;
   }, [myTasks]);
 
-  if (tasksLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -255,12 +260,12 @@ const StandardMyTasks = () => {
   }
 
   // Only show error alert if still loading (not for optimistic update errors during normal operation)
-  if (error && tasksLoading) {
+  if ((error || contextError) && loading) {
     return (
       <Alert variant="destructive" className="m-6">
         <AlertCircle className="h-4 w-4" />
         <AlertDescription>
-          Error loading tasks: {error}
+          Error loading tasks: {error || contextError}
         </AlertDescription>
       </Alert>
     );
@@ -279,16 +284,16 @@ const StandardMyTasks = () => {
   return (
     <div className="space-y-6">
       {/* Error Toast for Optimistic Update Failures */}
-      {error && !tasksLoading && (
+      {(error || contextError) && !loading && (
         <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-top-2 duration-300">
           <Alert variant="destructive" className="max-w-md shadow-lg">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription className="flex items-center justify-between">
-              <span>{error}</span>
+              <span>{error || contextError}</span>
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => {/* Error will auto-clear after 5s */ }}
+                onClick={() => setError(null)}
                 className="h-6 w-6 p-0 ml-2"
               >
                 <X className="h-4 w-4" />
@@ -307,18 +312,16 @@ const StandardMyTasks = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {refreshTasks && (
-            <Button
-              onClick={handleManualRefresh}
-              variant="outline"
-              size="sm"
-              disabled={isRefreshing}
-              className="flex items-center gap-2"
-            >
-              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-              {isRefreshing ? 'Refreshing...' : 'Refresh'}
-            </Button>
-          )}
+          <Button
+            onClick={handleManualRefresh}
+            variant="outline"
+            size="sm"
+            disabled={isRefreshing}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? 'Refreshing...' : 'Refresh'}
+          </Button>
           <Button
             onClick={toggleChatbot}
             variant="outline"
@@ -417,7 +420,7 @@ const StandardMyTasks = () => {
             onClick={() => setFilter('all')}
             className={filter === 'all' ? 'bg-homemade-orange hover:bg-homemade-orange-dark' : ''}
           >
-            All
+            all
           </Button>
           <Button
             variant={filter === 'today' ? 'default' : 'outline'}

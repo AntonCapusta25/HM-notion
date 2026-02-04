@@ -4,6 +4,15 @@ import { Plus, Calendar, BarChart3, Grid3X3, List, RefreshCw, MessageCircle, X, 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { TaskCard } from './TaskCard';
 import { CreateTaskDialog } from './CreateTaskDialog';
@@ -43,7 +52,11 @@ export const Dashboard = () => {
     toggleSubtask,
     loading: tasksLoading,
     error,
-    refreshTasks
+    refreshTasks,
+    page,
+    totalTasks,
+    TASKS_PER_PAGE,
+    setPage
   } = useTaskContext();
 
   const [showCreateTask, setShowCreateTask] = useState(false);
@@ -728,6 +741,54 @@ export const Dashboard = () => {
           onAssignTask={(taskId, userIds) => handleUpdateTask(taskId, { assignees: userIds })}
         />
       )}
+
+      {/* Pagination Controls */}
+      {totalTasks > TASKS_PER_PAGE && (
+        <div className="flex justify-center mt-8 pb-8">
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  href="#"
+                  onClick={(e) => { e.preventDefault(); if (page > 1) setPage(page - 1); }}
+                  className={page === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                />
+              </PaginationItem>
+
+              {/* Generate page numbers */}
+              {Array.from({ length: Math.ceil(totalTasks / TASKS_PER_PAGE) }, (_, i) => i + 1)
+                .filter(p => p === 1 || p === Math.ceil(totalTasks / TASKS_PER_PAGE) || (p >= page - 1 && p <= page + 1))
+                .map((p, i, arr) => {
+                  // Handle ellipsis logic (simplified)
+                  const showEllipsisBefore = i > 0 && p > arr[i - 1] + 1;
+                  return (
+                    <div key={p} className="flex items-center">
+                      {showEllipsisBefore && <PaginationEllipsis />}
+                      <PaginationItem>
+                        <PaginationLink
+                          href="#"
+                          isActive={page === p}
+                          onClick={(e) => { e.preventDefault(); setPage(p); }}
+                        >
+                          {p}
+                        </PaginationLink>
+                      </PaginationItem>
+                    </div>
+                  );
+                })}
+
+              <PaginationItem>
+                <PaginationNext
+                  href="#"
+                  onClick={(e) => { e.preventDefault(); if (page < Math.ceil(totalTasks / TASKS_PER_PAGE)) setPage(page + 1); }}
+                  className={page >= Math.ceil(totalTasks / TASKS_PER_PAGE) ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
+
 
       {/* Enhanced Floating Chatbot */}
       <div className="fixed bottom-6 right-6 z-50">

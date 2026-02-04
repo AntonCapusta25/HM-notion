@@ -14,7 +14,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Users, Calendar, TrendingUp, RefreshCw } from 'lucide-react';
-import { Task, User } from '../types';
+import { Task, User, formatTaskFromSupabase } from '../types';
 import { useTheme } from '../contexts/ThemeContext';
 import { PremiumTeam } from '../components/premium/PremiumTeam';
 
@@ -32,135 +32,102 @@ const StandardTeam = () => {
   const { user } = useAuth();
   const { profile: userProfile } = useProfile();
 
+  // We still use context for actions, but NOT for tasks (as we need ALL tasks here)
   const {
-    tasks,
     users,
     workspaces,
     updateTask,
     addComment,
     toggleSubtask,
-    refreshTasks,
-    loading: tasksLoading,
-    error
+    error: contextError
   } = useTaskContext();
+
+  const [teamTasks, setTeamTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
-  const [dashboardStats, setDashboardStats] = useState<TeamDashboardStats | null>(null);
-  const [statsLoading, setStatsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Fetch team stats
-  const fetchTeamStats = useCallback(async () => {
-    if (!userProfile?.id) {
-      setStatsLoading(false);
-      return;
-    }
-
+  // FETCH ALL TASKS (No Pagination)
+  const fetchAllTasks = useCallback(async () => {
+    if (!user) return;
     try {
-      setStatsLoading(true);
+      setLoading(true);
       const { data, error } = await supabase
-        .rpc('get_dashboard_stats', { user_uuid: userProfile.id });
+        .from('tasks')
+        .select(`
+          *,
+          comments(id, content, author, created_at),
+          subtasks(id, title, completed, created_at),
+          task_tags(tag),
+          task_assignees(user_id)
+        `)
+        .order('created_at', { ascending: false });
 
-      if (data && !error) {
-        setDashboardStats(data);
-      } else {
-        console.error('Error fetching team stats:', error);
-      }
-    } catch (err) {
-      console.error('Failed to fetch team stats:', err);
+      if (error) throw error;
+
+      const formatted = (data || []).map(t => {
+        const ft = formatTaskFromSupabase(t);
+        ft.task_assignees = t.task_assignees || [];
+        return ft;
+      });
+
+      setTeamTasks(formatted);
+      setError(null);
+    } catch (err: any) {
+      console.error('Failed to fetch team tasks:', err);
+      setError(err.message);
     } finally {
-      setStatsLoading(false);
+      setLoading(false);
     }
-  }, [userProfile?.id]);
+  }, [user]);
 
   useEffect(() => {
-    fetchTeamStats();
-  }, [fetchTeamStats]);
+    fetchAllTasks();
+  }, [fetchAllTasks]);
 
-  // Manual refresh function
   const handleManualRefresh = useCallback(async () => {
-    if (!refreshTasks) return;
-
     setIsRefreshing(true);
-    console.log('🔄 Team - Manual refresh triggered');
-
-    try {
-      await refreshTasks();
-      await fetchTeamStats();
-      console.log('✅ Team - Manual refresh completed');
-    } catch (err) {
-      console.error('❌ Team - Manual refresh failed:', err);
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [refreshTasks, fetchTeamStats]);
+    await fetchAllTasks();
+    setIsRefreshing(false);
+  }, [fetchAllTasks]);
 
   // Enhanced task operations
   const handleUpdateTask = useCallback(async (taskId: string, updates: any) => {
-    try {
-      console.log('📝 Team - Updating task:', taskId);
-      await updateTask(taskId, updates);
-      console.log('✅ Team - Task update completed');
-    } catch (err) {
-      console.error('❌ Team - Failed to update task:', err);
-      throw err;
-    }
+    await updateTask(taskId, updates);
+    // Optimistic update local state
+    setTeamTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
   }, [updateTask]);
 
   const handleAddComment = useCallback(async (taskId: string, content: string) => {
-    try {
-      console.log('💬 Team - Adding comment to task:', taskId);
-      await addComment(taskId, content);
-      console.log('✅ Team - Comment added successfully');
-    } catch (err) {
-      console.error('❌ Team - Failed to add comment:', err);
-      throw err;
-    }
+    await addComment(taskId, content);
   }, [addComment]);
 
   const handleToggleSubtask = useCallback(async (taskId: string, subtaskId: string) => {
-    try {
-      console.log('☑️ Team - Toggling subtask:', subtaskId);
-      await toggleSubtask(taskId, subtaskId);
-      console.log('✅ Team - Subtask toggled successfully');
-    } catch (err) {
-      console.error('❌ Team - Failed to toggle subtask:', err);
-      throw err;
-    }
+    await toggleSubtask(taskId, subtaskId);
   }, [toggleSubtask]);
 
-  // Fixed: Use correct field names for filtering
   const filteredTasks = useMemo(() => {
-    let result = tasks || [];
+    let result = teamTasks || [];
 
     if (selectedWorkspace) {
-      // Fixed: Filter by workspace_id (correct field name)
       result = result.filter(task => task.workspace_id === selectedWorkspace);
     }
 
     if (selectedUser) {
-      // Fixed: Filter by assignees array instead of assignedTo
       result = result.filter(task =>
         task.assignees && task.assignees.includes(selectedUser)
       );
     }
 
     return result;
-  }, [tasks, selectedWorkspace, selectedUser]);
+  }, [teamTasks, selectedWorkspace, selectedUser]);
 
-  // Fixed: Use correct field names for stats calculation
+  // Client-side stats calculation (Accurate now because we have ALL tasks)
   const teamStats = useMemo(() => {
-    if (dashboardStats) {
-      return {
-        totalTasks: dashboardStats.total_tasks,
-        inProgress: dashboardStats.in_progress_tasks,
-        completed: dashboardStats.done_tasks,
-        overdue: dashboardStats.overdue_tasks
-      };
-    }
-
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -178,12 +145,10 @@ const StandardTeam = () => {
         }
       }).length
     };
-  }, [dashboardStats, filteredTasks]);
+  }, [filteredTasks]);
 
-  // Fixed: Use correct field names for user stats
   const userStats = useMemo(() => {
     return users.map(user => {
-      // Fixed: Filter by assignees array
       const userTasks = filteredTasks.filter(t =>
         t.assignees && t.assignees.includes(user.id)
       );
@@ -221,29 +186,8 @@ const StandardTeam = () => {
     done: filteredTasks.filter(t => t.status === 'done')
   }), [filteredTasks]);
 
-  // Fixed: Updated to use correct assignees field structure
-  const handleAssignTask = useCallback(async (taskId: string, userId: string) => {
-    try {
-      console.log('👤 Team - Assigning task:', taskId, 'to user:', userId);
 
-      // Get current task to preserve existing assignees
-      const currentTask = tasks.find(t => t.id === taskId);
-      const currentAssignees = currentTask?.assignees || [];
-
-      // Add user if not already assigned
-      const newAssignees = currentAssignees.includes(userId)
-        ? currentAssignees
-        : [...currentAssignees, userId];
-
-      await handleUpdateTask(taskId, { assignees: newAssignees });
-      console.log('✅ Team - Task assignment completed');
-    } catch (err) {
-      console.error('❌ Team - Failed to assign task:', err);
-      throw err;
-    }
-  }, [tasks, handleUpdateTask]);
-
-  if (tasksLoading || statsLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -254,11 +198,11 @@ const StandardTeam = () => {
     );
   }
 
-  if (error) {
+  if (error || contextError) {
     return (
       <Alert variant="destructive" className="m-6">
         <AlertDescription>
-          Error loading team data: {error}
+          Error loading team data: {error || contextError}
         </AlertDescription>
       </Alert>
     );
@@ -282,18 +226,16 @@ const StandardTeam = () => {
           <p className="text-gray-600 mt-1">Track team progress and collaboration</p>
         </div>
 
-        {refreshTasks && (
-          <Button
-            onClick={handleManualRefresh}
-            variant="outline"
-            size="sm"
-            disabled={isRefreshing}
-            className="flex items-center gap-2"
-          >
-            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-            {isRefreshing ? 'Refreshing...' : 'Refresh'}
-          </Button>
-        )}
+        <Button
+          onClick={handleManualRefresh}
+          variant="outline"
+          size="sm"
+          disabled={isRefreshing}
+          className="flex items-center gap-2"
+        >
+          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+          {isRefreshing ? 'Refreshing...' : 'Refresh'}
+        </Button>
       </div>
 
       {/* Stats Cards */}
