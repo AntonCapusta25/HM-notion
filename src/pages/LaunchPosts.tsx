@@ -2,22 +2,90 @@ import { useState } from 'react';
 import { Layout } from '../components/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Rocket, Sparkles, Image, Layers, Download, Save, Loader2 } from 'lucide-react';
+import { Rocket, Sparkles, Image, Palette, Download, Save, Loader2 } from 'lucide-react';
 import { LaunchPostTemplate, LaunchPostPrompt } from '@/types/launchPosts';
 import { TemplateManager } from '@/components/LaunchPosts/TemplateManager';
 import { PromptEditor } from '@/components/LaunchPosts/PromptEditor';
 import { ImageGenerator } from '@/components/LaunchPosts/ImageGenerator';
-import { BackgroundProcessor } from '@/components/LaunchPosts/BackgroundProcessor';
-import { ExportPanel } from '@/components/LaunchPosts/ExportPanel';
+import { SimplePromptEditor } from '@/components/LaunchPosts/SimplePromptEditor';
+import { CanvasEditor } from '@/components/LaunchPosts/CanvasEditor';
 import { createTemplate } from '@/utils/launchPostsApi';
 import { useToast } from '@/hooks/use-toast';
 
 export default function LaunchPosts() {
-    const [currentStep, setCurrentStep] = useState(1);
+    // Default prompt structure
+    const DEFAULT_PROMPT: LaunchPostPrompt = {
+        camera: {
+            model: 'Canon EOS R5',
+            lens: '50mm',
+            aperture: 'f/5.6',
+            shutter: '1/200',
+            iso: '100',
+            framing: 'Medium shot',
+            angle: 'Eye-level',
+            movement: 'Static'
+        },
+        subject: {
+            primary: '',
+            secondary: 'Clean background',
+            pose: 'Centered',
+            expression: 'N/A',
+            build: 'N/A'
+        },
+        character: {
+            hair: 'N/A',
+            wardrobeNotes: 'N/A',
+            props: []
+        },
+        materialPhysics: {
+            fabricBehavior: 'N/A',
+            surfaceQuality: 'High quality texture',
+            lightInteraction: 'Natural reflection'
+        },
+        skinRendering: {
+            textureDetail: 'N/A',
+            finish: 'N/A',
+            retouchingStyle: 'N/A'
+        },
+        composition: {
+            theory: 'Rule of thirds',
+            depth: 'Medium depth of field',
+            focus: 'Sharp focus on subject'
+        },
+        setting: {
+            environment: 'Studio setting',
+            timeOfDay: 'Daytime',
+            atmosphere: 'Bright and airy',
+            shadowPlay: 'Soft shadows'
+        },
+        lighting: {
+            source: 'Natural light',
+            direction: 'Side lighting',
+            quality: 'Soft diffused',
+            colorTemperature: 'Neutral'
+        },
+        style: {
+            artDirection: 'Professional food photography',
+            mood: 'Appetizing',
+            references: []
+        },
+        rendering: {
+            engine: 'Photorealistic',
+            fidelitySpec: 'High resolution',
+            postProcessing: 'Color correction'
+        },
+        colorPlate: {
+            primaryColors: ['#FFFFFF', '#E67E22'],
+            accentColors: ['#000000']
+        },
+        negative_prompt: 'text, watermark, low quality, blurry, distorted'
+    };
+
+    const [currentStep, setCurrentStep] = useState(2); // Start at Customize step
+    const [isAdvancedMode, setIsAdvancedMode] = useState(false);
     const [selectedTemplate, setSelectedTemplate] = useState<LaunchPostTemplate | null>(null);
-    const [currentPrompt, setCurrentPrompt] = useState<LaunchPostPrompt | null>(null);
+    const [currentPrompt, setCurrentPrompt] = useState<LaunchPostPrompt | null>(DEFAULT_PROMPT);
     const [generatedImage, setGeneratedImage] = useState<string | null>(null);
-    const [processedImage, setProcessedImage] = useState<string | null>(null);
     const [isSavingTemplate, setIsSavingTemplate] = useState(false);
     const [refreshTemplatesTrigger, setRefreshTemplatesTrigger] = useState(0);
     const { toast } = useToast();
@@ -26,13 +94,13 @@ export default function LaunchPosts() {
         { id: 1, name: 'Template', icon: Sparkles, description: 'Choose or create a template' },
         { id: 2, name: 'Customize', icon: Image, description: 'Customize your prompt' },
         { id: 3, name: 'Generate', icon: Rocket, description: 'Generate your image' },
-        { id: 4, name: 'Process', icon: Layers, description: 'Remove background & compose' },
-        { id: 5, name: 'Export', icon: Download, description: 'Download final image' },
+        { id: 4, name: 'Design', icon: Palette, description: 'Design & Export' },
     ];
 
     const handleSelectTemplate = (template: LaunchPostTemplate) => {
         setSelectedTemplate(template);
         setCurrentPrompt(template.prompt);
+        setCurrentStep(2); // Go to Customize step after selection
     };
 
     const handleNext = () => {
@@ -52,15 +120,7 @@ export default function LaunchPosts() {
             });
             return;
         }
-        if (currentStep === 4 && !processedImage) {
-            toast({
-                title: "Image not processed",
-                description: "Please process the image first.",
-                variant: "destructive"
-            });
-            return;
-        }
-        setCurrentStep(Math.min(5, currentStep + 1));
+        setCurrentStep(Math.min(4, currentStep + 1));
     };
 
     const handlePrevious = () => {
@@ -105,82 +165,10 @@ export default function LaunchPosts() {
         setGeneratedImage(imageUrl);
     };
 
-    const handleImageProcessed = (imageUrl: string) => {
-        setProcessedImage(imageUrl);
-    };
-
     const handleCreateTemplate = () => {
-        // Initialize with default empty/skeleton prompt
-        const defaultPrompt: LaunchPostPrompt = {
-            camera: {
-                model: 'Canon EOS R5',
-                lens: '50mm',
-                aperture: 'f/5.6',
-                shutter: '1/200',
-                iso: '100',
-                framing: 'Medium shot',
-                angle: 'Eye-level',
-                movement: 'Static'
-            },
-            subject: {
-                primary: 'A delicious food item',
-                secondary: 'Clean background',
-                pose: 'Centered',
-                expression: 'N/A',
-                build: 'N/A'
-            },
-            character: {
-                hair: 'N/A',
-                wardrobeNotes: 'N/A',
-                props: []
-            },
-            materialPhysics: {
-                fabricBehavior: 'N/A',
-                surfaceQuality: 'High quality texture',
-                lightInteraction: 'Natural reflection'
-            },
-            skinRendering: {
-                textureDetail: 'N/A',
-                finish: 'N/A',
-                retouchingStyle: 'N/A'
-            },
-            composition: {
-                theory: 'Rule of thirds',
-                depth: 'Medium depth of field',
-                focus: 'Sharp focus on subject'
-            },
-            setting: {
-                environment: 'Studio setting',
-                timeOfDay: 'Daytime',
-                atmosphere: 'Bright and airy',
-                shadowPlay: 'Soft shadows'
-            },
-            lighting: {
-                source: 'Natural light',
-                direction: 'Side lighting',
-                quality: 'Soft diffused',
-                colorTemperature: 'Neutral'
-            },
-            style: {
-                artDirection: 'Professional food photography',
-                mood: 'Appetizing',
-                references: []
-            },
-            rendering: {
-                engine: 'Photorealistic',
-                fidelitySpec: 'High resolution',
-                postProcessing: 'Color correction'
-            },
-            colorPlate: {
-                primaryColors: ['#FFFFFF', '#E67E22'],
-                accentColors: ['#000000']
-            },
-            negative_prompt: 'text, watermark, low quality, blurry, distorted'
-        };
-
-        setCurrentPrompt(defaultPrompt);
-        setSelectedTemplate(null); // Clear selected template since this is new
-        setCurrentStep(2); // Go to Customize step
+        setCurrentPrompt(DEFAULT_PROMPT);
+        setSelectedTemplate(null);
+        setCurrentStep(2);
     };
 
     return (
@@ -240,19 +228,30 @@ export default function LaunchPosts() {
                                 <CardTitle>{steps[currentStep - 1].name}</CardTitle>
                                 <CardDescription>{steps[currentStep - 1].description}</CardDescription>
                             </div>
-                            {currentStep === 2 && currentPrompt && (
-                                <Button
-                                    variant="outline"
-                                    onClick={saveAsTemplate}
-                                    disabled={isSavingTemplate}
-                                >
-                                    {isSavingTemplate ? (
-                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                    ) : (
-                                        <Save className="h-4 w-4 mr-2" />
+                            {currentStep === 2 && (
+                                <div className="flex gap-2">
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => setCurrentStep(1)}
+                                    >
+                                        <Sparkles className="h-4 w-4 mr-2" />
+                                        Templates
+                                    </Button>
+                                    {currentPrompt && (
+                                        <Button
+                                            variant="outline"
+                                            onClick={saveAsTemplate}
+                                            disabled={isSavingTemplate}
+                                        >
+                                            {isSavingTemplate ? (
+                                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                            ) : (
+                                                <Save className="h-4 w-4 mr-2" />
+                                            )}
+                                            Save as Template
+                                        </Button>
                                     )}
-                                    Save as Template
-                                </Button>
+                                </div>
                             )}
                         </div>
                     </CardHeader>
@@ -269,10 +268,31 @@ export default function LaunchPosts() {
 
                         {/* Step 2: Customize Prompt */}
                         {currentStep === 2 && currentPrompt && (
-                            <PromptEditor
-                                prompt={currentPrompt}
-                                onChange={setCurrentPrompt}
-                            />
+                            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                {isAdvancedMode ? (
+                                    <div className="space-y-4">
+                                        <div className="flex justify-end">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => setIsAdvancedMode(false)}
+                                            >
+                                                Back to Simple Mode
+                                            </Button>
+                                        </div>
+                                        <PromptEditor
+                                            prompt={currentPrompt}
+                                            onChange={setCurrentPrompt}
+                                        />
+                                    </div>
+                                ) : (
+                                    <SimplePromptEditor
+                                        prompt={currentPrompt}
+                                        onChange={setCurrentPrompt}
+                                        onToggleAdvanced={() => setIsAdvancedMode(true)}
+                                    />
+                                )}
+                            </div>
                         )}
 
                         {/* Step 3: Generate Image */}
@@ -283,19 +303,11 @@ export default function LaunchPosts() {
                             />
                         )}
 
-                        {/* Step 4: Process Background */}
+                        {/* Step 4: Design & Export */}
                         {currentStep === 4 && generatedImage && (
-                            <BackgroundProcessor
-                                originalImage={generatedImage}
-                                onProcessed={handleImageProcessed}
-                            />
-                        )}
-
-                        {/* Step 5: Export */}
-                        {currentStep === 5 && processedImage && selectedTemplate && (
-                            <ExportPanel
-                                finalImage={processedImage}
-                                templateName={selectedTemplate.name}
+                            <CanvasEditor
+                                mainImage={generatedImage}
+                                onSave={(url) => console.log('Design saved:', url)}
                             />
                         )}
 
@@ -304,16 +316,16 @@ export default function LaunchPosts() {
                             <Button
                                 variant="outline"
                                 onClick={handlePrevious}
-                                disabled={currentStep === 1}
+                                disabled={currentStep <= 2}
                             >
                                 Previous
                             </Button>
                             <Button
                                 onClick={handleNext}
-                                disabled={currentStep === 5}
+                                disabled={currentStep === 4}
                                 className="bg-homemade-orange hover:bg-homemade-orange-dark"
                             >
-                                {currentStep === 5 ? 'Done' : 'Next'}
+                                {currentStep === 4 ? 'Done' : 'Next'}
                             </Button>
                         </div>
                     </CardContent>
