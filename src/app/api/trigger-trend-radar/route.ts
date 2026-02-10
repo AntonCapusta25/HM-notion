@@ -1,29 +1,46 @@
-export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
+export const runtime = 'edge';
 
 export async function POST() {
     try {
-        const { exec } = await import('child_process');
-        const { promisify } = await import('util');
-        const execAsync = promisify(exec);
+        console.log('🚀 Triggering Trend Radar pipeline via GitHub Actions...');
 
-        console.log('🚀 Triggering Trend Radar pipeline...');
+        // Trigger GitHub Actions workflow
+        const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+        const GITHUB_REPO = process.env.GITHUB_REPO || 'AntonCapusta25/HM-notion';
 
-        // Get the project root
-        const projectRoot = process.cwd();
+        if (!GITHUB_TOKEN) {
+            return new Response(JSON.stringify({
+                success: false,
+                error: 'GitHub token not configured. Set GITHUB_TOKEN in Netlify env vars.'
+            }), {
+                status: 500,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
 
-        // Run the pipeline in the background (don't wait for completion)
-        exec(`cd ${projectRoot}/trend_engine && python3 main.py --run > /tmp/trend-radar.log 2>&1 &`, (error) => {
-            if (error) {
-                console.error('Pipeline start error:', error);
-            } else {
-                console.log('Pipeline started successfully');
+        const response = await fetch(
+            `https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/daily-trend-radar.yml/dispatches`,
+            {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${GITHUB_TOKEN}`,
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    ref: 'main'
+                })
             }
-        });
+        );
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`GitHub API error: ${response.status} - ${errorText}`);
+        }
 
         return new Response(JSON.stringify({
             success: true,
-            message: 'Pipeline started! Check your email in 5-10 minutes.'
+            message: 'Pipeline triggered via GitHub Actions! Check your email in 5-10 minutes.'
         }), {
             status: 200,
             headers: { 'Content-Type': 'application/json' }
