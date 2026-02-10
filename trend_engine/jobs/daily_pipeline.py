@@ -102,17 +102,27 @@ def run_pipeline():
     print(f"   🎯 Found {len(viral_candidates)} viral candidates (Score >= {VIRAL_THRESHOLD_SCORE})")
     print("=" * 60)
 
-    # Scrape Cultural Trends
+    # Scrape Cultural Trends (Holidays, Festivals, Sports Events)
     print("\n🌍 Scraping Cultural Trends...")
     cultural_trends = get_cultural_trends()
-    print(f"   ✅ Found {len(cultural_trends)} cultural trends")
+    
+    # Flatten all events into a single list for AI analysis
+    all_events = []
+    all_events.extend(cultural_trends.get('holidays', []))
+    all_events.extend(cultural_trends.get('festivals', []))
+    all_events.extend(cultural_trends.get('sports_events', []))
+    
+    print(f"   ✅ Found {len(all_events)} upcoming events")
+    print(f"      Holidays: {len(cultural_trends.get('holidays', []))}")
+    print(f"      Festivals: {len(cultural_trends.get('festivals', []))}")
+    print(f"      Sports: {len(cultural_trends.get('sports_events', []))}")
     print("=" * 60)
     
     # 3. AI Analysis - Analyze ALL viral candidates + cultural trends
     content_ideas_data = {}
     if viral_candidates:
-        print(f"\n🤖 Analyzing ALL {len(viral_candidates)} viral posts + cultural trends...")
-        content_ideas_data = analyze_trends_for_content_ideas(viral_candidates, cultural_trends)
+        print(f"\n🤖 Analyzing ALL {len(viral_candidates)} viral posts + {len(all_events)} cultural events...")
+        content_ideas_data = analyze_trends_for_content_ideas(viral_candidates, all_events)
         
         b2c_count = len(content_ideas_data.get('b2c_content_ideas', []))
         b2b_count = len(content_ideas_data.get('b2b_content_ideas', []))
@@ -143,10 +153,23 @@ def run_pipeline():
                     event_data = {
                         "event_name": highlight.get('trend', ''),
                         "event_type": "cultural_trend",
-                        "event_date": None,  # AI should provide this in future
+                        "event_date": None,
                         "opportunity": highlight.get('opportunity', ''),
                         "urgency": highlight.get('urgency', ''),
                         "source": "ai_analysis"
+                    }
+                    if db.save_event(event_data):
+                        events_saved += 1
+                
+                # Also save the actual calendar events (holidays, festivals, sports)
+                for event in all_events:
+                    event_data = {
+                        "event_name": event.get('name', ''),
+                        "event_type": event.get('type', 'event'),
+                        "event_date": event.get('date'),
+                        "opportunity": event.get('opportunity', ''),
+                        "urgency": event.get('urgency', ''),
+                        "source": "calendar"
                     }
                     if db.save_event(event_data):
                         events_saved += 1

@@ -70,6 +70,29 @@ def build_html_report(content_ideas_data):
     # Build trending themes HTML
     themes_html = "".join([f"<span style='background: #9b59b6; color: white; padding: 6px 16px; border-radius: 20px; margin: 5px; display: inline-block;'>{theme}</span>" for theme in trending_themes])
     
+    # Build cultural highlights HTML
+    cultural_highlights = content_ideas_data.get('cultural_highlights', [])
+    cultural_highlights_html = ""
+    if cultural_highlights:
+        highlights_items = ""
+        for highlight in cultural_highlights:
+            highlights_items += f"""
+            <div style="background: white; padding: 15px; margin-bottom: 15px; border-radius: 8px; border-left: 4px solid #e74c3c;">
+                <h4 style="color: #e74c3c; margin: 0 0 8px 0; font-size: 16px;">🔥 {highlight.get('trend', 'Unknown Trend')}</h4>
+                <p style="margin: 5px 0; color: #34495e;"><strong>Opportunity:</strong> {highlight.get('opportunity', 'N/A')}</p>
+                <p style="margin: 5px 0; color: #7f8c8d; font-size: 14px;"><strong>Act:</strong> {highlight.get('urgency', 'N/A')}</p>
+            </div>
+            """
+        
+        cultural_highlights_html = f"""
+        <div style="background: #fef5e7; padding: 25px; border-radius: 8px; margin-bottom: 30px;">
+            <h2 style="color: #d35400; margin: 0 0 15px 0; font-size: 22px;">🌍 Cultural Moments to Leverage</h2>
+            <p style="color: #7f8c8d; margin: 0 0 20px 0;">Tie your content to what's happening now:</p>
+            {highlights_items}
+        </div>
+        """
+    
+    
     html = f"""
     <!DOCTYPE html>
     <html>

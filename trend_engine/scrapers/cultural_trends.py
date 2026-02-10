@@ -1,113 +1,202 @@
 import requests
+from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
-from datetime import datetime
 
 def get_cultural_trends():
     """
-    Scrapes trending topics from multiple sources:
-    - Reddit r/all for viral memes and trends
-    - Google Trends (via RSS)
-    - Twitter/X trending topics (if accessible)
+    Scrapes cultural events, holidays, and festivals.
+    Returns a structured list of events with dates.
     """
     trends = {
-        "viral_memes": [],
-        "trending_topics": [],
+        "holidays": [],
+        "festivals": [],
         "sports_events": [],
-        "entertainment": []
+        "cultural_moments": []
     }
     
-    print("🌍 Scraper: Fetching cultural trends...")
+    print("🌍 Scraper: Fetching cultural events and holidays...")
     
-    # 1. Reddit r/all for viral content
-    try:
-        print("   Checking Reddit r/all...")
-        response = requests.get(
-            "https://www.reddit.com/r/all.json",
-            headers={"User-Agent": "Mozilla/5.0"}
-        )
-        if response.status_code == 200:
-            data = response.json()
-            posts = data.get('data', {}).get('children', [])[:10]
-            
-            for post in posts:
-                post_data = post.get('data', {})
-                trends["viral_memes"].append({
-                    "title": post_data.get('title', ''),
-                    "subreddit": post_data.get('subreddit', ''),
-                    "upvotes": post_data.get('ups', 0),
-                    "url": f"https://reddit.com{post_data.get('permalink', '')}",
-                    "type": "reddit_viral"
-                })
-    except Exception as e:
-        print(f"   ⚠️ Error fetching Reddit trends: {e}")
+    # 1. Get upcoming holidays (hardcoded calendar + API)
+    print("   Checking upcoming holidays...")
+    holidays = get_upcoming_holidays()
+    trends["holidays"].extend(holidays)
     
-    # 2. Google Trends via RSS (trending searches)
-    try:
-        print("   Checking Google Trends...")
-        response = requests.get(
-            "https://trends.google.com/trends/trendingsearches/daily/rss?geo=US",
-            headers={"User-Agent": "Mozilla/5.0"}
-        )
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.content, 'xml')
-            items = soup.find_all('item')[:10]
-            
-            for item in items:
-                title = item.find('title')
-                traffic = item.find('ht:approx_traffic')
-                
-                trends["trending_topics"].append({
-                    "title": title.text if title else "Unknown",
-                    "traffic": traffic.text if traffic else "Unknown",
-                    "type": "google_trend"
-                })
-    except Exception as e:
-        print(f"   ⚠️ Error fetching Google Trends: {e}")
+    # 2. Get festivals and cultural events
+    print("   Checking festivals and cultural events...")
+    festivals = get_festivals()
+    trends["festivals"].extend(festivals)
     
-    # 3. Reddit r/sports for sports events
-    try:
-        print("   Checking sports events...")
-        response = requests.get(
-            "https://www.reddit.com/r/sports.json",
-            headers={"User-Agent": "Mozilla/5.0"}
-        )
-        if response.status_code == 200:
-            data = response.json()
-            posts = data.get('data', {}).get('children', [])[:5]
-            
-            for post in posts:
-                post_data = post.get('data', {})
-                trends["sports_events"].append({
-                    "title": post_data.get('title', ''),
-                    "upvotes": post_data.get('ups', 0),
-                    "type": "sports"
-                })
-    except Exception as e:
-        print(f"   ⚠️ Error fetching sports: {e}")
-    
-    # 4. Reddit r/movies and r/entertainment
-    try:
-        print("   Checking entertainment trends...")
-        response = requests.get(
-            "https://www.reddit.com/r/movies.json",
-            headers={"User-Agent": "Mozilla/5.0"}
-        )
-        if response.status_code == 200:
-            data = response.json()
-            posts = data.get('data', {}).get('children', [])[:5]
-            
-            for post in posts:
-                post_data = post.get('data', {})
-                trends["entertainment"].append({
-                    "title": post_data.get('title', ''),
-                    "upvotes": post_data.get('ups', 0),
-                    "type": "entertainment"
-                })
-    except Exception as e:
-        print(f"   ⚠️ Error fetching entertainment: {e}")
-    
-    total = (len(trends["viral_memes"]) + len(trends["trending_topics"]) + 
-             len(trends["sports_events"]) + len(trends["entertainment"]))
-    print(f"   ✅ Found {total} cultural trends")
+    # 3. Get major sports events
+    print("   Checking major sports events...")
+    sports = get_sports_events()
+    trends["sports_events"].extend(sports)
     
     return trends
+
+def get_upcoming_holidays():
+    """
+    Returns upcoming holidays with dates and content opportunities.
+    """
+    current_date = datetime.now()
+    current_year = current_date.year
+    
+    # Comprehensive holiday calendar
+    holidays_calendar = [
+        # February
+        {"name": "Valentine's Day", "date": f"{current_year}-02-14", "type": "holiday", 
+         "opportunity": "Romantic dinner packages, couples cooking classes, aphrodisiac ingredients spotlight",
+         "urgency": "Plan content 1 week before"},
+        
+        # March
+        {"name": "International Women's Day", "date": f"{current_year}-03-08", "type": "holiday",
+         "opportunity": "Feature female chefs, women-owned food businesses, empowerment through cooking",
+         "urgency": "Plan content 1 week before"},
+        {"name": "St. Patrick's Day", "date": f"{current_year}-03-17", "type": "holiday",
+         "opportunity": "Irish-inspired dishes, green food creations, pub-style meals",
+         "urgency": "Plan content 1 week before"},
+        
+        # April
+        {"name": "Easter", "date": f"{current_year}-04-20", "type": "holiday",
+         "opportunity": "Brunch specials, egg-based dishes, spring ingredients, family meal packages",
+         "urgency": "Plan content 2 weeks before"},
+        {"name": "Earth Day", "date": f"{current_year}-04-22", "type": "holiday",
+         "opportunity": "Sustainable cooking, zero-waste recipes, local ingredients focus",
+         "urgency": "Plan content 1 week before"},
+        
+        # May
+        {"name": "Mother's Day", "date": f"{current_year}-05-11", "type": "holiday",
+         "opportunity": "Breakfast in bed kits, mom's favorite recipes, family cooking experiences",
+         "urgency": "Plan content 2 weeks before"},
+        {"name": "Memorial Day", "date": f"{current_year}-05-26", "type": "holiday",
+         "opportunity": "BBQ packages, summer kickoff meals, outdoor cooking",
+         "urgency": "Plan content 1 week before"},
+        
+        # June
+        {"name": "Father's Day", "date": f"{current_year}-06-15", "type": "holiday",
+         "opportunity": "Grilling masterclasses, dad's favorite comfort foods, BBQ specials",
+         "urgency": "Plan content 2 weeks before"},
+        
+        # July
+        {"name": "Independence Day (US)", "date": f"{current_year}-07-04", "type": "holiday",
+         "opportunity": "American classics, BBQ catering, patriotic-themed meals",
+         "urgency": "Plan content 2 weeks before"},
+        
+        # October
+        {"name": "Halloween", "date": f"{current_year}-10-31", "type": "holiday",
+         "opportunity": "Spooky-themed dishes, pumpkin recipes, party catering",
+         "urgency": "Plan content 2 weeks before"},
+        
+        # November
+        {"name": "Thanksgiving", "date": f"{current_year}-11-27", "type": "holiday",
+         "opportunity": "Full turkey dinner packages, sides, leftover transformation recipes",
+         "urgency": "Plan content 3 weeks before"},
+        
+        # December
+        {"name": "Christmas", "date": f"{current_year}-12-25", "type": "holiday",
+         "opportunity": "Holiday feast packages, cookie decorating, festive meal prep",
+         "urgency": "Plan content 4 weeks before"},
+        {"name": "New Year's Eve", "date": f"{current_year}-12-31", "type": "holiday",
+         "opportunity": "Party catering, champagne pairings, midnight snack boxes",
+         "urgency": "Plan content 2 weeks before"},
+    ]
+    
+    # Filter to only upcoming holidays (within next 90 days)
+    upcoming = []
+    for holiday in holidays_calendar:
+        holiday_date = datetime.strptime(holiday["date"], "%Y-%m-%d")
+        days_until = (holiday_date - current_date).days
+        
+        if 0 <= days_until <= 90:  # Next 3 months
+            holiday["days_until"] = days_until
+            upcoming.append(holiday)
+    
+    return upcoming
+
+def get_festivals():
+    """
+    Returns major food and cultural festivals.
+    """
+    current_date = datetime.now()
+    current_year = current_date.year
+    
+    festivals_calendar = [
+        # Food Festivals
+        {"name": "Amsterdam Restaurant Week", "date": f"{current_year}-03-01", "type": "festival",
+         "opportunity": "Showcase your best dishes, special tasting menus, collaborate with local restaurants",
+         "urgency": "Apply 6 weeks before"},
+        
+        {"name": "King's Day (Netherlands)", "date": f"{current_year}-04-27", "type": "festival",
+         "opportunity": "Orange-themed dishes, Dutch classics, street food specials",
+         "urgency": "Plan content 3 weeks before"},
+        
+        {"name": "Taste of Amsterdam", "date": f"{current_year}-06-15", "type": "festival",
+         "opportunity": "Feature local ingredients, Dutch cuisine, chef collaborations",
+         "urgency": "Plan content 4 weeks before"},
+        
+        {"name": "Oktoberfest", "date": f"{current_year}-09-21", "type": "festival",
+         "opportunity": "German-inspired dishes, beer pairings, hearty comfort food",
+         "urgency": "Plan content 3 weeks before"},
+    ]
+    
+    # Filter to upcoming festivals
+    upcoming = []
+    for festival in festivals_calendar:
+        festival_date = datetime.strptime(festival["date"], "%Y-%m-%d")
+        days_until = (festival_date - current_date).days
+        
+        if 0 <= days_until <= 120:  # Next 4 months
+            festival["days_until"] = days_until
+            upcoming.append(festival)
+    
+    return upcoming
+
+def get_sports_events():
+    """
+    Returns major sports events that drive food/catering demand.
+    """
+    current_date = datetime.now()
+    current_year = current_date.year
+    
+    sports_calendar = [
+        {"name": "Super Bowl", "date": f"{current_year}-02-09", "type": "sports",
+         "opportunity": "Game day platters, wings, dips, party catering packages",
+         "urgency": "Plan content 2 weeks before"},
+        
+        {"name": "March Madness", "date": f"{current_year}-03-19", "type": "sports",
+         "opportunity": "Watch party catering, snack boxes, bracket-themed promotions",
+         "urgency": "Plan content 2 weeks before"},
+        
+        {"name": "UEFA Champions League Final", "date": f"{current_year}-05-31", "type": "sports",
+         "opportunity": "Football watch party catering, European-inspired dishes",
+         "urgency": "Plan content 2 weeks before"},
+        
+        {"name": "FIFA World Cup (if applicable)", "date": f"{current_year}-11-21", "type": "sports",
+         "opportunity": "International cuisine, watch party packages, themed menus",
+         "urgency": "Plan content 4 weeks before"},
+    ]
+    
+    # Filter to upcoming events
+    upcoming = []
+    for event in sports_calendar:
+        event_date = datetime.strptime(event["date"], "%Y-%m-%d")
+        days_until = (event_date - current_date).days
+        
+        if 0 <= days_until <= 90:  # Next 3 months
+            event["days_until"] = days_until
+            upcoming.append(event)
+    
+    return upcoming
+
+if __name__ == "__main__":
+    trends = get_cultural_trends()
+    print("\n📅 Upcoming Holidays:")
+    for h in trends["holidays"]:
+        print(f"   {h['name']} - {h['date']} ({h['days_until']} days)")
+    
+    print("\n🎉 Upcoming Festivals:")
+    for f in trends["festivals"]:
+        print(f"   {f['name']} - {f['date']} ({f['days_until']} days)")
+    
+    print("\n⚽ Upcoming Sports Events:")
+    for s in trends["sports_events"]:
+        print(f"   {s['name']} - {s['date']} ({s['days_until']} days)")
