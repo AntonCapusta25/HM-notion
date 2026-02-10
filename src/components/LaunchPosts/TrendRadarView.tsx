@@ -14,7 +14,7 @@ import {
     RefreshCw,
     ExternalLink
 } from 'lucide-react';
-import { supabase } from '@/lib/supabaseClient';
+import { supabase } from '@/lib/supabase';
 
 interface ContentIdea {
     id: string;
