@@ -48,6 +48,7 @@ export function TrendRadarView() {
     const [events, setEvents] = useState<Event[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('all');
+    const [triggering, setTriggering] = useState(false);
 
     const fetchData = async () => {
         setLoading(true);
@@ -82,6 +83,31 @@ export function TrendRadarView() {
         fetchData();
     }, []);
 
+    const triggerPipeline = async () => {
+        setTriggering(true);
+        try {
+            const response = await fetch('/api/trigger-trend-radar', {
+                method: 'POST',
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to trigger pipeline');
+            }
+
+            alert('✅ Pipeline triggered! Check your email in 5-10 minutes.');
+
+            // Refresh data after a delay
+            setTimeout(() => {
+                fetchData();
+            }, 5000);
+        } catch (error) {
+            console.error('Error triggering pipeline:', error);
+            alert('❌ Failed to trigger pipeline. Check console for details.');
+        } finally {
+            setTriggering(false);
+        }
+    };
+
     const b2cIdeas = contentIdeas.filter(idea => idea.target_audience === 'B2C');
     const b2bIdeas = contentIdeas.filter(idea => idea.target_audience === 'B2B');
     const topIdeas = [...contentIdeas].sort((a, b) => b.viral_score - a.viral_score).slice(0, 10);
@@ -103,10 +129,16 @@ export function TrendRadarView() {
                         AI-powered content ideas and cultural calendar. Updated daily at 9:30 AM CET.
                     </p>
                 </div>
-                <Button onClick={fetchData} disabled={loading}>
-                    <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                    Refresh
-                </Button>
+                <div className="flex gap-2">
+                    <Button onClick={fetchData} disabled={loading} variant="outline">
+                        <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                        Refresh Data
+                    </Button>
+                    <Button onClick={triggerPipeline} disabled={triggering}>
+                        <Flame className={`w-4 h-4 mr-2 ${triggering ? 'animate-pulse' : ''}`} />
+                        {triggering ? 'Running...' : 'Run Pipeline & Send Email'}
+                    </Button>
+                </div>
             </div>
 
             {/* Stats Cards */}
