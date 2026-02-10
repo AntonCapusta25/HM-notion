@@ -33,27 +33,37 @@ Viral Score: {post.get('viral_score', 0)}/10
     # Prepare cultural trends summary
     cultural_text = ""
     if cultural_trends:
-        cultural_text = "\n\nCULTURAL TRENDS TODAY:\n"
+        cultural_text = "\n\nUPCOMING CULTURAL EVENTS:\n"
         
-        if cultural_trends.get('trending_topics'):
-            cultural_text += "\nGoogle Trending Searches:\n"
-            for topic in cultural_trends['trending_topics'][:5]:
-                cultural_text += f"- {topic.get('title', 'Unknown')} ({topic.get('traffic', 'Unknown')} searches)\n"
+        # Check if cultural_trends is a list (new structure) or dict (old structure support)
+        if isinstance(cultural_trends, list):
+            for event in cultural_trends[:10]:  # Limit to 10 events
+                name = event.get('event_name', 'Unknown Event')
+                date = event.get('event_date', 'Unknown Date')
+                opportunity = event.get('opportunity', '')
+                cultural_text += f"- {name} ({date}): {opportunity}\n"
         
-        if cultural_trends.get('viral_memes'):
-            cultural_text += "\nViral on Reddit:\n"
-            for meme in cultural_trends['viral_memes'][:5]:
-                cultural_text += f"- {meme.get('title', 'Unknown')} ({meme.get('upvotes', 0)} upvotes)\n"
-        
-        if cultural_trends.get('sports_events'):
-            cultural_text += "\nSports Events:\n"
-            for event in cultural_trends['sports_events'][:3]:
-                cultural_text += f"- {event.get('title', 'Unknown')}\n"
-        
-        if cultural_trends.get('entertainment'):
-            cultural_text += "\nEntertainment/Movies:\n"
-            for ent in cultural_trends['entertainment'][:3]:
-                cultural_text += f"- {ent.get('title', 'Unknown')}\n"
+        elif isinstance(cultural_trends, dict):
+            # Fallback for old structure if ever used
+            if cultural_trends.get('trending_topics'):
+                cultural_text += "\nGoogle Trending Searches:\n"
+                for topic in cultural_trends['trending_topics'][:5]:
+                    cultural_text += f"- {topic.get('title', 'Unknown')} ({topic.get('traffic', 'Unknown')} searches)\n"
+            
+            if cultural_trends.get('viral_memes'):
+                cultural_text += "\nViral on Reddit:\n"
+                for meme in cultural_trends['viral_memes'][:5]:
+                    cultural_text += f"- {meme.get('title', 'Unknown')} ({meme.get('upvotes', 0)} upvotes)\n"
+            
+            if cultural_trends.get('sports_events'):
+                cultural_text += "\nSports Events:\n"
+                for event in cultural_trends['sports_events'][:3]:
+                    cultural_text += f"- {event.get('title', 'Unknown')}\n"
+            
+            if cultural_trends.get('entertainment'):
+                cultural_text += "\nEntertainment/Movies:\n"
+                for ent in cultural_trends['entertainment'][:3]:
+                    cultural_text += f"- {ent.get('title', 'Unknown')}\n"
 
     prompt = f"""
 You are a content strategist for HomeMade Meals, a platform connecting home chefs with customers.
