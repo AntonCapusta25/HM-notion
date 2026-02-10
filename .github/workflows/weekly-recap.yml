@@ -1,0 +1,39 @@
+name: Weekly Recap
+
+on:
+  schedule:
+    # Run every Sunday at 10:00 UTC (11:00 AM CET/Amsterdam time)
+    - cron: "0 10 * * 0"
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  send-weekly-recap:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          cd trend_engine
+          pip install -r requirements.txt
+
+      - name: Run Weekly Recap
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
+        run: |
+          cd trend_engine
+          python jobs/weekly_recap.py
+
+      - name: Notify on failure
+        if: failure()
+        run: echo "Weekly Recap failed. Check logs."

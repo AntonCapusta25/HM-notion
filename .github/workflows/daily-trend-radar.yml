@@ -1,0 +1,43 @@
+name: Daily Trend Radar
+
+on:
+  schedule:
+    # Run daily at 8:30 UTC (9:30 AM CET/Amsterdam time)
+    - cron: "30 8 * * *"
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  run-trend-radar:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          cd trend_engine
+          pip install -r requirements.txt
+
+      - name: Install Playwright browsers
+        run: |
+          playwright install chromium
+
+      - name: Run Daily Trend Radar
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
+        run: |
+          cd trend_engine
+          python main.py --run
+
+      - name: Notify on failure
+        if: failure()
+        run: echo "Daily Trend Radar failed. Check logs."

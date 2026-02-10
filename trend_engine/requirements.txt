@@ -1,0 +1,7 @@
+requests
+beautifulsoup4
+google-genai
+python-dotenv
+supabase
+playwright
+lxml

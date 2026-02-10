@@ -3,7 +3,7 @@ import { Layout } from '../components/Layout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { JustDoItView } from '@/components/LaunchPosts/JustDoItView';
 import ForNerdsView from '@/components/LaunchPosts/ForNerdsView';
-import { Sparkles, Code2 } from 'lucide-react';
+import { Sparkles, Code2, TrendingUp } from 'lucide-react';
 import { SlotFillingView } from '@/components/LaunchPosts/SlotFillingView';
 import { STYLE_PRESETS } from '@/components/LaunchPosts/styles';
 import { SUBJECT_TYPES } from '@/components/LaunchPosts/subjectTypes';
@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { BrewingLoading } from '@/components/LaunchPosts/BrewingLoading';
 import { Button } from '@/components/ui/button';
 import { TemplateRenderer } from '@/components/LaunchPosts/TemplateRenderer';
+import { TrendRadarView } from '@/components/LaunchPosts/TrendRadarView';
 import { cn } from '@/lib/utils';
 
 export default function LaunchPosts() {
@@ -254,7 +255,7 @@ export default function LaunchPosts() {
                 </div>
 
                 <Tabs defaultValue="images" className="space-y-6">
-                    <TabsList className="grid w-full grid-cols-2 max-w-[400px]">
+                    <TabsList className="grid w-full grid-cols-3 max-w-[600px]">
                         <TabsTrigger value="templator" className="flex items-center gap-2">
                             <Sparkles className="w-4 h-4 text-purple-500" />
                             Templator
@@ -262,6 +263,10 @@ export default function LaunchPosts() {
                         <TabsTrigger value="images" className="flex items-center gap-2">
                             <Code2 className="w-4 h-4 text-blue-500" />
                             Images
+                        </TabsTrigger>
+                        <TabsTrigger value="trends" className="flex items-center gap-2">
+                            <TrendingUp className="w-4 h-4 text-red-500" />
+                            Trend Radar
                         </TabsTrigger>
                     </TabsList>
 
@@ -303,8 +308,12 @@ export default function LaunchPosts() {
                     <TabsContent value="images">
                         <ForNerdsView />
                     </TabsContent>
+
+                    <TabsContent value="trends">
+                        <TrendRadarView />
+                    </TabsContent>
                 </Tabs>
             </div>
-        </Layout>
+        </Layout >
     );
 }
