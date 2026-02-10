@@ -134,10 +134,12 @@ export function TrendRadarView() {
                         <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                         Refresh Data
                     </Button>
-                    <Button onClick={triggerPipeline} disabled={triggering}>
-                        <Flame className={`w-4 h-4 mr-2 ${triggering ? 'animate-pulse' : ''}`} />
-                        {triggering ? 'Running...' : 'Run Pipeline & Send Email'}
-                    </Button>
+                    {typeof window !== 'undefined' && window.location.hostname === 'localhost' && (
+                        <Button onClick={triggerPipeline} disabled={triggering}>
+                            <Flame className={`w-4 h-4 mr-2 ${triggering ? 'animate-pulse' : ''}`} />
+                            {triggering ? 'Running...' : 'Run Pipeline & Send Email'}
+                        </Button>
+                    )}
                 </div>
             </div>
 
