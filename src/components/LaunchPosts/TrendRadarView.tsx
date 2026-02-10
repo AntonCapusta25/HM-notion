@@ -135,9 +135,9 @@ export function TrendRadarView() {
                         Refresh Data
                     </Button>
                     {typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && (
-                        <Button onClick={triggerPipeline} disabled={triggering}>
-                            <Flame className={`w-4 h-4 mr-2 ${triggering ? 'animate-pulse' : ''}`} />
-                            {triggering ? 'Running...' : 'Run Pipeline & Send Email'}
+                        <Button onClick={triggerPipeline}>
+                            <Flame className="w-4 h-4 mr-2" />
+                            Copy Run Command
                         </Button>
                     )}
                 </div>
