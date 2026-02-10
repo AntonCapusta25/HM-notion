@@ -1,52 +1,41 @@
-export const runtime = 'edge';
-
 export async function POST() {
     try {
-        console.log('🚀 Triggering Trend Radar pipeline via GitHub Actions...');
+        // Only allow on localhost
+        const isDev = process.env.NODE_ENV === 'development';
 
-        // Trigger GitHub Actions workflow
-        const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-        const GITHUB_REPO = process.env.GITHUB_REPO || 'AntonCapusta25/HM-notion';
-
-        if (!GITHUB_TOKEN) {
+        if (!isDev) {
             return new Response(JSON.stringify({
                 success: false,
-                error: 'GitHub token not configured. Set GITHUB_TOKEN in Netlify env vars.'
+                error: 'This endpoint only works on localhost. Use GitHub Actions manual trigger for production.'
             }), {
-                status: 500,
+                status: 403,
                 headers: { 'Content-Type': 'application/json' }
             });
         }
 
-        const response = await fetch(
-            `https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/daily-trend-radar.yml/dispatches`,
-            {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${GITHUB_TOKEN}`,
-                    'Accept': 'application/vnd.github.v3+json',
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    ref: 'main'
-                })
-            }
-        );
+        console.log('🚀 Triggering Trend Radar pipeline...');
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`GitHub API error: ${response.status} - ${errorText}`);
-        }
+        const { exec } = await import('child_process');
+        const projectRoot = process.cwd();
+
+        // Run the pipeline in the background
+        exec(`cd ${projectRoot}/trend_engine && python3 main.py --run > /tmp/trend-radar.log 2>&1 &`, (error) => {
+            if (error) {
+                console.error('Pipeline start error:', error);
+            } else {
+                console.log('✅ Pipeline started successfully');
+            }
+        });
 
         return new Response(JSON.stringify({
             success: true,
-            message: 'Pipeline triggered via GitHub Actions! Check your email in 5-10 minutes.'
+            message: 'Pipeline started! Check your email in 5-10 minutes.'
         }), {
             status: 200,
             headers: { 'Content-Type': 'application/json' }
         });
     } catch (error) {
-        console.error('Error in trigger endpoint:', error);
+        console.error('Error:', error);
         return new Response(JSON.stringify({
             success: false,
             error: error instanceof Error ? error.message : 'Unknown error'
