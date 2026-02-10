@@ -1,34 +1,38 @@
-import { exec } from 'child_process';
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 export async function POST() {
     try {
+        const { exec } = await import('child_process');
+        const { promisify } = await import('util');
+        const execAsync = promisify(exec);
+
         console.log('🚀 Triggering Trend Radar pipeline...');
 
-        // Run the Python pipeline in the background
+        // Get the project root
         const projectRoot = process.cwd();
-        const command = `cd ${projectRoot}/trend_engine && python3 main.py --run`;
 
-        // Execute the command without waiting for it to complete
-        exec(command, (error, stdout, stderr) => {
+        // Run the pipeline in the background (don't wait for completion)
+        exec(`cd ${projectRoot}/trend_engine && python3 main.py --run > /tmp/trend-radar.log 2>&1 &`, (error) => {
             if (error) {
-                console.error('Pipeline error:', error);
-                return;
+                console.error('Pipeline start error:', error);
+            } else {
+                console.log('Pipeline started successfully');
             }
-            console.log('Pipeline output:', stdout);
-            if (stderr) console.error('Pipeline stderr:', stderr);
         });
 
         return new Response(JSON.stringify({
             success: true,
-            message: 'Pipeline triggered successfully. Check your email in 5-10 minutes.'
+            message: 'Pipeline started! Check your email in 5-10 minutes.'
         }), {
+            status: 200,
             headers: { 'Content-Type': 'application/json' }
         });
     } catch (error) {
-        console.error('Error triggering pipeline:', error);
+        console.error('Error in trigger endpoint:', error);
         return new Response(JSON.stringify({
             success: false,
-            error: 'Failed to trigger pipeline'
+            error: error instanceof Error ? error.message : 'Unknown error'
         }), {
             status: 500,
             headers: { 'Content-Type': 'application/json' }
