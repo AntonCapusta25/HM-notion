@@ -165,5 +165,41 @@ class Database:
             print(f"❌ Error fetching upcoming events: {e}")
             return []
 
+    def save_global_trend(self, trend_data: dict, analysis_json: dict):
+        """
+        Saves a global viral trend and its deep analysis to 'global_viral_trends'.
+        
+        Args:
+            trend_data: Basic video metadata (url, title, views, etc)
+            analysis_json: The deep AI analysis Output
+        """
+        if not self.client:
+            return None
+            
+        try:
+            # Merge data
+            data = {
+                "platform": trend_data.get("platform", "youtube"),
+                "source_id": trend_data.get("source_id", ""),
+                "url": trend_data.get("url", ""),
+                "title": trend_data.get("title", ""),
+                "description": trend_data.get("description", "")[:500], # Truncate if too long
+                "duration_seconds": trend_data.get("duration", 0),
+                "views": trend_data.get("views", 0),
+                "analysis_json": json.dumps(analysis_json) # Store deep analysis as JSONB
+            }
+            
+            # Insert (ignore if duplicate due to unique constraint on source_id)
+            result = self.client.table("global_viral_trends").insert(data).execute()
+            print(f"✅ Predicted Global Trend Saved: {data.get('title')}")
+            return result
+        except Exception as e:
+            # Handle unique constraint violation gracefully
+            if "duplicate key" in str(e) or "unique constraint" in str(e):
+                print(f"⚠️ Video already exists in DB: {trend_data.get('title')}")
+                return "duplicate"
+            print(f"❌ Error saving global trend: {e}")
+            return None
+
 # Global database instance
 db = Database()

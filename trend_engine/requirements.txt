@@ -5,3 +5,5 @@ python-dotenv
 supabase
 playwright
 lxml
+yt-dlp
+ffmpeg-python

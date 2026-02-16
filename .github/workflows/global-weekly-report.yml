@@ -1,0 +1,35 @@
+name: Global Virality Weekly Report
+
+on:
+  schedule:
+    # Run at 9:00 AM UTC on Mondays
+    - cron: "0 9 * * 1"
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  send_weekly_report:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          cd trend_engine
+          pip install -r requirements.txt
+          pip install google-genai
+
+      - name: Generate & Send Report
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          # Run as module
+          python -m trend_engine.jobs.global_weekly_report
