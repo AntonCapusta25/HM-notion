@@ -21,6 +21,8 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useToast } from '@/hooks/use-toast'
 import NewLeadModal from './NewLeadModal'
 import { Lead, CollabLead } from '@/types'
+import { exportLeadsToCSV } from '@/utils/csvExport'
+
 
 interface LeadsViewProps {
   workspaceId: string
@@ -149,6 +151,37 @@ export default function LeadsView({ workspaceId, outreachType = 'client' }: Lead
     }
   }
 
+  const handleExport = () => {
+    try {
+      const leadsToExport = selectedLeads.length > 0
+        ? filteredLeads.filter(lead => selectedLeads.includes(lead.id))
+        : filteredLeads;
+
+      if (leadsToExport.length === 0) {
+        toast({
+          title: "No leads to export",
+          description: "Please select leads or adjust your filters",
+          variant: "destructive"
+        })
+        return;
+      }
+
+      exportLeadsToCSV(leadsToExport, outreachType);
+
+      toast({
+        title: "Export successful",
+        description: `Exported ${leadsToExport.length} lead${leadsToExport.length !== 1 ? 's' : ''} to CSV`,
+      })
+    } catch (error) {
+      toast({
+        title: "Export failed",
+        description: "Failed to export leads to CSV",
+        variant: "destructive"
+      })
+    }
+  }
+
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'new': return 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/40 dark:text-blue-200 dark:border-blue-800'
@@ -189,10 +222,15 @@ export default function LeadsView({ workspaceId, outreachType = 'client' }: Lead
         </div>
 
         <div className="flex items-center gap-3">
-          <Button variant="outline" className="h-9 border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors flex items-center gap-2">
+          <Button
+            variant="outline"
+            className="h-9 border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors flex items-center gap-2"
+            onClick={handleExport}
+          >
             <Download className="h-4 w-4" />
             <span className="text-sm font-medium">Export</span>
           </Button>
+
 
           <Button variant="outline" className="h-9 border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors flex items-center gap-2">
             <Upload className="h-4 w-4" />

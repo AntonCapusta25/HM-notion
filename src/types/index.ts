@@ -798,8 +798,30 @@ export const getChefProgressPercentage = (progressSteps: ProgressSteps): number 
 // Date utility functions
 export const isToday = (dateString: string): boolean => {
   const today = new Date().toISOString().split('T')[0];
-  return dateString === today;
+  return dateString.startsWith(today);
 };
+
+// ======================================
+// CONTENT HUB TYPES (NEW)
+// ======================================
+
+export interface ContentIdea {
+  id: string;
+  title: string;
+  format: string;
+  concept: string;
+  execution_steps: string[]; // JSONB in DB, parsed as array here
+  platform: string;
+  why_it_works: string;
+  cultural_tie_in?: string;
+  target_audience: 'B2C' | 'B2B';
+  viral_score: number;
+  week_number: number;
+  year: number;
+  status: 'new' | 'approved' | 'rejected' | 'posted';
+  created_at: string;
+}
+
 
 export const isPastDate = (dateString: string): boolean => {
   const today = new Date().toISOString().split('T')[0];
@@ -830,3 +852,73 @@ export const getUpcomingFollowUps = (logs: OutreachLog[], days: number = 7): Out
 
 // Export launch posts types
 export * from './launchPosts';
+
+// ======================================
+// EMAIL INTELLIGENCE TYPES
+// ======================================
+
+export interface GmailConnection {
+  id: string;
+  workspace_id: string;
+  account_label: string;           // e.g. 'Chef Outreach', 'Customer Outreach'
+  gmail_address: string;
+  token_expiry?: string;
+  last_synced_at?: string;
+  is_active: boolean;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type EmailSource = 'gmail' | 'sendgrid' | 'manual';
+export type EmailStatus = 'sent' | 'opened' | 'clicked' | 'replied' | 'bounced' | 'failed';
+
+export interface UnifiedEmailLog {
+  id: string;
+  workspace_id: string;
+  source: EmailSource;
+  gmail_connection_id?: string;
+  external_id?: string;
+  thread_id?: string;
+  subject: string;
+  recipient_email: string;
+  recipient_name?: string;
+  sender_email: string;
+  segment?: string;                // 'chefs' | 'customers' | custom
+  group_name?: string;             // e.g. 'Amsterdam Chefs Wave 1'
+  sent_at: string;
+  opened_at?: string;
+  clicked_at?: string;
+  replied_at?: string;
+  bounced_at?: string;
+  status: EmailStatus;
+  metadata?: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+  body_text?: string; // New field for email content
+  // Joined
+  gmail_connection?: GmailConnection;
+}
+
+export interface EmailSubjectStats {
+  subject: string;
+  total_sent: number;
+  replied: number;
+  opened: number;
+  clicked: number;
+  bounced: number;
+  reply_rate: number;
+  open_rate: number;
+  click_rate: number;
+  last_sent: string;
+}
+
+export interface EmailSegmentStats {
+  segment: string;
+  total_sent: number;
+  replied: number;
+  opened: number;
+  reply_rate: number;
+  open_rate: number;
+}
+

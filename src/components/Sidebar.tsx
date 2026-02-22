@@ -23,8 +23,10 @@ import {
   Bot,
   Image,
   Wrench,
-  Rocket
+  Rocket,
+  Inbox
 } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -53,8 +55,11 @@ const navigation = [
   { name: 'Team', href: '/team', icon: Users },
   { name: 'Calendar', href: '/calendar', icon: Calendar },
   { name: 'Launch Posts', href: '/launch-posts', icon: Rocket },
+  { name: 'Trend Radar', href: '/content-hub', icon: Sparkles },
+  { name: 'Email Intel', href: '/email-intel', icon: Inbox },
   { name: 'Search', href: '/search', icon: Search },
 ];
+
 
 export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
   const location = useLocation();

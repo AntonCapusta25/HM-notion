@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Task, User, Workspace, formatTaskFromSupabase } from '../types';
@@ -833,7 +833,7 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
     }
   }, [tasks]);
 
-  return {
+  return useMemo(() => ({
     tasks,
     users,
     workspaces,
@@ -851,5 +851,9 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
     totalTasks,
     TASKS_PER_PAGE,
     setPage: fetchTasks // Expose fetchTasks as setPage for direct page jumps
-  };
+  }), [
+    tasks, users, workspaces, loading, error,
+    createTask, updateTask, deleteTask, addComment, updateAssignees, updateTags, toggleSubtask, refreshTasks,
+    page, totalTasks, fetchTasks
+  ]);
 };

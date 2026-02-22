@@ -22,6 +22,9 @@ import WorkspaceDetail from "./pages/WorkspaceDetail";
 import Education from "./pages/Education";
 import { ThemeRoute } from "./components/ThemeRoute";
 import LaunchPosts from "./pages/LaunchPosts";
+import ContentHub from "./pages/ContentHub";
+import EmailIntelligencePage from "./pages/EmailIntelligencePage";
+
 
 // CRITICAL FIX: Move QueryClient creation outside component
 const queryClient = new QueryClient({
@@ -75,6 +78,17 @@ const App = () => (
                   <LaunchPosts />
                 </ProtectedRoute>
               } />
+              <Route path="/content-hub" element={
+                <ProtectedRoute>
+                  <ContentHub />
+                </ProtectedRoute>
+              } />
+              <Route path="/email-intel" element={
+                <ProtectedRoute>
+                  <EmailIntelligencePage />
+                </ProtectedRoute>
+              } />
+
               <Route path="/search" element={
                 <ProtectedRoute>
                   <Search />
