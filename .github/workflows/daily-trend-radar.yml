@@ -21,8 +21,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          cd trend_engine
-          pip install -r requirements.txt
+          pip install -r trend_engine/requirements.txt
 
       - name: Install Playwright browsers
         run: |
@@ -35,8 +34,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
         run: |
-          cd trend_engine
-          python main.py --run
+          python -m trend_engine.main --run
 
       - name: Notify on failure
         if: failure()

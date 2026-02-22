@@ -31,4 +31,4 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           # Removed REDDIT credentials as we switched to public scraping
         run: |
-          python trend_engine/main.py --run
+          python -m trend_engine.main --run

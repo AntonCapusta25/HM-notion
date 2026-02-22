@@ -21,8 +21,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          cd trend_engine
-          pip install -r requirements.txt
+          pip install -r trend_engine/requirements.txt
 
       - name: Run Weekly Recap
         env:
@@ -31,8 +30,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
         run: |
-          cd trend_engine
-          python jobs/weekly_recap.py
+          python -m trend_engine.jobs.weekly_recap
 
       - name: Notify on failure
         if: failure()
