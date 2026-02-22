@@ -6,10 +6,11 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import { supabase } from '@/lib/supabase'
 import Papa from 'papaparse'
-import { ArrowLeft, ArrowRight, Wand2, Mail, Users, Upload, Send, Save, RefreshCw } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Wand2, Mail, Users, Upload, Send, Save, RefreshCw, Plus } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 
 interface CampaignWizardProps {
@@ -26,9 +27,17 @@ export default function CampaignWizard({ onBack, campaignId: initialCampaignId }
     // Form State
     const [name, setName] = useState('')
     const [goal, setGoal] = useState('')
+    const [industry, setIndustry] = useState('')
     const [prompt, setPrompt] = useState('Write a friendly introduction email to {{name}} from {{company}}.')
     const [importedLeads, setImportedLeads] = useState<any[]>([])
     const [segmentId, setSegmentId] = useState<string | null>(null)
+    const [existingLeadCount, setExistingLeadCount] = useState(0)
+
+    const INDUSTRIES = [
+        'Cooking Schools', 'Restaurants', 'Caterers', 'Hotels & Hospitality',
+        'Food Bloggers', 'Private Chefs', 'Meal Prep Services', 'Food Trucks',
+        'Bakeries & Pastry', 'Corporate Catering', 'Event Planners', 'Other',
+    ]
 
     // Generation State
     const [generatedEmails, setGeneratedEmails] = useState<any[]>([])
@@ -48,14 +57,18 @@ export default function CampaignWizard({ onBack, campaignId: initialCampaignId }
         if (data) {
             setName(data.name)
             setGoal(data.description || '')
+            setIndustry(data.industry || '')
             setPrompt(data.settings?.prompt || prompt)
             setSegmentId(data.segment_id)
             setCampaignId(data.id)
-            // If has progress, maybe switch tab?
             if (data.status !== 'draft') setActiveTab('review')
             else if (data.segment_id) setActiveTab('content')
-
             fetchGeneratedEmails(id)
+            // Count existing leads in this segment
+            if (data.segment_id) {
+                const { count } = await supabase.from('leads').select('id', { count: 'exact' }).eq('segment_id', data.segment_id)
+                setExistingLeadCount(count || 0)
+            }
         }
         setLoading(false)
     }
@@ -69,8 +82,9 @@ export default function CampaignWizard({ onBack, campaignId: initialCampaignId }
         const campaignData = {
             name,
             description: goal,
+            industry,
             status: 'draft',
-            settings: { prompt }, // Store prompt in settings
+            settings: { prompt },
         }
 
         let error
@@ -178,6 +192,39 @@ export default function CampaignWizard({ onBack, campaignId: initialCampaignId }
         setLoading(false)
     }
 
+    // 2b. Add more leads to existing segment (dedup by email+workspace_id)
+    const handleAddMoreLeads = async () => {
+        if (!importedLeads.length || !segmentId || !campaignId) return
+        setLoading(true)
+        const { data: { user } } = await supabase.auth.getUser()
+        let workspaceId = ''
+        if (user) {
+            const { data: member } = await supabase.from('workspace_members').select('workspace_id').eq('user_id', user.id).single()
+            workspaceId = member?.workspace_id
+        }
+        const formattedLeads = importedLeads.map((l: any) => ({
+            email: l.Email || l.email,
+            name: l.Name || l.name || '',
+            company: l.Company || l.company || '',
+            industry: industry || l.Industry || l.industry || '',
+            notes: l.Notes || l.notes || '',
+            segment_id: segmentId,
+            workspace_id: workspaceId,
+            created_by: user!.id,
+            status: 'new'
+        }))
+        const { error } = await supabase.from('leads').upsert(formattedLeads, { onConflict: 'email,workspace_id' })
+        if (error) {
+            toast({ title: 'Error adding leads', description: error.message, variant: 'destructive' })
+        } else {
+            const { count } = await supabase.from('leads').select('id', { count: 'exact' }).eq('segment_id', segmentId)
+            setExistingLeadCount(count || 0)
+            setImportedLeads([])
+            toast({ title: 'Leads added', description: `${count} total leads in this campaign` })
+        }
+        setLoading(false)
+    }
+
     // 3. Generate Content
     const handleGenerate = async () => {
         if (!campaignId) return
@@ -266,6 +313,19 @@ export default function CampaignWizard({ onBack, campaignId: initialCampaignId }
                                 <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Q1 Outreach - Hospitality" />
                             </div>
                             <div className="space-y-2">
+                                <Label>Industry / Segment</Label>
+                                <Select value={industry} onValueChange={setIndustry}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select industry..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {INDUSTRIES.map(ind => (
+                                            <SelectItem key={ind} value={ind}>{ind}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
                                 <Label>Goal / Description</Label>
                                 <Textarea value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="Reach out to potential restaurant partners..." />
                             </div>
@@ -287,8 +347,19 @@ export default function CampaignWizard({ onBack, campaignId: initialCampaignId }
                             <CardDescription>Upload a CSV with columns: Email, Name, Company, Industry</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
+                            {/* If campaign already has leads, show count + add-more section */}
+                            {existingLeadCount > 0 && (
+                                <div className="rounded-lg border bg-muted/30 px-4 py-3 flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm font-medium">{existingLeadCount} leads already in this campaign</p>
+                                        <p className="text-xs text-muted-foreground">Upload a new CSV to add more — duplicates will be ignored</p>
+                                    </div>
+                                    <Badge variant="secondary">{industry || 'No industry set'}</Badge>
+                                </div>
+                            )}
+
                             <div className="grid w-full max-w-sm items-center gap-1.5">
-                                <Label htmlFor="csv">CSV File</Label>
+                                <Label htmlFor="csv">{existingLeadCount > 0 ? 'Add More Leads (CSV)' : 'CSV File'}</Label>
                                 <Input id="csv" type="file" accept=".csv" onChange={handleFileUpload} />
                             </div>
 
@@ -320,9 +391,27 @@ export default function CampaignWizard({ onBack, campaignId: initialCampaignId }
                         </CardContent>
                         <CardFooter className="flex justify-between">
                             <Button variant="outline" onClick={() => setActiveTab('setup')}>Back</Button>
-                            <Button onClick={handleImportLeads} disabled={importedLeads.length === 0 || loading}>
-                                {loading ? 'Importing...' : 'Import & Continue'} <Upload className="ml-2 h-4 w-4" />
-                            </Button>
+                            <div className="flex gap-2">
+                                {existingLeadCount > 0 && importedLeads.length > 0 && (
+                                    <Button variant="outline" onClick={handleAddMoreLeads} disabled={loading}>
+                                        <Plus className="mr-2 h-4 w-4" />
+                                        Add {importedLeads.length} Leads
+                                    </Button>
+                                )}
+                                <Button
+                                    onClick={existingLeadCount > 0 && importedLeads.length === 0
+                                        ? () => setActiveTab('content')
+                                        : handleImportLeads
+                                    }
+                                    disabled={(importedLeads.length === 0 && existingLeadCount === 0) || loading}
+                                >
+                                    {loading ? 'Importing...' :
+                                        existingLeadCount > 0 && importedLeads.length === 0
+                                            ? 'Continue to Content'
+                                            : 'Import & Continue'
+                                    } <Upload className="ml-2 h-4 w-4" />
+                                </Button>
+                            </div>
                         </CardFooter>
                     </Card>
                 </TabsContent>

@@ -9,8 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import {
     Mail, RefreshCw, Search, Download, MessageSquare,
-    Eye, AlertCircle, Inbox, Settings, CheckCircle2
+    Eye, AlertCircle, Inbox, Settings, CheckCircle2, Zap, Plus, Trash2
 } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
 import { supabase } from '@/lib/supabase'
 import { UnifiedEmailLog, EmailSubjectStats, EmailSegmentStats } from '@/types'
@@ -60,6 +61,77 @@ export default function EmailIntelligence({ workspaceId }: EmailIntelligenceProp
     const [view, setView] = useState<'dashboard' | 'campaign-wizard'>('dashboard')
     const [campaignId, setCampaignId] = useState<string | null>(null)
 
+    // Industry stats from campaigns
+    interface IndustryStat { industry: string; campaigns: number; total_leads: number; emails_sent: number; replied: number; reply_rate: number }
+    const [industryStats, setIndustryStats] = useState<IndustryStat[]>([])
+
+    const fetchIndustryStats = async () => {
+        if (!workspaceId) return
+        // Get campaigns with industry set
+        const { data: campaigns } = await supabase
+            .from('outreach_campaigns')
+            .select('id, industry')
+            .eq('workspace_id', workspaceId)
+            .not('industry', 'is', null)
+        if (!campaigns?.length) return
+
+        const map = new Map<string, IndustryStat>()
+        for (const c of campaigns) {
+            const ind = c.industry || 'Other'
+            if (!map.has(ind)) map.set(ind, { industry: ind, campaigns: 0, total_leads: 0, emails_sent: 0, replied: 0, reply_rate: 0 })
+            const s = map.get(ind)!
+            s.campaigns++
+            // Count leads in this campaign via segment
+            const { count: leadCount } = await supabase
+                .from('outreach_emails')
+                .select('id', { count: 'exact' })
+                .eq('campaign_id', c.id)
+            s.emails_sent += leadCount || 0
+            const { count: repliedCount } = await supabase
+                .from('outreach_emails')
+                .select('id', { count: 'exact' })
+                .eq('campaign_id', c.id)
+                .eq('status', 'replied')
+            s.replied += repliedCount || 0
+        }
+        const result = Array.from(map.values()).map(s => ({
+            ...s,
+            reply_rate: s.emails_sent > 0 ? s.replied / s.emails_sent * 100 : 0
+        })).sort((a, b) => b.emails_sent - a.emails_sent)
+        setIndustryStats(result)
+    }
+
+    // Subject Groups — persisted in localStorage
+    interface SubjectGroup { id: string; name: string; prefix: string; color: string }
+    const [subjectGroups, setSubjectGroups] = useState<SubjectGroup[]>(() => {
+        try { return JSON.parse(localStorage.getItem('email_subject_groups') || '[]') } catch { return [] }
+    })
+    const [showGroupDialog, setShowGroupDialog] = useState(false)
+    const [groupForm, setGroupForm] = useState({ name: '', prefix: '', color: '#3b82f6' })
+
+    const GROUP_COLORS = [
+        '#3b82f6', '#8b5cf6', '#10b981', '#f59e0b',
+        '#ef4444', '#ec4899', '#06b6d4', '#64748b',
+    ]
+
+    const saveGroups = (groups: SubjectGroup[]) => {
+        setSubjectGroups(groups)
+        localStorage.setItem('email_subject_groups', JSON.stringify(groups))
+    }
+
+    const handleCreateGroup = () => {
+        if (!groupForm.name || !groupForm.prefix) return
+        const newGroup: SubjectGroup = {
+            id: crypto.randomUUID(),
+            name: groupForm.name.trim(),
+            prefix: groupForm.prefix.trim().toLowerCase(),
+            color: groupForm.color,
+        }
+        saveGroups([...subjectGroups, newGroup])
+        setGroupForm({ name: '', prefix: '', color: '#3b82f6' })
+        setShowGroupDialog(false)
+    }
+
     const ACCOUNTS = [
         { value: 'all', label: 'All Accounts' },
         { value: 'chefs@homemademeals.net', label: 'Chef Outreach' },
@@ -96,6 +168,8 @@ export default function EmailIntelligence({ workspaceId }: EmailIntelligenceProp
         if (workspaceId) fetchEmails()
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [workspaceId, dateRange])
+
+    useEffect(() => { if (workspaceId) fetchIndustryStats() }, [workspaceId])
 
     const handleSyncAll = async () => {
         setSyncing(true)
@@ -312,6 +386,13 @@ export default function EmailIntelligence({ workspaceId }: EmailIntelligenceProp
                         <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
                         Sync Gmail
                     </Button>
+                    <Button
+                        onClick={() => { setCampaignId(null); setView('campaign-wizard') }}
+                        className="gap-2"
+                    >
+                        <Zap className="h-4 w-4" />
+                        New Campaign
+                    </Button>
                     <Button variant="ghost" size="icon" onClick={() => setShowSettings(!showSettings)}>
                         <Settings className="h-4 w-4" />
                     </Button>
@@ -338,7 +419,6 @@ export default function EmailIntelligence({ workspaceId }: EmailIntelligenceProp
                 <TabsList>
                     <TabsTrigger value="overview">Overview</TabsTrigger>
                     <TabsTrigger value="history">History</TabsTrigger>
-                    <TabsTrigger value="campaigns">Campaign Creator</TabsTrigger>
                     <TabsTrigger value="by-subject">By Subject</TabsTrigger>
                     <TabsTrigger value="by-segment">By Segment</TabsTrigger>
                 </TabsList>
@@ -575,10 +655,70 @@ export default function EmailIntelligence({ workspaceId }: EmailIntelligenceProp
 
                 {/* ── BY SUBJECT TAB ── */}
                 <TabsContent value="by-subject" className="space-y-4">
+                    {/* Groups section */}
+                    {subjectGroups.length > 0 && (
+                        <div className="space-y-3">
+                            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Groups</h3>
+                            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                {subjectGroups.map(group => {
+                                    // Aggregate stats for subjects matching this group's prefix
+                                    const matched = subjectStats.filter(s =>
+                                        s.subject.toLowerCase().includes(group.prefix)
+                                    )
+                                    const totalSent = matched.reduce((a, s) => a + s.total_sent, 0)
+                                    const totalReplied = matched.reduce((a, s) => a + s.replied, 0)
+                                    const totalOpened = matched.reduce((a, s) => a + s.opened, 0)
+                                    const replyRate = totalSent > 0 ? (totalReplied / totalSent * 100) : 0
+                                    const openRate = totalSent > 0 ? (totalOpened / totalSent * 100) : 0
+                                    return (
+                                        <Card key={group.id} className="relative overflow-hidden">
+                                            <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: group.color }} />
+                                            <CardHeader className="pb-2 pl-5">
+                                                <div className="flex items-center justify-between">
+                                                    <CardTitle className="text-sm font-semibold">{group.name}</CardTitle>
+                                                    <Button
+                                                        variant="ghost" size="icon"
+                                                        className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                                        onClick={() => saveGroups(subjectGroups.filter(g => g.id !== group.id))}
+                                                    >
+                                                        <Trash2 className="h-3 w-3" />
+                                                    </Button>
+                                                </div>
+                                                <p className="text-xs text-muted-foreground">prefix: "{group.prefix}" · {matched.length} subject{matched.length !== 1 ? 's' : ''}</p>
+                                            </CardHeader>
+                                            <CardContent className="pl-5 pt-0">
+                                                <div className="flex gap-4 text-sm">
+                                                    <div>
+                                                        <div className="text-lg font-bold">{totalSent}</div>
+                                                        <div className="text-xs text-muted-foreground">Sent</div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-lg font-bold text-blue-600">{openRate.toFixed(1)}%</div>
+                                                        <div className="text-xs text-muted-foreground">Open</div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-lg font-bold text-green-600">{replyRate.toFixed(1)}%</div>
+                                                        <div className="text-xs text-muted-foreground">Reply</div>
+                                                    </div>
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                    )}
+
                     <Card>
-                        <CardHeader>
-                            <CardTitle>Subject Line Performance</CardTitle>
-                            <CardDescription>Top performing subject lines by engagement</CardDescription>
+                        <CardHeader className="flex flex-row items-center justify-between">
+                            <div>
+                                <CardTitle>Subject Line Performance</CardTitle>
+                                <CardDescription>Top performing subject lines by engagement</CardDescription>
+                            </div>
+                            <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowGroupDialog(true)}>
+                                <Plus className="h-4 w-4" />
+                                Create Group
+                            </Button>
                         </CardHeader>
                         <CardContent>
                             <div className="rounded-md border">
@@ -592,29 +732,126 @@ export default function EmailIntelligence({ workspaceId }: EmailIntelligenceProp
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {subjectStats.map((stat, i) => (
-                                            <TableRow key={i}>
-                                                <TableCell className="font-medium max-w-[400px] truncate" title={stat.subject}>
-                                                    {stat.subject}
-                                                </TableCell>
-                                                <TableCell className="text-right">{stat.total_sent}</TableCell>
-                                                <TableCell className="text-right font-medium text-blue-600">
-                                                    {stat.open_rate.toFixed(1)}%
-                                                </TableCell>
-                                                <TableCell className="text-right font-medium text-green-600">
-                                                    {stat.reply_rate.toFixed(1)}%
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
+                                        {subjectStats.map((stat, i) => {
+                                            // Find if this subject belongs to any group
+                                            const group = subjectGroups.find(g =>
+                                                stat.subject.toLowerCase().includes(g.prefix)
+                                            )
+                                            return (
+                                                <TableRow key={i}>
+                                                    <TableCell className="font-medium max-w-[400px]" title={stat.subject}>
+                                                        <div className="flex items-center gap-2">
+                                                            {group && (
+                                                                <span
+                                                                    className="inline-block w-2 h-2 rounded-full flex-shrink-0"
+                                                                    style={{ backgroundColor: group.color }}
+                                                                    title={group.name}
+                                                                />
+                                                            )}
+                                                            <span className="truncate">{stat.subject}</span>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell className="text-right">{stat.total_sent}</TableCell>
+                                                    <TableCell className="text-right font-medium text-blue-600">
+                                                        {stat.open_rate.toFixed(1)}%
+                                                    </TableCell>
+                                                    <TableCell className="text-right font-medium text-green-600">
+                                                        {stat.reply_rate.toFixed(1)}%
+                                                    </TableCell>
+                                                </TableRow>
+                                            )
+                                        })}
                                     </TableBody>
                                 </Table>
                             </div>
                         </CardContent>
                     </Card>
+
+                    {/* Create Group Dialog */}
+                    <Dialog open={showGroupDialog} onOpenChange={setShowGroupDialog}>
+                        <DialogContent className="sm:max-w-md">
+                            <DialogHeader>
+                                <DialogTitle>Create Subject Group</DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-4 py-2">
+                                <div className="space-y-1.5">
+                                    <label className="text-sm font-medium">Group Name</label>
+                                    <Input
+                                        placeholder="e.g. Chef Invitations"
+                                        value={groupForm.name}
+                                        onChange={e => setGroupForm(f => ({ ...f, name: e.target.value }))}
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-sm font-medium">Subject Contains</label>
+                                    <Input
+                                        placeholder="e.g. Partnership with Homemade"
+                                        value={groupForm.prefix}
+                                        onChange={e => setGroupForm(f => ({ ...f, prefix: e.target.value }))}
+                                    />
+                                    <p className="text-xs text-muted-foreground">Subjects containing this text will be grouped together</p>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-sm font-medium">Color</label>
+                                    <div className="flex gap-2 flex-wrap">
+                                        {GROUP_COLORS.map(color => (
+                                            <button
+                                                key={color}
+                                                className={`w-7 h-7 rounded-full border-2 transition-all ${groupForm.color === color ? 'border-foreground scale-110' : 'border-transparent'
+                                                    }`}
+                                                style={{ backgroundColor: color }}
+                                                onClick={() => setGroupForm(f => ({ ...f, color }))}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                            <DialogFooter>
+                                <Button variant="outline" onClick={() => setShowGroupDialog(false)}>Cancel</Button>
+                                <Button onClick={handleCreateGroup} disabled={!groupForm.name || !groupForm.prefix}>
+                                    Create Group
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
                 </TabsContent>
 
                 {/* ── BY SEGMENT TAB ── */}
                 <TabsContent value="by-segment" className="space-y-4">
+                    {/* Industry cards */}
+                    {industryStats.length > 0 && (
+                        <div className="space-y-3">
+                            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">By Industry</h3>
+                            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                {industryStats.map(stat => (
+                                    <Card key={stat.industry}>
+                                        <CardHeader className="pb-2">
+                                            <CardTitle className="text-sm font-semibold">{stat.industry}</CardTitle>
+                                            <p className="text-xs text-muted-foreground">{stat.campaigns} campaign{stat.campaigns !== 1 ? 's' : ''}</p>
+                                        </CardHeader>
+                                        <CardContent className="pt-0">
+                                            <div className="flex gap-4 text-sm">
+                                                <div>
+                                                    <div className="text-lg font-bold">{stat.emails_sent}</div>
+                                                    <div className="text-xs text-muted-foreground">Sent</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-lg font-bold text-green-600">{stat.reply_rate.toFixed(1)}%</div>
+                                                    <div className="text-xs text-muted-foreground">Reply Rate</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-lg font-bold text-muted-foreground">{stat.replied}</div>
+                                                    <div className="text-xs text-muted-foreground">Replied</div>
+                                                </div>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Original segment bar chart */}
                     <div className="grid gap-4 md:grid-cols-2">
                         <Card className="col-span-2">
                             <CardHeader>
@@ -642,29 +879,17 @@ export default function EmailIntelligence({ workspaceId }: EmailIntelligenceProp
                     </div>
                 </TabsContent>
 
-                {/* ── CAMPAIGNS TAB ── */}
-                <TabsContent value="campaigns">
-                    {view === 'dashboard' ? (
-                        <CampaignList
-                            onCreate={() => {
-                                setCampaignId(null)
-                                setView('campaign-wizard')
-                            }}
-                            onSelect={(id) => {
-                                setCampaignId(id)
-                                setView('campaign-wizard')
-                            }}
-                        />
-                    ) : (
-                        <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-                            <CampaignWizard
-                                campaignId={campaignId}
-                                onBack={() => setView('dashboard')}
-                            />
-                        </div>
-                    )}
-                </TabsContent>
             </Tabs>
+
+            {/* ── CAMPAIGN WIZARD (inline overlay) ── */}
+            {view === 'campaign-wizard' && (
+                <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+                    <CampaignWizard
+                        campaignId={campaignId}
+                        onBack={() => setView('dashboard')}
+                    />
+                </div>
+            )}
 
             <ReplyDialog
                 open={replyOpen}
