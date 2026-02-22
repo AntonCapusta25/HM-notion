@@ -4,7 +4,6 @@ from trend_engine.config import VIRAL_THRESHOLD_SCORE
 from trend_engine.scrapers.reddit import get_reddit_posts
 from trend_engine.scrapers.youtube import get_youtube_shorts
 from trend_engine.scrapers.instagram import get_instagram_posts
-from trend_engine.scrapers.tiktok import get_tiktok_posts
 from trend_engine.scrapers.cultural_trends import get_cultural_trends
 from trend_engine.processors.viral_score import calculate_viral_score
 from trend_engine.ai.analyze_virality import analyze_trends_for_content_ideas
@@ -26,12 +25,6 @@ YOUTUBE_QUERIES = [
     "cooking asmr", "recipe shorts", "cooking tutorial"
 ]
 
-TIKTOK_HASHTAGS = [
-    "homecooking", "cookwithme", "easyrecipes", "mealprep",
-    "cookinghacks", "budgetmeals", "healthyrecipes", "comfortfood",
-    "quickrecipes", "foodtok", "recipetok", "cookingtrends",
-    "viralrecipes", "cookingtips", "foodhacks"
-]
 
 INSTAGRAM_ACCOUNTS = [
     "buzzfeedtasty", "food52", "bonappetitmag", "foodnetwork",
@@ -56,17 +49,7 @@ def run_pipeline():
         youtube_total += len(posts)
     print(f"   ✅ {youtube_total} posts from YouTube")
     
-    # PRIORITY 2: TikTok (15 hashtags)
-    print("\n🎵 Scraping TikTok (15 hashtags)...")
-    tiktok_total = 0
-    for i, hashtag in enumerate(TIKTOK_HASHTAGS, 1):
-        print(f"   [{i}/15] Hashtag: #{hashtag}...")
-        posts = get_tiktok_posts(hashtag=hashtag, limit=10)
-        all_posts.extend(posts)
-        tiktok_total += len(posts)
-    print(f"   ✅ {tiktok_total} posts from TikTok")
-    
-    # PRIORITY 3: Instagram (15 accounts)
+    # PRIORITY 2: Instagram (15 accounts)
     print("\n📸 Scraping Instagram (15 accounts)...")
     instagram_total = 0
     for i, account in enumerate(INSTAGRAM_ACCOUNTS, 1):
@@ -83,7 +66,7 @@ def run_pipeline():
     print(f"   ✅ {len(reddit_posts)} posts from Reddit")
     
     print(f"\n📊 Total posts collected: {len(all_posts)}")
-    print(f"   YouTube: {youtube_total} | TikTok: {tiktok_total} | Instagram: {instagram_total} | Reddit: {len(reddit_posts)}")
+    print(f"   YouTube: {youtube_total} | Instagram: {instagram_total} | Reddit: {len(reddit_posts)}")
     print("=" * 60)
 
     # 2. Score & Filter

@@ -1,6 +1,6 @@
 from supabase import create_client
 import os
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import json
 
 class Database:
@@ -42,26 +42,40 @@ class Database:
     def save_content_idea(self, idea: dict, target_audience: str):
         """
         Saves a content idea to the 'content_ideas' table.
-        
-        Args:
-            idea: Content idea dictionary from AI
-            target_audience: 'B2C' or 'B2B'
+        Skips if an idea with the same title already exists in the last 14 days.
         """
         if not self.client:
             return None
-        
+
         try:
+            title = idea.get("title", "").strip()
+            if not title:
+                return None
+
+            # Deduplication: check if this title was already saved in the last 14 days
+            cutoff = (datetime.now() - timedelta(days=14)).isoformat()
+            existing = (
+                self.client.table("content_ideas")
+                .select("id")
+                .ilike("title", title)   # case-insensitive match
+                .gte("created_at", cutoff)
+                .limit(1)
+                .execute()
+            )
+            if existing.data:
+                print(f"   ⏭️  Skipping duplicate: '{title}'")
+                return None
+
             # Get current week number and year
             now = datetime.now()
             week_number = now.isocalendar()[1]
             year = now.year
-            
-            # Prepare data for insertion
+
             data = {
-                "title": idea.get("title", ""),
+                "title": title,
                 "format": idea.get("format", ""),
                 "concept": idea.get("concept", ""),
-                "execution_steps": json.dumps(idea.get("execution_steps", [])),  # Store as JSONB
+                "execution_steps": json.dumps(idea.get("execution_steps", [])),
                 "platform": idea.get("platform", ""),
                 "why_it_works": idea.get("why_it_works", ""),
                 "cultural_tie_in": idea.get("cultural_tie_in", ""),
@@ -70,7 +84,7 @@ class Database:
                 "week_number": week_number,
                 "year": year
             }
-            
+
             result = self.client.table("content_ideas").insert(data).execute()
             return result
         except Exception as e:
