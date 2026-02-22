@@ -7,3 +7,5 @@ playwright
 lxml
 yt-dlp
 ffmpeg-python
+schedule
+sendgrid
