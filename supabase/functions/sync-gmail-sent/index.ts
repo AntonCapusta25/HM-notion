@@ -173,15 +173,24 @@ serve(async (req) => {
                         let recipientName = ''
                         let recipientEmail = to.trim()
 
-                        // Regex for "Name <email>"
-                        const matchNameEmail = to.match(/^"?([^"]+)"?\s*<([^>]+)>$/)
-                        if (matchNameEmail) {
-                            recipientName = matchNameEmail[1].trim()
-                            recipientEmail = matchNameEmail[2].trim()
-                        } else {
-                            // Fallback: just email or "email"
-                            recipientEmail = to.replace(/[<>]/g, '').trim()
+                        // Robust recipient parsing — handles:
+                        //   "Name <email>", <email>, bare email, multi-recipient (takes first)
+                        const parseFirstEmail = (raw: string): { name: string; email: string } => {
+                            // Take first recipient if comma-separated
+                            const first = raw.split(/,(?=[^>]*(?:<|$))/)[0].trim()
+                            // "Display Name <email@domain>" or "<email@domain>"
+                            const angleMatch = first.match(/<([^>]+@[^>]+)>/)
+                            if (angleMatch) {
+                                const name = first.replace(/<[^>]+>/, '').replace(/^"|"$/g, '').trim()
+                                return { name, email: angleMatch[1].trim() }
+                            }
+                            // bare email
+                            if (first.includes('@')) return { name: '', email: first.trim() }
+                            return { name: '', email: first }
                         }
+                        const parsed = parseFirstEmail(to)
+                        recipientName = parsed.name
+                        recipientEmail = parsed.email
 
                         // Parse sender
                         const senderMatch = from.match(/<?([^>]+)>?$/)
