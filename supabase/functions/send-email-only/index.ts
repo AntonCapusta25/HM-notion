@@ -30,8 +30,23 @@ serve(async (req) => {
             )
         }
 
-        const recipient = to_email || 'bangalexf@gmail.com'
         const emailSubject = subject || `🔥 Daily Viral Trend Radar - ${new Date().toISOString().split('T')[0]}`
+
+        // Convert to_email to array
+        let recipientList = [];
+        if (Array.isArray(to_email)) {
+            recipientList = to_email;
+        } else if (typeof to_email === 'string') {
+            recipientList = [to_email];
+        } else {
+            recipientList = ['bangalexf@gmail.com'];
+        }
+
+        // Create a personalization object for each recipient so they are sent separately
+        const personalizations = recipientList.map(email => ({
+            to: [{ email: email }],
+            subject: emailSubject
+        }));
 
         // Send via SendGrid
         const sendGridResponse = await fetch('https://api.sendgrid.com/v3/mail/send', {
@@ -41,10 +56,7 @@ serve(async (req) => {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                personalizations: [{
-                    to: [{ email: recipient }],
-                    subject: emailSubject
-                }],
+                personalizations: personalizations,
                 from: {
                     email: FROM_EMAIL,
                     name: FROM_NAME
@@ -65,7 +77,7 @@ serve(async (req) => {
         return new Response(
             JSON.stringify({
                 success: true,
-                message: `Email sent to ${recipient}`,
+                message: `Email sent to ${recipientList.join(', ')}`,
                 subject: emailSubject
             }),
             {
@@ -77,7 +89,7 @@ serve(async (req) => {
     } catch (error) {
         console.error('Error:', error)
         return new Response(
-            JSON.stringify({ error: error.message }),
+            JSON.stringify({ error: error instanceof Error ? error.message : String(error) }),
             {
                 status: 500,
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' }

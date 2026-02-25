@@ -55,7 +55,7 @@ def generate_weekly_recap():
     # Send email
     print("\n📧 Sending Weekly Recap Email...")
     send_email_report(html_report, subject="📊 Weekly Content Recap - Top 10 Ideas")
-    print("   ✅ Email sent to bangalexf@gmail.com")
+    print("   ✅ Email sent to the configured team list")
     
     print("\n" + "=" * 60)
     print("✅ Weekly Recap Complete!")

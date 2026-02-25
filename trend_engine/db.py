@@ -71,24 +71,41 @@ class Database:
             week_number = now.isocalendar()[1]
             year = now.year
 
+            # Type safe extraction with fallbacks
+            try:
+                execution_steps = idea.get("execution_steps", [])
+                if not isinstance(execution_steps, list):
+                    execution_steps = [str(execution_steps)]
+                execution_steps_json = json.dumps(execution_steps)
+            except Exception:
+                execution_steps_json = "[]"
+                
+            try:
+                viral_score = float(idea.get("viral_score", 0.0))
+            except (ValueError, TypeError):
+                viral_score = 0.0
+
             data = {
-                "title": title,
-                "format": idea.get("format", ""),
-                "concept": idea.get("concept", ""),
-                "execution_steps": json.dumps(idea.get("execution_steps", [])),
-                "platform": idea.get("platform", ""),
-                "why_it_works": idea.get("why_it_works", ""),
-                "cultural_tie_in": idea.get("cultural_tie_in", ""),
+                "title": title[:255], # truncate to fit
+                "format": str(idea.get("format", ""))[:255],
+                "concept": str(idea.get("concept", "")),
+                "execution_steps": execution_steps_json,
+                "platform": str(idea.get("platform", ""))[:255],
+                "why_it_works": str(idea.get("why_it_works", "")),
+                "cultural_tie_in": str(idea.get("cultural_tie_in", "")),
                 "target_audience": target_audience,
-                "viral_score": idea.get("viral_score", 0.0),
+                "viral_score": viral_score,
                 "week_number": week_number,
                 "year": year
             }
 
             result = self.client.table("content_ideas").insert(data).execute()
+            print(f"   ✅ Saved idea to DB: {title[:30]}...")
             return result
         except Exception as e:
-            print(f"❌ Error saving content idea: {e}")
+            import traceback
+            print(f"❌ Error saving content idea '{idea.get('title', 'Unknown')}': {e}")
+            traceback.print_exc()
             return None
     
     def save_event(self, event: dict):

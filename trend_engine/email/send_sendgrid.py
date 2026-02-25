@@ -19,12 +19,9 @@ def send_email_report(html_content, subject=None):
         today = datetime.date.today().strftime("%Y-%m-%d")
         subject = f"🔥 Daily Viral Trend Radar - {today}"
     
-    # Use first email from list
-    to_email = EMAIL_TO_LIST[0] if EMAIL_TO_LIST else "bangalexf@gmail.com"
-    
     payload = {
         "html_content": html_content,
-        "to_email": to_email,
+        "to_email": EMAIL_TO_LIST,
         "subject": subject
     }
     

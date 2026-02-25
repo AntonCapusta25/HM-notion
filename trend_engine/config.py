@@ -12,7 +12,17 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 # Configuration
 EMAIL_FROM = "trends@homemade-meals.com"
-EMAIL_TO_LIST = ["bangalexf@gmail.com"]
+EMAIL_TO_LIST = [
+    "aisha@abdel-wahab.com",
+    "aureymballa@gmail.com",
+    "bangalexf@gmail.com",
+    "hamedzadjali65@gmail.com",
+    "info@homemademeals.net",
+    "khaylanlalla35@gmail.com",
+    "mahmoudelwakil22@gmail.com",
+    "mennatyehiaz@gmail.com",
+    "walid_sabihi@outlook.com"
+]
 VIRAL_THRESHOLD_SCORE = 7.5
 
 # Scraper Settings
