@@ -14,12 +14,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { 
-  Plus, 
-  Calendar, 
-  Users, 
-  Settings, 
-  ArrowLeft, 
+import {
+  Plus,
+  Calendar,
+  Users,
+  Settings,
+  ArrowLeft,
   TrendingUp,
   Clock,
   CheckCircle,
@@ -34,21 +34,21 @@ import { Task } from '../types';
 // Separate component for task management workspace to isolate useTaskContext
 const TaskManagementWorkspace = ({ workspaceId, workspace }: { workspaceId: string, workspace: any }) => {
   const { user } = useAuth();
-  
-  const { 
-    tasks, 
-    users, 
-    workspaces, 
-    createTask, 
-    updateTask, 
-    deleteTask, 
-    addComment, 
+
+  const {
+    tasks,
+    users,
+    workspaces,
+    createTask,
+    updateTask,
+    deleteTask,
+    addComment,
     toggleSubtask,
     refreshTasks,
-    loading: tasksLoading, 
-    error 
+    loading: tasksLoading,
+    error
   } = useTaskContext();
-  
+
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showEditWorkspace, setShowEditWorkspace] = useState(false);
@@ -98,14 +98,14 @@ const TaskManagementWorkspace = ({ workspaceId, workspace }: { workspaceId: stri
     const completed = workspaceTasks.filter(t => t.status === 'done').length;
     const inProgress = workspaceTasks.filter(t => t.status === 'in_progress').length;
     const todo = workspaceTasks.filter(t => t.status === 'todo').length;
-    
+
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    
-    const overdue = workspaceTasks.filter(t => 
+
+    const overdue = workspaceTasks.filter(t =>
       t.due_date && new Date(t.due_date) < today && t.status !== 'done'
     ).length;
-    
+
     const dueToday = workspaceTasks.filter(t => {
       if (!t.due_date) return false;
       const dueDate = new Date(t.due_date);
@@ -121,7 +121,7 @@ const TaskManagementWorkspace = ({ workspaceId, workspace }: { workspaceId: stri
     return {
       total,
       completed,
-      inProgress, 
+      inProgress,
       todo,
       overdue,
       dueToday,
@@ -139,10 +139,10 @@ const TaskManagementWorkspace = ({ workspaceId, workspace }: { workspaceId: stri
   // Manual refresh function
   const handleManualRefresh = useCallback(async () => {
     if (!refreshTasks) return;
-    
+
     setIsRefreshing(true);
     console.log('🔄 WorkspaceDetail - Manual refresh triggered');
-    
+
     try {
       await refreshTasks();
       console.log('✅ WorkspaceDetail - Manual refresh completed');
@@ -156,7 +156,7 @@ const TaskManagementWorkspace = ({ workspaceId, workspace }: { workspaceId: stri
   // Enhanced task operations
   const handleCreateTask = useCallback(async (taskData: any) => {
     if (!workspaceId) return;
-    
+
     try {
       console.log('📝 WorkspaceDetail - Creating task for workspace:', workspaceId);
       await createTask({
@@ -186,14 +186,14 @@ const TaskManagementWorkspace = ({ workspaceId, workspace }: { workspaceId: stri
   const handleAssignTask = useCallback(async (taskId: string, userId: string) => {
     try {
       console.log('👤 WorkspaceDetail - Assigning task:', taskId, 'to user:', userId);
-      
+
       const currentTask = tasks.find(t => t.id === taskId);
       const currentAssignees = currentTask?.assignees || [];
-      
-      const newAssignees = currentAssignees.includes(userId) 
-        ? currentAssignees 
+
+      const newAssignees = currentAssignees.includes(userId)
+        ? currentAssignees
         : [...currentAssignees, userId];
-      
+
       await updateTask(taskId, { assignees: newAssignees });
       console.log('✅ WorkspaceDetail - Task assignment completed');
     } catch (err) {
@@ -201,11 +201,11 @@ const TaskManagementWorkspace = ({ workspaceId, workspace }: { workspaceId: stri
       throw err;
     }
   }, [tasks, updateTask]);
-  
+
   const handleDeleteTask = useCallback(async (taskId: string) => {
     const confirmed = window.confirm('Are you sure you want to delete this task?');
     if (!confirmed) return;
-    
+
     try {
       console.log('🗑️ WorkspaceDetail - Deleting task:', taskId);
       await deleteTask(taskId);
@@ -275,11 +275,11 @@ const TaskManagementWorkspace = ({ workspaceId, workspace }: { workspaceId: stri
               Back
             </Button>
           </Link>
-          
+
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <div 
-                className="w-6 h-6 rounded-lg flex-shrink-0 flex items-center justify-center text-white text-xs" 
+              <div
+                className="w-6 h-6 rounded-lg flex-shrink-0 flex items-center justify-center text-white text-xs"
                 style={{ backgroundColor: workspace.color }}
               >
                 {getWorkspaceIcon()}
@@ -291,11 +291,11 @@ const TaskManagementWorkspace = ({ workspaceId, workspace }: { workspaceId: stri
                 {getWorkspaceTypeLabel()}
               </Badge>
             </div>
-            
+
             {workspace.description && (
               <p className="text-gray-600 max-w-2xl">{workspace.description}</p>
             )}
-            
+
             <div className="flex items-center gap-4 mt-3 text-sm text-gray-500">
               <span className="flex items-center gap-1">
                 <Users className="h-4 w-4" />
@@ -308,12 +308,12 @@ const TaskManagementWorkspace = ({ workspaceId, workspace }: { workspaceId: stri
             </div>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-2">
           {refreshTasks && (
-            <Button 
-              onClick={handleManualRefresh} 
-              variant="outline" 
+            <Button
+              onClick={handleManualRefresh}
+              variant="outline"
               size="sm"
               disabled={isRefreshing}
               className="flex items-center gap-2"
@@ -329,8 +329,8 @@ const TaskManagementWorkspace = ({ workspaceId, workspace }: { workspaceId: stri
             <Settings className="h-4 w-4 mr-2" />
             Settings
           </Button>
-          <Button 
-            onClick={() => setShowCreateTask(true)} 
+          <Button
+            onClick={() => setShowCreateTask(true)}
             className="bg-homemade-orange hover:bg-homemade-orange-dark"
           >
             <Plus className="h-4 w-4 mr-2" />
@@ -422,11 +422,11 @@ const TaskManagementWorkspace = ({ workspaceId, workspace }: { workspaceId: stri
             </span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-4">
-            <div 
+            <div
               className="h-4 rounded-full transition-all duration-500"
-              style={{ 
+              style={{
                 width: `${stats.completionRate}%`,
-                backgroundColor: workspace.color 
+                backgroundColor: workspace.color
               }}
             />
           </div>
@@ -445,11 +445,11 @@ const TaskManagementWorkspace = ({ workspaceId, workspace }: { workspaceId: stri
           <CardContent>
             <div className="flex flex-wrap gap-4">
               {workspaceTeam.map(member => {
-                const memberTasks = workspaceTasks.filter(t => 
+                const memberTasks = workspaceTasks.filter(t =>
                   (t.assignees && t.assignees.includes(member.id)) || t.created_by === member.id
                 );
                 const memberCompleted = memberTasks.filter(t => t.status === 'done').length;
-                
+
                 return (
                   <div key={member.id} className="flex items-center gap-3 p-3 border rounded-lg">
                     <Avatar className="h-10 w-10">
@@ -486,9 +486,9 @@ const TaskManagementWorkspace = ({ workspaceId, workspace }: { workspaceId: stri
           </CardHeader>
           <CardContent className="space-y-3">
             {tasksByStatus.todo.map(task => (
-              <TaskCard 
-                key={task.id} 
-                task={task} 
+              <TaskCard
+                key={task.id}
+                task={task}
                 onClick={() => setSelectedTask(task)}
               />
             ))}
@@ -510,8 +510,8 @@ const TaskManagementWorkspace = ({ workspaceId, workspace }: { workspaceId: stri
           </CardHeader>
           <CardContent className="space-y-3">
             {tasksByStatus.in_progress.map(task => (
-              <TaskCard 
-                key={task.id} 
+              <TaskCard
+                key={task.id}
                 task={task}
                 onClick={() => setSelectedTask(task)}
               />
@@ -534,8 +534,8 @@ const TaskManagementWorkspace = ({ workspaceId, workspace }: { workspaceId: stri
           </CardHeader>
           <CardContent className="space-y-3">
             {tasksByStatus.done.map(task => (
-              <TaskCard 
-                key={task.id} 
+              <TaskCard
+                key={task.id}
                 task={task}
                 onClick={() => setSelectedTask(task)}
               />
@@ -553,7 +553,7 @@ const TaskManagementWorkspace = ({ workspaceId, workspace }: { workspaceId: stri
             <CheckCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">No tasks yet</h3>
             <p className="text-gray-500 mb-4">Get started by creating the first task for this workspace.</p>
-            <Button 
+            <Button
               onClick={() => setShowCreateTask(true)}
               className="bg-homemade-orange hover:bg-homemade-orange-dark"
             >
@@ -565,8 +565,8 @@ const TaskManagementWorkspace = ({ workspaceId, workspace }: { workspaceId: stri
       )}
 
       {/* Dialogs */}
-      <CreateTaskDialog 
-        open={showCreateTask} 
+      <CreateTaskDialog
+        open={showCreateTask}
         onOpenChange={setShowCreateTask}
         onCreateTask={handleCreateTask}
       />
@@ -596,7 +596,7 @@ const TaskManagementWorkspace = ({ workspaceId, workspace }: { workspaceId: stri
 const WorkspaceDetail = () => {
   const { id: workspaceId } = useParams<{ id: string }>();
   const { user } = useAuth();
-  
+
   // Only get workspaces for routing, not full task context
   const { workspaces, loading: workspacesLoading, error: workspacesError } = useTaskContext();
 

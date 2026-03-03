@@ -24,7 +24,8 @@ import {
   Image,
   Wrench,
   Rocket,
-  Inbox
+  Inbox,
+  Film
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -57,6 +58,7 @@ const navigation = [
   { name: 'Launch Posts', href: '/launch-posts', icon: Rocket },
   { name: 'Trend Radar', href: '/content-hub', icon: Sparkles },
   { name: 'Email Intel', href: '/email-intel', icon: Inbox },
+  { name: 'Video Pipeline', href: '/video', icon: Film },
   { name: 'Search', href: '/search', icon: Search },
 ];
 

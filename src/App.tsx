@@ -24,6 +24,7 @@ import { ThemeRoute } from "./components/ThemeRoute";
 import LaunchPosts from "./pages/LaunchPosts";
 import ContentHub from "./pages/ContentHub";
 import EmailIntelligencePage from "./pages/EmailIntelligencePage";
+import VideoPage from "./pages/VideoPage";
 
 
 // CRITICAL FIX: Move QueryClient creation outside component
@@ -86,6 +87,11 @@ const App = () => (
               <Route path="/email-intel" element={
                 <ProtectedRoute>
                   <EmailIntelligencePage />
+                </ProtectedRoute>
+              } />
+              <Route path="/video" element={
+                <ProtectedRoute>
+                  <VideoPage />
                 </ProtectedRoute>
               } />
 

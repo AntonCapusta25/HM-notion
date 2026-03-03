@@ -489,6 +489,106 @@ export interface CollabActivity {
 }
 
 // ======================================
+// VIDEO PIPELINE TYPES
+// ======================================
+
+export type VideoStatus = 'scheduled' | 'shoot_done' | 'editing' | 'publish' | 'done';
+
+export interface VideoProject {
+  id: string;
+  // Chef details (from lovable onboarding)
+  chef_id: string;
+  chef_name: string;
+  chef_hyperzod_id?: string;
+  // Shoot info
+  shoot_date: string;
+  location?: string;
+  notes?: string;
+  attendance_status: 'pending' | 'attended' | 'not_attended';
+  // Pipeline
+  status: VideoStatus;
+  shoot_proof_url?: string;
+  edit_proof_url?: string;
+  social_media_url?: string;
+  // Team
+  assigned_shooter_id?: string;
+  assigned_shooter_name?: string;
+  assigned_editor_id?: string;
+  assigned_editor_name?: string;
+  assigned_publisher_id?: string;
+  assigned_publisher_name?: string;
+  // Audit
+  created_by?: string;
+  triggered_from?: 'manual' | 'lovable';
+  created_at: string;
+  updated_at: string;
+}
+
+export const VIDEO_STATUS_CONFIG: Record<VideoStatus, {
+  label: string;
+  icon: string;
+  color: string;       // Tailwind text colour
+  bg: string;          // Tailwind bg colour
+  border: string;      // Tailwind border colour
+  proofRequired: boolean; // Whether a proof link is required to LEAVE this status
+  proofField: 'shoot_proof_url' | 'edit_proof_url' | null;
+}> = {
+  scheduled: {
+    label: 'Shoot Scheduled',
+    icon: '📅',
+    color: 'text-slate-300',
+    bg: 'bg-slate-800/60',
+    border: 'border-slate-600',
+    proofRequired: true,
+    proofField: 'shoot_proof_url',
+  },
+  shoot_done: {
+    label: 'Shoot Done',
+    icon: '🎬',
+    color: 'text-amber-300',
+    bg: 'bg-amber-900/40',
+    border: 'border-amber-600',
+    proofRequired: true,
+    proofField: 'edit_proof_url',
+  },
+  editing: {
+    label: 'Editing',
+    icon: '✂️',
+    color: 'text-violet-300',
+    bg: 'bg-violet-900/40',
+    border: 'border-violet-600',
+    proofRequired: false,
+    proofField: null,
+  },
+  publish: {
+    label: 'Ready to Publish',
+    icon: '📣',
+    color: 'text-sky-300',
+    bg: 'bg-sky-900/40',
+    border: 'border-sky-600',
+    proofRequired: false,
+    proofField: null,
+  },
+  done: {
+    label: 'Published',
+    icon: '🚀',
+    color: 'text-emerald-300',
+    bg: 'bg-emerald-900/40',
+    border: 'border-emerald-600',
+    proofRequired: false,
+    proofField: null,
+  },
+};
+
+export const VIDEO_STATUS_ORDER: VideoStatus[] = [
+  'scheduled',
+  'shoot_done',
+  'editing',
+  'publish',
+  'done',
+];
+
+// ======================================
 // CONFIGURATION OBJECTS
 // ======================================
 

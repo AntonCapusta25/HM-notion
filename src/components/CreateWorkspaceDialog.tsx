@@ -88,7 +88,7 @@ export const CreateWorkspaceDialog = ({ open, onOpenChange }: CreateWorkspaceDia
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!user) {
       setError('You must be logged in to create workspaces');
       return;
@@ -126,10 +126,10 @@ export const CreateWorkspaceDialog = ({ open, onOpenChange }: CreateWorkspaceDia
       // Success - close dialog and reset form
       onOpenChange(false);
       resetForm();
-      
+
       // Trigger a refresh of the workspaces list
       window.location.reload();
-      
+
     } catch (err: any) {
       console.error('Error creating workspace:', err);
       setError('Failed to create workspace. Please try again.');
@@ -160,13 +160,13 @@ export const CreateWorkspaceDialog = ({ open, onOpenChange }: CreateWorkspaceDia
         <DialogHeader>
           <DialogTitle>Create New Workspace</DialogTitle>
         </DialogHeader>
-        
+
         {error && (
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
-        
+
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Workspace Type Selection */}
           <div className="space-y-3">
@@ -179,14 +179,13 @@ export const CreateWorkspaceDialog = ({ open, onOpenChange }: CreateWorkspaceDia
                     key={workspaceType.id}
                     type="button"
                     onClick={() => handleTypeChange(workspaceType.id)}
-                    className={`flex items-start gap-4 p-4 border-2 rounded-lg text-left transition-all ${
-                      type === workspaceType.id
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
+                    className={`flex items-start gap-4 p-4 border-2 rounded-lg text-left transition-all ${type === workspaceType.id
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                      }`}
                     disabled={isSubmitting}
                   >
-                    <div 
+                    <div
                       className="w-10 h-10 rounded-lg flex items-center justify-center text-white flex-shrink-0"
                       style={{ backgroundColor: workspaceType.defaultColor }}
                     >
@@ -197,7 +196,7 @@ export const CreateWorkspaceDialog = ({ open, onOpenChange }: CreateWorkspaceDia
                       <div className="text-sm text-gray-600 mb-2">{workspaceType.description}</div>
                       <div className="flex flex-wrap gap-1">
                         {workspaceType.features.map((feature, index) => (
-                          <span 
+                          <span
                             key={index}
                             className="inline-block px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded"
                           >
@@ -275,9 +274,8 @@ export const CreateWorkspaceDialog = ({ open, onOpenChange }: CreateWorkspaceDia
                 <button
                   key={colorOption}
                   type="button"
-                  className={`w-8 h-8 rounded-full border-2 transition-all ${
-                    color === colorOption ? 'border-gray-800 scale-110' : 'border-gray-300'
-                  }`}
+                  className={`w-8 h-8 rounded-full border-2 transition-all ${color === colorOption ? 'border-gray-800 scale-110' : 'border-gray-300'
+                    }`}
                   style={{ backgroundColor: colorOption }}
                   onClick={() => setColor(colorOption)}
                   disabled={isSubmitting}
@@ -297,7 +295,7 @@ export const CreateWorkspaceDialog = ({ open, onOpenChange }: CreateWorkspaceDia
                 <div>
                   <h4 className="font-medium text-green-800">AI-Powered Outreach</h4>
                   <p className="text-sm text-green-700 mt-1">
-                    This workspace includes OpenAI integration for deep research, automated lead generation, 
+                    This workspace includes OpenAI integration for deep research, automated lead generation,
                     and intelligent email campaigns. You'll need to configure your API keys in workspace settings.
                   </p>
                 </div>
@@ -312,7 +310,7 @@ export const CreateWorkspaceDialog = ({ open, onOpenChange }: CreateWorkspaceDia
                 <div>
                   <h4 className="font-medium text-orange-800">Chef Recruitment System</h4>
                   <p className="text-sm text-orange-700 mt-1">
-                    Specialized workspace for managing chef outreach, recruitment tracking, 
+                    Specialized workspace for managing chef outreach, recruitment tracking,
                     onboarding progress, and communication logs with potential chef partners.
                   </p>
                 </div>
@@ -327,7 +325,7 @@ export const CreateWorkspaceDialog = ({ open, onOpenChange }: CreateWorkspaceDia
                 <div>
                   <h4 className="font-medium text-blue-800">Team Collaboration</h4>
                   <p className="text-sm text-blue-700 mt-1">
-                    Traditional project management workspace for task tracking, team collaboration, 
+                    Traditional project management workspace for task tracking, team collaboration,
                     and progress monitoring across your team and projects.
                   </p>
                 </div>
@@ -336,16 +334,16 @@ export const CreateWorkspaceDialog = ({ open, onOpenChange }: CreateWorkspaceDia
           )}
 
           <div className="flex gap-3 pt-4">
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="flex-1 bg-homemade-orange hover:bg-homemade-orange-dark"
               disabled={isSubmitting || !name.trim() || !department}
             >
               {isSubmitting ? 'Creating Workspace...' : `Create ${selectedWorkspaceType?.name} Workspace`}
             </Button>
-            <Button 
-              type="button" 
-              variant="outline" 
+            <Button
+              type="button"
+              variant="outline"
               onClick={handleClose}
               disabled={isSubmitting}
             >
