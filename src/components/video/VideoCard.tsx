@@ -1,9 +1,11 @@
 // src/components/video/VideoCard.tsx
 import { VideoProject, VIDEO_STATUS_CONFIG, VideoStatus } from '@/types';
-import { Calendar, MapPin, ExternalLink, AlertCircle, CheckCircle2, User, Check } from 'lucide-react';
+import { Calendar, MapPin, ExternalLink, AlertCircle, CheckCircle2, User, Check, MoreHorizontal } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { useUsersQuery } from '@/hooks/queries/useTasksQuery';
 import { cn } from '@/lib/utils';
 
@@ -53,151 +55,167 @@ export const VideoCard = ({ project, isCompleted, currentColumnStatus, onClick, 
     const activeInitials = activeName ? activeName.charAt(0).toUpperCase() : '?';
 
     return (
-        <div
+        <Card
             onClick={onClick}
             className={cn(
-                'group relative bg-white rounded-xl border cursor-pointer transition-all duration-200',
+                'group cursor-pointer hover:shadow-md transition-all duration-200 border',
                 isCompleted
-                    ? 'bg-slate-50/50 border-slate-200 hover:bg-slate-50 opacity-80'
-                    : cn('border-slate-200 hover:border-slate-300 hover:shadow-md'),
-                'p-4 space-y-3'
+                    ? 'bg-slate-50 border-slate-200 hover:bg-slate-100 opacity-80'
+                    : 'bg-white hover:border-slate-300'
             )}
         >
-            {/* Top accent bar */}
-            <div className={cn(
-                'absolute top-0 left-0 right-0 h-0.5 rounded-t-xl',
-                isCompleted ? 'bg-emerald-600/50' : cfg.border.replace('border-', 'bg-')
-            )} />
+            <CardContent className="p-4">
+                <div className="space-y-3">
+                    {/* Title Row */}
+                    <div className="flex items-center gap-2">
+                        <h3 className="flex-1 font-medium leading-tight hover:text-blue-600 transition-colors text-slate-900 truncate" title={project.chef_name}>
+                            {project.chef_name}
+                        </h3>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <MoreHorizontal className="h-4 w-4 text-slate-500" />
+                        </Button>
+                    </div>
 
-            {/* Header */}
-            <div className="flex items-start justify-between gap-2 mt-1">
-                <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-sm text-slate-900 truncate leading-snug">
-                        {project.chef_name}
-                    </h3>
+                    {/* Description (HZ ID) */}
                     {project.chef_hyperzod_id && (
-                        <span className="text-[10px] font-mono text-slate-500 mt-0.5 block">
+                        <p className="text-sm text-slate-600 line-clamp-2">
                             HZ-{project.chef_hyperzod_id}
-                        </span>
+                        </p>
                     )}
-                </div>
-                {/* Source badge */}
-                {isFromLovable && (
-                    <span className="shrink-0 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 border border-orange-200">
-                        onboarding
-                    </span>
-                )}
-            </div>
 
-            {/* Date & Location */}
-            <div className="space-y-1">
-                <div className={cn("flex items-center gap-1.5 text-xs text-slate-600", isCompleted && "text-slate-400")}>
-                    <Calendar className={cn("h-3 w-3 shrink-0 text-slate-400")} />
-                    <span>{new Date(project.shoot_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                </div>
-                {project.location && (
-                    <div className={cn("flex items-center gap-1.5 text-xs text-slate-500", isCompleted && "text-slate-400")}>
-                        <MapPin className="h-3 w-3 shrink-0" />
-                        <span className="truncate">{project.location}</span>
-                    </div>
-                )}
-            </div>
-
-            {/* Footer: proof state + assignee */}
-            <div className={cn("flex items-center justify-between pt-3 border-t", "border-slate-100")}>
-                {/* Proof pill */}
-                {isCompleted ? (
-                    <div className="flex items-center gap-1 text-[10px] text-emerald-500">
-                        <CheckCircle2 className="h-3 w-3" />
-                        <span>Done</span>
-                    </div>
-                ) : proofMissing ? (
-                    <div className="flex items-center gap-1 text-[10px] text-amber-400">
-                        <AlertCircle className="h-3 w-3" />
-                        <span>Proof needed</span>
-                    </div>
-                ) : (project.shoot_proof_url || project.edit_proof_url) ? (
-                    <div className="flex items-center gap-1 text-[10px] text-emerald-400">
-                        <ExternalLink className="h-3 w-3" />
-                        <span>Proof linked</span>
-                    </div>
-                ) : (
-                    <span />
-                )}
-
-                {/* Assignee Popover */}
-                <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                    <Popover>
-                        <PopoverTrigger asChild>
-                            {activeId || activeName ? (
-                                <div className={cn(
-                                    "flex items-center gap-1.5 cursor-pointer transition-opacity text-xs font-medium",
-                                    !isCompleted && "hover:opacity-80",
-                                    "px-1.5 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-700"
-                                )}>
-                                    <Avatar className="h-4 w-4">
-                                        <AvatarFallback className="text-[9px] bg-slate-200 text-slate-600 font-bold">
-                                            {activeInitials}
-                                        </AvatarFallback>
-                                    </Avatar>
-                                    <span>{activeName?.split(' ')[0] || "User"}</span>
-                                </div>
-                            ) : (
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 w-6 p-0 rounded-full border border-dashed border-slate-300 hover:border-slate-400 bg-slate-50"
-                                >
-                                    <User className="h-3 w-3 text-slate-400" />
-                                </Button>
+                    {/* Properties Row */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                        {/* Status Badge */}
+                        <Badge
+                            variant="outline"
+                            className={cn(
+                                "border text-[10px] uppercase font-bold tracking-wider px-2 py-0.5",
+                                // Dark mode text colors are -300, we map them to -700 for light mode
+                                cfg.color.replace('-300', '-700'),
+                                // Dark mode border colors are -600, we map them to bg- -100 for light mode
+                                isCompleted ? "bg-slate-50 border-slate-200 text-slate-500" : [
+                                    cfg.border.replace('border-', 'bg-').replace('-600', '-50'),
+                                    cfg.border.replace('-600', '-200')
+                                ]
                             )}
-                        </PopoverTrigger>
-                        {!isCompleted && onUpdate && (
-                            <PopoverContent className="w-56 p-2 bg-white border-slate-200 text-slate-900 shadow-md" align="end" onClick={(e) => e.stopPropagation()}>
-                                <div className="space-y-1">
-                                    <div className="text-[10px] uppercase tracking-wider font-semibold text-slate-500 px-2 py-1">
-                                        Assign {roleName}:
-                                    </div>
-                                    <div className="max-h-60 overflow-y-auto pr-1">
-                                        {users.map(u => {
-                                            const isAssigned = activeId === u.id;
-                                            return (
-                                                <Button
-                                                    key={u.id}
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className={cn(
-                                                        "w-full justify-start text-xs",
-                                                        isAssigned && "bg-slate-100 text-slate-900 font-semibold hover:bg-slate-200",
-                                                        !isAssigned && "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                                                    )}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        onUpdate(project.id, {
-                                                            [idField]: u.id,
-                                                            [nameField]: u.name,
-                                                        });
-                                                    }}
-                                                >
-                                                    <div className="flex items-center gap-2 flex-1">
-                                                        <Avatar className="h-5 w-5">
-                                                            <AvatarFallback className="text-[10px] bg-indigo-100 text-indigo-700 font-bold">
-                                                                {u.name.charAt(0).toUpperCase()}
-                                                            </AvatarFallback>
-                                                        </Avatar>
-                                                        <span className="flex-1 text-left">{u.name}</span>
-                                                        {isAssigned && <Check className="h-3 w-3 text-violet-600" />}
-                                                    </div>
-                                                </Button>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            </PopoverContent>
+                        >
+                            {cfg.label}
+                        </Badge>
+
+                        {/* Date */}
+                        <div className="flex items-center gap-1 text-xs text-slate-500 px-1 py-0.5 rounded-md hover:bg-slate-100 cursor-pointer">
+                            <Calendar className="h-3 w-3" />
+                            <span>{new Date(project.shoot_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
+                        </div>
+
+                        {/* Location */}
+                        {project.location && (
+                            <div className="flex items-center gap-1 text-xs text-slate-500 px-1 py-0.5 rounded-md hover:bg-slate-100 cursor-pointer">
+                                <MapPin className="h-3 w-3" />
+                                <span className="truncate max-w-[100px]">{project.location}</span>
+                            </div>
                         )}
-                    </Popover>
+                    </div>
+
+                    {/* Tags Row */}
+                    {isFromLovable && (
+                        <div className="flex flex-wrap gap-1">
+                            <Badge variant="secondary" className="text-xs bg-slate-100 text-slate-700 hover:bg-slate-200">
+                                onboarding
+                            </Badge>
+                        </div>
+                    )}
+
+                    {/* Bottom Row - Assignees, Proof states */}
+                    <div className="flex items-center justify-between pt-1">
+                        <div className="flex items-center gap-2">
+                            {/* Assignee Popover */}
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                        {activeId || activeName ? (
+                                            <div className="flex -space-x-2 cursor-pointer hover:opacity-80 transition-opacity">
+                                                <Avatar className="h-6 w-6 border-2 border-white">
+                                                    <AvatarFallback className="text-[10px] bg-blue-500 text-white font-medium">
+                                                        {activeInitials}
+                                                    </AvatarFallback>
+                                                </Avatar>
+                                            </div>
+                                        ) : (
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-6 w-6 p-0 rounded-full border-2 border-dashed border-slate-300 hover:border-slate-400 bg-slate-50"
+                                            >
+                                                <User className="h-3 w-3 text-slate-400" />
+                                            </Button>
+                                        )}
+                                    </div>
+                                </PopoverTrigger>
+                                {!isCompleted && onUpdate && (
+                                    <PopoverContent className="w-56 p-2 bg-white border-slate-200 text-slate-900 shadow-md" align="start" onClick={(e) => e.stopPropagation()}>
+                                        <div className="space-y-1">
+                                            <div className="text-[10px] uppercase tracking-wider font-semibold text-slate-500 px-2 py-1">
+                                                Assign {roleName}:
+                                            </div>
+                                            <div className="max-h-60 overflow-y-auto pr-1">
+                                                {users.map(u => {
+                                                    const isAssigned = activeId === u.id;
+                                                    return (
+                                                        <Button
+                                                            key={u.id}
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className={cn(
+                                                                "w-full justify-start text-xs",
+                                                                isAssigned && "bg-slate-100 text-slate-900 font-semibold hover:bg-slate-200",
+                                                                !isAssigned && "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                                                            )}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                onUpdate(project.id, {
+                                                                    [idField]: u.id,
+                                                                    [nameField]: u.name,
+                                                                });
+                                                            }}
+                                                        >
+                                                            <div className="flex items-center gap-2 flex-1">
+                                                                <Avatar className="h-5 w-5">
+                                                                    <AvatarFallback className="text-[10px] bg-indigo-100 text-indigo-700 font-bold">
+                                                                        {u.name.charAt(0).toUpperCase()}
+                                                                    </AvatarFallback>
+                                                                </Avatar>
+                                                                <span className="flex-1 text-left">{u.name}</span>
+                                                                {isAssigned && <Check className="h-3 w-3 text-violet-600" />}
+                                                            </div>
+                                                        </Button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    </PopoverContent>
+                                )}
+                            </Popover>
+                        </div>
+
+                        {/* Proof icons */}
+                        <div className="flex items-center gap-1 text-xs text-slate-500">
+                            {isCompleted ? (
+                                <div className="flex items-center gap-1"><CheckCircle2 className="h-4 w-4 text-emerald-500" /></div>
+                            ) : proofMissing ? (
+                                <div className="flex items-center gap-1"><AlertCircle className="h-4 w-4 text-amber-500" /></div>
+                            ) : (project.shoot_proof_url || project.edit_proof_url) ? (
+                                <div className="flex items-center gap-1"><ExternalLink className="h-4 w-4 text-emerald-500" /></div>
+                            ) : null}
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </div>
+            </CardContent>
+        </Card>
     );
 };

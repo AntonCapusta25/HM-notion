@@ -155,18 +155,21 @@ export const VideoWorkspace = ({ workspaceName = 'Video Pipeline' }: VideoWorksp
                             <div className={cn(
                                 'flex items-center justify-between px-3 py-2.5 rounded-xl border',
                                 'bg-white shadow-sm',
-                                cfg.border,
+                                cfg.border.replace('-600', '-200'),
                             )}>
                                 <div className="flex items-center gap-2">
                                     <span className="text-base leading-none">{cfg.icon}</span>
-                                    <span className={cn('text-xs font-semibold uppercase tracking-wider', cfg.color)}>
+                                    <span className={cn('text-[10px] font-bold uppercase tracking-wider', cfg.color.replace('-300', '-700'))}>
                                         {cfg.label}
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-1.5">
                                     <span className={cn(
-                                        'text-xs font-bold px-2 py-0.5 rounded-full',
-                                        cfg.bg, cfg.color, 'border', cfg.border,
+                                        'text-[10px] font-bold px-2 py-0.5 rounded-full',
+                                        cfg.border.replace('border-', 'bg-').replace('-600', '-50'),
+                                        cfg.color.replace('-300', '-700'),
+                                        'border',
+                                        cfg.border.replace('-600', '-200'),
                                     )}>
                                         {columnProjects.length}
                                     </span>

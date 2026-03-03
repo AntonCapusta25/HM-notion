@@ -338,14 +338,10 @@ export const VideoProjectDialog = ({
                 {/* Active step card */}
                 <div className="px-6 pb-6 space-y-4">
                     {!isDone ? (
-                        <div className={cn(
-                            'rounded-xl border p-5 space-y-4',
-                            VIDEO_STATUS_CONFIG[project.status].bg,
-                            VIDEO_STATUS_CONFIG[project.status].border,
-                        )}>
+                        <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-4 shadow-sm">
                             <div>
-                                <p className={cn('text-xs font-bold uppercase tracking-wider mb-1', VIDEO_STATUS_CONFIG[project.status].color)}>
-                                    {VIDEO_STATUS_CONFIG[project.status].icon} Current Step
+                                <p className="text-[10px] font-bold uppercase tracking-wider mb-1 text-slate-500 flex items-center gap-1.5 opacity-80">
+                                    <span className="text-sm grayscale">{VIDEO_STATUS_CONFIG[project.status].icon}</span> Current Step
                                 </p>
                                 <h3 className="text-base font-bold text-slate-900">{currentStep.title}</h3>
                                 <p className="text-sm text-slate-600 mt-1">{currentStep.description}</p>
@@ -363,19 +359,19 @@ export const VideoProjectDialog = ({
                             )}
                             {(project.status === 'shoot_done' || project.status === 'editing') && (
                                 <div className="flex items-center gap-2 text-sm">
-                                    <div className="w-7 h-7 rounded-full bg-violet-100 border border-violet-200 flex items-center justify-center text-xs font-bold text-violet-600">
+                                    <div className="w-7 h-7 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-xs font-bold text-slate-600">
                                         {project.assigned_editor_name?.charAt(0) ?? 'A'}
                                     </div>
-                                    <span className="text-violet-900 font-medium">{project.assigned_editor_name}</span>
+                                    <span className="text-slate-900 font-medium">{project.assigned_editor_name}</span>
                                     <span className="text-slate-500 text-xs">editing</span>
                                 </div>
                             )}
                             {project.status === 'publish' && (
                                 <div className="flex items-center gap-2 text-sm">
-                                    <div className="w-7 h-7 rounded-full bg-sky-100 border border-sky-200 flex items-center justify-center text-xs font-bold text-sky-600">
+                                    <div className="w-7 h-7 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-xs font-bold text-slate-600">
                                         {project.assigned_publisher_name?.charAt(0) ?? 'M'}
                                     </div>
-                                    <span className="text-sky-900 font-medium">{project.assigned_publisher_name}</span>
+                                    <span className="text-slate-900 font-medium">{project.assigned_publisher_name}</span>
                                     <span className="text-slate-500 text-xs">publishing</span>
                                 </div>
                             )}
