@@ -26,6 +26,9 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
   // Track tasks with optimistic assignee updates to prevent flicker
   const optimisticAssigneeUpdates = useRef<Set<string>>(new Set());
 
+  // Track tasks with any optimistic update in-flight (status, title, etc.) to block real-time echo
+  const optimisticTaskUpdates = useRef<Set<string>>(new Set());
+
   // Pagination state
   const [page, setPage] = useState(1); // 1-indexed for UI convenience
   const [totalTasks, setTotalTasks] = useState(0);
@@ -87,7 +90,7 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
     } finally {
       setLoading(false);
     }
-  }, [user?.id, userProfile?.id]);
+  }, [user?.id]);
 
   // Expose refreshTasks method for manual refresh (resets to page 1)
   const refreshTasks = useCallback(async () => {
@@ -173,9 +176,25 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
             const newTask = formatTaskFromSupabase(payload.new);
             setTasks(prev => [...prev, newTask]);
           } else if (payload.eventType === 'UPDATE') {
-            setTasks(prev => prev.map(task =>
-              task.id === payload.new.id ? { ...task, ...payload.new } : task
-            ));
+            const updatedId = payload.new.id;
+            // Skip echo from our own optimistic update — we already have fresh state
+            if (optimisticTaskUpdates.current.has(updatedId)) {
+              console.log('⏭️ Skipping real-time echo for optimistically-updated task:', updatedId);
+            } else {
+              setTasks(prev => prev.map(task => {
+                if (task.id !== updatedId) return task;
+                // Merge only flat scalar DB fields, preserve nested relational arrays
+                return {
+                  ...task,
+                  ...payload.new,
+                  // These come from JOINs — payload.new won't have them, keep existing
+                  comments: task.comments,
+                  subtasks: task.subtasks,
+                  task_assignees: task.task_assignees,
+                  tags: task.tags,
+                };
+              }));
+            }
           } else if (payload.eventType === 'DELETE') {
             setTasks(prev => prev.filter(task => task.id !== payload.old.id));
           }
@@ -640,14 +659,19 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
     console.log('⚡ Fire-and-forget update for task:', taskId, 'updates:', updates);
     const { assignees, tags, subtasks, ...restOfUpdates } = updates;
 
-    // Store original task for potential rollback
-    const originalTask = tasks.find(t => t.id === taskId);
-    if (!originalTask) return;
+    // 🔒 Block realtime echo for this task while update is in-flight
+    optimisticTaskUpdates.current.add(taskId);
 
     // 🚀 STEP 1: IMMEDIATE UI UPDATE (Optimistic)
+    // Capture a rollback snapshot inside the setter to avoid stale closure
+    let rollbackSnapshot: Task | undefined;
+
     setTasks(prevTasks => {
       return prevTasks.map(task => {
         if (task.id === taskId) {
+          // Capture current state for rollback (inside functional update = always fresh)
+          rollbackSnapshot = task;
+
           const updatedTask = {
             ...task,
             ...updates,
@@ -693,20 +717,28 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
       } catch (error: any) {
         console.error('❌ Background update failed, rolling back:', error);
 
-        // ↩️ ROLLBACK UI UPDATE
-        if (originalTask) {
+        // ↩️ ROLLBACK UI UPDATE using the snapshot captured in the setter
+        if (rollbackSnapshot) {
+          const snapshot = rollbackSnapshot;
           setTasks(prevTasks => prevTasks.map(t =>
-            t.id === taskId ? originalTask : t
+            t.id === taskId ? snapshot : t
           ));
           console.log('Reverted task to original state due to error');
         }
+      } finally {
+        // 🔓 Release the optimistic lock after a short settling delay
+        // so any remaining in-flight realtime echoes are still suppressed
+        setTimeout(() => {
+          optimisticTaskUpdates.current.delete(taskId);
+          console.log('🔓 Released realtime lock for task:', taskId);
+        }, 600);
       }
     })();
 
     // Return immediately without waiting
     console.log('✅ UI updated instantly, DB updating in background');
 
-  }, [tasks, updateAssignees]);
+  }, [updateAssignees]);
 
   const deleteTask = useCallback(async (taskId: string) => {
     console.log('🗑️ Deleting task:', taskId);

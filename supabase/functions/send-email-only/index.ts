@@ -38,8 +38,13 @@ serve(async (req) => {
             recipientList = to_email;
         } else if (typeof to_email === 'string') {
             recipientList = [to_email];
-        } else {
-            recipientList = ['bangalexf@gmail.com'];
+        }
+
+        if (recipientList.length === 0) {
+            return new Response(
+                JSON.stringify({ error: 'to_email is required and must be a valid string or array' }),
+                { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
         }
 
         // Create a personalization object for each recipient so they are sent separately

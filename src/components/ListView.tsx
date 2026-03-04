@@ -1,4 +1,4 @@
-import { useState, useTransition } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -206,15 +206,8 @@ export const ListView = ({
     due_date: ''
   });
 
-  // Optimistic state for all tasks
-  const [optimisticTasks, setOptimisticTasks] = useState<Task[]>(tasks);
-  const [isPending, startTransition] = useTransition();
-  const [deletingTaskIds, setDeletingTaskIds] = useState<Set<string>>(new Set());
-
-  // Sync optimistic state with actual tasks when not pending
-  if (tasks !== optimisticTasks && !isPending) {
-    setOptimisticTasks(tasks);
-  }
+  // Note: optimistic updates are handled by the global store (useTaskStore).
+  // No local state copy needed — we use the `tasks` prop directly.
 
   const priorityColors = {
     low: 'bg-green-100 text-green-800 border-green-200',
@@ -242,18 +235,12 @@ export const ListView = ({
       created_at: new Date().toISOString()
     } as Task;
 
-    startTransition(() => {
-      // Add optimistically
-      setOptimisticTasks(prev => [...prev, taskData]);
-
-      // Actual API call
-      onCreateTask({
-        title: newTask.title.trim(),
-        description: newTask.description.trim(),
-        priority: newTask.priority,
-        status: newTask.status,
-        due_date: newTask.due_date || null
-      });
+    onCreateTask({
+      title: newTask.title.trim(),
+      description: newTask.description.trim(),
+      priority: newTask.priority,
+      status: newTask.status,
+      due_date: newTask.due_date || null
     });
 
     setNewTask({
@@ -267,93 +254,25 @@ export const ListView = ({
   };
 
   const handleStatusChange = (taskId: string, status: string) => {
-    startTransition(() => {
-      // Optimistic update
-      setOptimisticTasks(prev =>
-        prev.map(task =>
-          task.id === taskId
-            ? { ...task, status: status as 'todo' | 'in_progress' | 'done' }
-            : task
-        )
-      );
-
-      // Actual API call
-      onUpdateTask(taskId, { status: status as 'todo' | 'in_progress' | 'done' });
-    });
+    // Call the global store update directly — it handles optimistic updates
+    onUpdateTask(taskId, { status: status as 'todo' | 'in_progress' | 'done' });
   };
 
   const handlePriorityChange = (taskId: string, priority: string) => {
-    startTransition(() => {
-      // Optimistic update
-      setOptimisticTasks(prev =>
-        prev.map(task =>
-          task.id === taskId
-            ? { ...task, priority: priority as 'low' | 'medium' | 'high' }
-            : task
-        )
-      );
-
-      // Actual API call
-      onUpdateTask(taskId, { priority: priority as 'low' | 'medium' | 'high' });
-    });
+    onUpdateTask(taskId, { priority: priority as 'low' | 'medium' | 'high' });
   };
 
   const handleDelete = (taskId: string) => {
-    // Mark as deleting for fade effect
-    setDeletingTaskIds(prev => new Set(prev).add(taskId));
-
-    startTransition(() => {
-      // Optimistic deletion
-      setOptimisticTasks(prev => prev.filter(task => task.id !== taskId));
-
-      // Actual API call
-      onDeleteTask(taskId);
-
-      // Clean up deleting state
-      setTimeout(() => {
-        setDeletingTaskIds(prev => {
-          const next = new Set(prev);
-          next.delete(taskId);
-          return next;
-        });
-      }, 300);
-    });
+    onDeleteTask(taskId);
   };
 
   const handleAssign = (taskId: string, userIds: string[]) => {
     console.log('[ListView] handleAssign called:', { taskId, userIds });
-
-    startTransition(() => {
-      // Optimistic update
-      setOptimisticTasks(prev =>
-        prev.map(task => {
-          if (task.id === taskId) {
-            console.log('[ListView] Updating task optimistically:', { taskId, oldAssignees: task.assignees, newAssignees: userIds });
-            return { ...task, assignees: userIds };
-          }
-          return task;
-        })
-      );
-
-      // Actual API call
-      onAssignTask(taskId, userIds);
-    });
+    onAssignTask(taskId, userIds);
   };
 
   const handleDateUpdate = (taskId: string, updates: Partial<Task>) => {
-    startTransition(() => {
-      // Optimistic update
-      setOptimisticTasks(prev =>
-        prev.map(task =>
-          task.id === taskId
-            ? { ...task, ...updates }
-            : task
-        )
-      );
-
-      // Actual API call
-      onUpdateTask(taskId, updates);
-    });
+    onUpdateTask(taskId, updates);
   };
 
   return (
@@ -457,16 +376,15 @@ export const ListView = ({
                 </TableRow>
               )}
 
-              {optimisticTasks.map((task) => {
+              {tasks.map((task) => {
                 const taskAssignees = task.assignees || [];
                 const assignedUsers = users.filter(u => taskAssignees.includes(u.id));
-                const isDeleting = deletingTaskIds.has(task.id);
                 const isTempTask = task.id.startsWith('temp-');
 
                 return (
                   <TableRow
                     key={task.id}
-                    className={`hover:bg-gray-50 transition-all duration-300 ${isDeleting ? 'opacity-0' : isTempTask ? 'opacity-70' : 'opacity-100'
+                    className={`hover:bg-gray-50 transition-all duration-300 ${isTempTask ? 'opacity-70' : 'opacity-100'
                       }`}
                   >
                     <TableCell className="font-medium">
@@ -555,7 +473,6 @@ export const ListView = ({
                         variant="ghost"
                         onClick={() => handleDelete(task.id)}
                         className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        disabled={isDeleting}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -567,7 +484,7 @@ export const ListView = ({
           </Table>
         </div>
 
-        {optimisticTasks.length === 0 && !isAddingTask && (
+        {tasks.length === 0 && !isAddingTask && (
           <div className="text-center py-8 text-gray-500">
             <p>No tasks yet. Click "Add Task" to get started!</p>
           </div>
