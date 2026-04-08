@@ -105,10 +105,16 @@ const StandardMyTasks = () => {
     fetchAllTasks();
   }, [fetchAllTasks]);
 
-  // Reset selection when tasks change or filter changes
   useEffect(() => {
-    setSelectedIds([]);
-  }, [selectedWorkspace, filter, viewMode]);
+    console.log('🏗️ StandardMyTasks - Mounted');
+    return () => console.log('🗑️ StandardMyTasks - Unmounted');
+  }, []);
+
+  // Reset selection when tasks change or filter changes
+  // useEffect(() => {
+  //   console.log('🔄 MyTasks - Resetting selection state due to dependency change:', { selectedWorkspace, filter, viewMode });
+  //   setSelectedIds([]);
+  // }, [selectedWorkspace, filter, viewMode]);
 
   // Chatbot toggle functions
   const toggleChatbot = () => {
@@ -190,21 +196,25 @@ const StandardMyTasks = () => {
     }
   }, [selectedIds, deleteTasks]);
 
-  const handleSelect = (taskId: string, selected: boolean) => {
-    setSelectedIds(prev =>
-      selected
+  const handleSelect = useCallback((taskId: string, selected: boolean) => {
+    console.log('🔘 MyTasks - handleSelect called:', { taskId, selected });
+    setSelectedIds(prev => {
+      const next = selected
         ? [...prev, taskId]
-        : prev.filter(id => id !== taskId)
-    );
-  };
+        : prev.filter(id => id !== taskId);
+      console.log('🔘 MyTasks - Next selectedIds state:', next);
+      return next;
+    });
+  }, []);
 
-  const handleSelectAll = (selected: boolean, visibleTasks: Task[]) => {
+  const handleSelectAll = useCallback((selected: boolean, visibleTasks: Task[]) => {
+    console.log('🔘 MyTasks - handleSelectAll called:', { selected, count: visibleTasks.length });
     if (selected) {
       setSelectedIds(visibleTasks.map(t => t.id));
     } else {
       setSelectedIds([]);
     }
-  };
+  }, []);
 
   // ⚡ OPTIMIZED: Instant comment addition
   const handleAddComment = useCallback((taskId: string, content: string) => {
