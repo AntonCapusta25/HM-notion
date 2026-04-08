@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Plus, Calendar, AlertCircle, LayoutGrid, List, RefreshCw, MessageCircle, X, Minimize2 } from 'lucide-react';
+import { Plus, Calendar, AlertCircle, LayoutGrid, List, RefreshCw, MessageCircle, X, Minimize2, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Task, formatTaskFromSupabase } from '../types';
 import { useTheme } from '../contexts/ThemeContext';
@@ -29,6 +29,7 @@ const StandardMyTasks = () => {
     workspaces,
     createTask,
     deleteTask,
+    deleteTasks,
     updateTask,
     addComment,
     toggleSubtask,
@@ -48,6 +49,9 @@ const StandardMyTasks = () => {
   const [filter, setFilter] = useState<'all' | 'today' | 'week' | 'overdue'>('all');
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Batch Selection State
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // Chatbot integration states
   const [showChatbot, setShowChatbot] = useState(false);
@@ -100,6 +104,11 @@ const StandardMyTasks = () => {
   useEffect(() => {
     fetchAllTasks();
   }, [fetchAllTasks]);
+
+  // Reset selection when tasks change or filter changes
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [selectedWorkspace, filter, viewMode]);
 
   // Chatbot toggle functions
   const toggleChatbot = () => {
@@ -162,6 +171,40 @@ const StandardMyTasks = () => {
       throw err;
     }
   }, [deleteTask]);
+
+  const handleBatchDelete = useCallback(async () => {
+    if (selectedIds.length === 0) return;
+    
+    const confirmed = window.confirm(`Are you sure you want to delete ${selectedIds.length} tasks?`);
+    if (!confirmed) return;
+
+    try {
+      console.log('🗑️ MyTasks - Deleting multiple tasks:', selectedIds);
+      await deleteTasks?.(selectedIds);
+      setAllTasks(prev => prev.filter(t => !selectedIds.includes(t.id)));
+      setSelectedIds([]);
+      console.log('✅ MyTasks - Batch deletion completed');
+    } catch (err) {
+      console.error('❌ MyTasks - Failed to delete tasks:', err);
+      throw err;
+    }
+  }, [selectedIds, deleteTasks]);
+
+  const handleSelect = (taskId: string, selected: boolean) => {
+    setSelectedIds(prev =>
+      selected
+        ? [...prev, taskId]
+        : prev.filter(id => id !== taskId)
+    );
+  };
+
+  const handleSelectAll = (selected: boolean, visibleTasks: Task[]) => {
+    if (selected) {
+      setSelectedIds(visibleTasks.map(t => t.id));
+    } else {
+      setSelectedIds([]);
+    }
+  };
 
   // ⚡ OPTIMIZED: Instant comment addition
   const handleAddComment = useCallback((taskId: string, content: string) => {
@@ -351,6 +394,17 @@ const StandardMyTasks = () => {
               List
             </Button>
           </div>
+          {selectedIds.length > 0 && (
+            <Button
+              onClick={handleBatchDelete}
+              variant="destructive"
+              size="sm"
+              className="flex items-center gap-2 animate-in zoom-in-95 duration-200"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete {selectedIds.length} Selected
+            </Button>
+          )}
           <Button
             onClick={() => setShowCreateTask(true)}
             className="bg-homemade-orange hover:bg-homemade-orange-dark"
@@ -361,6 +415,7 @@ const StandardMyTasks = () => {
         </div>
       </div>
 
+      {/* Kanban/Stats logic... */}
       {viewMode === 'kanban' && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card>
@@ -457,6 +512,9 @@ const StandardMyTasks = () => {
           onUpdateTask={handleUpdateTask}
           onDeleteTask={handleDeleteTask}
           onAssignTask={(taskId, userIds) => handleUpdateTask(taskId, { assignees: userIds })}
+          selectedIds={selectedIds}
+          onSelect={handleSelect}
+          onSelectAll={(selected) => handleSelectAll(selected, myTasks)}
         />
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -476,6 +534,8 @@ const StandardMyTasks = () => {
                   key={task.id}
                   task={task}
                   onClick={() => setSelectedTask(task)}
+                  isSelected={selectedIds.includes(task.id)}
+                  onSelect={handleSelect}
                 />
               ))}
               {tasksByStatus.todo.length === 0 && (
@@ -502,6 +562,8 @@ const StandardMyTasks = () => {
                   key={task.id}
                   task={task}
                   onClick={() => setSelectedTask(task)}
+                  isSelected={selectedIds.includes(task.id)}
+                  onSelect={handleSelect}
                 />
               ))}
               {tasksByStatus.in_progress.length === 0 && (
@@ -528,6 +590,8 @@ const StandardMyTasks = () => {
                   key={task.id}
                   task={task}
                   onClick={() => setSelectedTask(task)}
+                  isSelected={selectedIds.includes(task.id)}
+                  onSelect={handleSelect}
                 />
               ))}
               {tasksByStatus.done.length === 0 && (

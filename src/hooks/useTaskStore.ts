@@ -757,6 +757,25 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
     }
   }, [tasks]);
 
+  const deleteTasks = useCallback(async (taskIds: string[]) => {
+    if (taskIds.length === 0) return;
+    console.log('🗑️ Deleting multiple tasks:', taskIds);
+
+    // Optimistic delete
+    const originalTasks = [...tasks];
+    setTasks(prev => prev.filter(t => !taskIds.includes(t.id)));
+
+    try {
+      const { error } = await supabase.from('tasks').delete().in('id', taskIds);
+      if (error) throw error;
+      console.log(`✅ Successfully deleted ${taskIds.length} tasks`);
+    } catch (error) {
+      console.error('Failed to delete multiple tasks, rolling back:', error);
+      setTasks(originalTasks);
+      throw error;
+    }
+  }, [tasks]);
+
   // 🚀 OPTIMISTIC: Add comment with instant UI update
   const addComment = useCallback(async (taskId: string, content: string) => {
     // ... (existing implementation is fine, it has rollback)
@@ -874,6 +893,7 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
     createTask,
     updateTask,
     deleteTask,
+    deleteTasks,
     addComment,
     updateAssignees,
     updateTags,
@@ -885,7 +905,7 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
     setPage: fetchTasks // Expose fetchTasks as setPage for direct page jumps
   }), [
     tasks, users, workspaces, loading, error,
-    createTask, updateTask, deleteTask, addComment, updateAssignees, updateTags, toggleSubtask, refreshTasks,
+    createTask, updateTask, deleteTask, deleteTasks, addComment, updateAssignees, updateTags, toggleSubtask, refreshTasks,
     page, totalTasks, fetchTasks
   ]);
 };

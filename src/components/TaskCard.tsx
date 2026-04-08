@@ -29,6 +29,8 @@ interface TaskCardProps {
   onAssign?: (taskId: string, userId: string) => void;
   compact?: boolean;
   variant?: 'standard' | 'premium';
+  isSelected?: boolean;
+  onSelect?: (taskId: string, selected: boolean) => void;
 }
 
 const safeFormatDate = (dateInput: string | null | undefined, formatStr: string = 'MMM d'): string => {
@@ -55,7 +57,7 @@ const isValidDate = (dateInput: string | null | undefined): boolean => {
   }
 };
 
-export const TaskCard = ({ task, onClick, onAssign, compact = false, variant = 'standard' }: TaskCardProps) => {
+export const TaskCard = ({ task, onClick, onAssign, compact = false, variant = 'standard', isSelected = false, onSelect }: TaskCardProps) => {
   const { users, updateTask, deleteTask } = useTaskContext();
   const [isEditing, setIsEditing] = useState(false);
   const [editingField, setEditingField] = useState<string | null>(null);
@@ -184,14 +186,28 @@ export const TaskCard = ({ task, onClick, onAssign, compact = false, variant = '
 
   return (
     <Card className={`group cursor-pointer hover:shadow-md transition-all duration-200 border 
+      ${isSelected ? (isPremium ? 'bg-white/10 border-white/20' : 'bg-orange-50 border-orange-200') : ''}
       ${isPremium
         ? 'bg-white/5 hover:bg-white/10 border-white/5 text-white backdrop-blur-md hover:shadow-lg shadow-black/20'
         : 'bg-white hover:border-gray-300'
       }`}>
-      <CardContent className="p-4">
+      <CardContent className="p-4" onClick={(e) => {
+        // Only trigger selection if we're in selection mode or clicking the checkbox area
+        // For now, let's keep it simple: clicking the card still opens detail if not clicking checkbox
+      }}>
         <div className="space-y-3">
           {/* Title Row */}
           <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              className={cn(
+                "h-4 w-4 rounded border-gray-300 text-homemade-orange focus:ring-homemade-orange transition-opacity",
+                !isSelected && "opacity-0 group-hover:opacity-100"
+              )}
+              checked={isSelected}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => onSelect?.(task.id, e.target.checked)}
+            />
             {editingField === 'title' ? (
               <input
                 ref={titleInputRef}

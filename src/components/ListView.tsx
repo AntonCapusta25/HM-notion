@@ -19,6 +19,9 @@ interface ListViewProps {
   onUpdateTask: (taskId: string, updates: Partial<Task>) => void;
   onDeleteTask: (taskId: string) => void;
   onAssignTask: (taskId: string, userIds: string[]) => void;
+  selectedIds?: string[];
+  onSelect?: (taskId: string, selected: boolean) => void;
+  onSelectAll?: (selected: boolean) => void;
 }
 
 // Safe date formatting utility
@@ -195,7 +198,10 @@ export const ListView = ({
   onCreateTask,
   onUpdateTask,
   onDeleteTask,
-  onAssignTask
+  onAssignTask,
+  selectedIds = [],
+  onSelect,
+  onSelectAll
 }: ListViewProps) => {
   const [isAddingTask, setIsAddingTask] = useState(false);
   const [newTask, setNewTask] = useState({
@@ -275,6 +281,9 @@ export const ListView = ({
     onUpdateTask(taskId, updates);
   };
 
+  const allSelected = tasks.length > 0 && selectedIds?.length === tasks.length;
+  const someSelected = (selectedIds?.length || 0) > 0 && !allSelected;
+
   return (
     <Card>
       <CardHeader className="pb-4">
@@ -295,6 +304,17 @@ export const ListView = ({
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[40px]">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-gray-300 text-homemade-orange focus:ring-homemade-orange"
+                    checked={allSelected}
+                    ref={el => {
+                      if (el) el.indeterminate = someSelected;
+                    }}
+                    onChange={(e) => onSelectAll?.(e.target.checked)}
+                  />
+                </TableHead>
                 <TableHead className="min-w-[250px] max-w-[450px]">Task</TableHead>
                 <TableHead className="w-[140px]">Status</TableHead>
                 <TableHead className="w-[120px]">Priority</TableHead>
@@ -306,6 +326,7 @@ export const ListView = ({
             <TableBody>
               {isAddingTask && (
                 <TableRow className="bg-blue-50">
+                  <TableCell></TableCell>
                   <TableCell>
                     <div className="space-y-2">
                       <Input
@@ -380,13 +401,22 @@ export const ListView = ({
                 const taskAssignees = task.assignees || [];
                 const assignedUsers = users.filter(u => taskAssignees.includes(u.id));
                 const isTempTask = task.id.startsWith('temp-');
+                const isSelected = selectedIds?.includes(task.id);
 
                 return (
                   <TableRow
                     key={task.id}
                     className={`hover:bg-gray-50 transition-all duration-300 ${isTempTask ? 'opacity-70' : 'opacity-100'
-                      }`}
+                      } ${isSelected ? 'bg-orange-50 hover:bg-orange-100' : ''}`}
                   >
+                    <TableCell>
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-gray-300 text-homemade-orange focus:ring-homemade-orange"
+                        checked={isSelected}
+                        onChange={(e) => onSelect?.(task.id, e.target.checked)}
+                      />
+                    </TableCell>
                     <TableCell className="font-medium">
                       <div className="space-y-1">
                         <div className="font-medium text-gray-900">{task.title}</div>
