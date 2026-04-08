@@ -201,13 +201,18 @@ export const TaskCard = ({ task, onClick, onAssign, compact = false, variant = '
           <div className="flex items-center gap-2">
             <Checkbox
               checked={isSelected}
-              onCheckedChange={(checked) => {
-                onSelect?.(task.id, !!checked);
+              onClick={(e) => {
+                e.stopPropagation();
+                console.log('👆 TaskCard - Checkbox clicked:', { taskId: task.id, currentlySelected: isSelected });
+                onSelect?.(task.id, !isSelected);
               }}
-              onClick={(e) => e.stopPropagation()}
+              onCheckedChange={(checked) => {
+                // Keep this as fallback or remove if onClick handles it
+                // console.log('🔘 TaskCard - onCheckedChange:', { checked });
+              }}
               className={cn(
-                "h-4 w-4 transition-opacity",
-                !isSelected && "opacity-20 group-hover:opacity-100"
+                "h-4 w-4 relative z-10",
+                !isSelected && "opacity-40 group-hover:opacity-100"
               )}
             />
             {editingField === 'title' ? (

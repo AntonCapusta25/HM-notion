@@ -308,7 +308,14 @@ export const ListView = ({
                 <TableHead className="w-[40px]">
                   <Checkbox
                     checked={allSelected}
-                    onCheckedChange={(checked) => onSelectAll?.(!!checked)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      console.log('👆 ListView - Select All clicked:', { currentlyAllSelected: allSelected });
+                      onSelectAll?.(!allSelected);
+                    }}
+                    onCheckedChange={(checked) => {
+                      // console.log('🔘 ListView - onSelectAll changed:', checked);
+                    }}
                     aria-label="Select all tasks"
                   />
                 </TableHead>
@@ -409,8 +416,13 @@ export const ListView = ({
                     <TableCell>
                       <Checkbox
                         checked={isSelected}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          console.log('👆 ListView - Row checkbox clicked:', { taskId: task.id, currentlySelected: isSelected });
+                          onSelect?.(task.id, !isSelected);
+                        }}
                         onCheckedChange={(checked) => {
-                          onSelect?.(task.id, !!checked);
+                          // console.log('🔘 ListView - onCheckedChange:', { checked });
                         }}
                       />
                     </TableCell>
