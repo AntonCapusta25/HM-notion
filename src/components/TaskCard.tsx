@@ -22,6 +22,7 @@ import { Task, User as UserType } from '../types';
 import { format, isAfter, isBefore, startOfDay, isToday, isTomorrow } from 'date-fns';
 import { useTaskContext } from '../contexts/TaskContext';
 import { cn } from '@/lib/utils';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface TaskCardProps {
   task: Task;
@@ -198,15 +199,16 @@ export const TaskCard = ({ task, onClick, onAssign, compact = false, variant = '
         <div className="space-y-3">
           {/* Title Row */}
           <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              className={cn(
-                "h-4 w-4 rounded border-gray-300 text-homemade-orange focus:ring-homemade-orange transition-opacity",
-                !isSelected && "opacity-0 group-hover:opacity-100"
-              )}
+            <Checkbox
               checked={isSelected}
+              onCheckedChange={(checked) => {
+                onSelect?.(task.id, !!checked);
+              }}
               onClick={(e) => e.stopPropagation()}
-              onChange={(e) => onSelect?.(task.id, e.target.checked)}
+              className={cn(
+                "h-4 w-4 transition-opacity",
+                !isSelected && "opacity-20 group-hover:opacity-100"
+              )}
             />
             {editingField === 'title' ? (
               <input

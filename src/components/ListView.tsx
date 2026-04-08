@@ -11,6 +11,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '
 import { Plus, Calendar, Trash2, Check, X, Users, Edit2 } from 'lucide-react';
 import { Task, User as UserType } from '../types';
 import { format } from 'date-fns';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface ListViewProps {
   tasks: Task[];
@@ -305,14 +306,10 @@ export const ListView = ({
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[40px]">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 rounded border-gray-300 text-homemade-orange focus:ring-homemade-orange"
+                  <Checkbox
                     checked={allSelected}
-                    ref={el => {
-                      if (el) el.indeterminate = someSelected;
-                    }}
-                    onChange={(e) => onSelectAll?.(e.target.checked)}
+                    onCheckedChange={(checked) => onSelectAll?.(!!checked)}
+                    aria-label="Select all tasks"
                   />
                 </TableHead>
                 <TableHead className="min-w-[250px] max-w-[450px]">Task</TableHead>
@@ -410,11 +407,11 @@ export const ListView = ({
                       } ${isSelected ? 'bg-orange-50 hover:bg-orange-100' : ''}`}
                   >
                     <TableCell>
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 rounded border-gray-300 text-homemade-orange focus:ring-homemade-orange"
+                      <Checkbox
                         checked={isSelected}
-                        onChange={(e) => onSelect?.(task.id, e.target.checked)}
+                        onCheckedChange={(checked) => {
+                          onSelect?.(task.id, !!checked);
+                        }}
                       />
                     </TableCell>
                     <TableCell className="font-medium">
