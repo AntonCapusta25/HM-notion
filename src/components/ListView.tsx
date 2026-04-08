@@ -12,6 +12,7 @@ import { Plus, Calendar, Trash2, Check, X, Users, Edit2 } from 'lucide-react';
 import { Task, User as UserType } from '../types';
 import { format } from 'date-fns';
 import { Checkbox } from '@/components/ui/checkbox';
+import { cn } from '@/lib/utils';
 
 interface ListViewProps {
   tasks: Task[];
@@ -306,18 +307,32 @@ export const ListView = ({
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[40px]">
-                  <Checkbox
-                    checked={allSelected}
+                  <div
+                    role="checkbox"
+                    aria-checked={allSelected}
+                    tabIndex={0}
                     onClick={(e) => {
                       e.stopPropagation();
-                      console.log('👆 ListView - Select All clicked:', { currentlyAllSelected: allSelected });
+                      e.preventDefault();
+                      console.log('👆 ListView - Select All custom click:', { val: !allSelected });
                       onSelectAll?.(!allSelected);
                     }}
-                    onCheckedChange={(checked) => {
-                      // console.log('🔘 ListView - onSelectAll changed:', checked);
+                    onKeyDown={(e) => {
+                      if (e.key === ' ' || e.key === 'Enter') {
+                        e.preventDefault();
+                        onSelectAll?.(!allSelected);
+                      }
                     }}
-                    aria-label="Select all tasks"
-                  />
+                    className={cn(
+                      "h-4 w-4 rounded border flex items-center justify-center transition-all cursor-pointer mx-auto",
+                      allSelected 
+                        ? "bg-homemade-orange border-homemade-orange text-white" 
+                        : "bg-white border-gray-300 hover:border-homemade-orange"
+                    )}
+                  >
+                    {allSelected && <Check className="h-3 w-3" />}
+                    {someSelected && <div className="w-2 h-0.5 bg-homemade-orange rounded-full" />}
+                  </div>
                 </TableHead>
                 <TableHead className="min-w-[250px] max-w-[450px]">Task</TableHead>
                 <TableHead className="w-[140px]">Status</TableHead>
@@ -414,17 +429,31 @@ export const ListView = ({
                       } ${isSelected ? 'bg-orange-50 hover:bg-orange-100' : ''}`}
                   >
                     <TableCell>
-                      <Checkbox
-                        checked={isSelected}
+                      <div
+                        role="checkbox"
+                        aria-checked={isSelected}
+                        tabIndex={0}
                         onClick={(e) => {
                           e.stopPropagation();
-                          console.log('👆 ListView - Row checkbox clicked:', { taskId: task.id, currentlySelected: isSelected });
+                          e.preventDefault();
+                          console.log('👆 ListView - Row custom check clicked:', { id: task.id, val: !isSelected });
                           onSelect?.(task.id, !isSelected);
                         }}
-                        onCheckedChange={(checked) => {
-                          // console.log('🔘 ListView - onCheckedChange:', { checked });
+                        onKeyDown={(e) => {
+                          if (e.key === ' ' || e.key === 'Enter') {
+                            e.preventDefault();
+                            onSelect?.(task.id, !isSelected);
+                          }
                         }}
-                      />
+                        className={cn(
+                          "h-4 w-4 rounded border flex items-center justify-center transition-all cursor-pointer mx-auto",
+                          isSelected 
+                            ? "bg-homemade-orange border-homemade-orange text-white" 
+                            : "bg-white border-gray-300 hover:border-homemade-orange"
+                        )}
+                      >
+                        {isSelected && <Check className="h-3 w-3" />}
+                      </div>
                     </TableCell>
                     <TableCell className="font-medium">
                       <div className="space-y-1">

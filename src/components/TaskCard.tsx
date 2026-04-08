@@ -199,22 +199,31 @@ export const TaskCard = ({ task, onClick, onAssign, compact = false, variant = '
         <div className="space-y-3">
           {/* Title Row */}
           <div className="flex items-center gap-2">
-            <Checkbox
-              checked={isSelected}
+            <div
+              role="checkbox"
+              aria-checked={isSelected}
+              tabIndex={0}
               onClick={(e) => {
                 e.stopPropagation();
-                console.log('👆 TaskCard - Checkbox clicked:', { taskId: task.id, currentlySelected: isSelected });
+                e.preventDefault();
+                console.log('👆 TaskCard - Custom Check clicked:', { id: task.id, val: !isSelected });
                 onSelect?.(task.id, !isSelected);
               }}
-              onCheckedChange={(checked) => {
-                // Keep this as fallback or remove if onClick handles it
-                // console.log('🔘 TaskCard - onCheckedChange:', { checked });
+              onKeyDown={(e) => {
+                if (e.key === ' ' || e.key === 'Enter') {
+                  e.preventDefault();
+                  onSelect?.(task.id, !isSelected);
+                }
               }}
               className={cn(
-                "h-4 w-4 relative z-10",
-                !isSelected && "opacity-40 group-hover:opacity-100"
+                "h-4 w-4 rounded border flex items-center justify-center transition-all cursor-pointer",
+                isSelected 
+                  ? "bg-homemade-orange border-homemade-orange text-white" 
+                  : "bg-white border-gray-300 opacity-40 group-hover:opacity-100"
               )}
-            />
+            >
+              {isSelected && <Check className="h-3 w-3" />}
+            </div>
             {editingField === 'title' ? (
               <input
                 ref={titleInputRef}
