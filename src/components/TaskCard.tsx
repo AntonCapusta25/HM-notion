@@ -206,8 +206,13 @@ export const TaskCard = ({ task, onClick, onAssign, compact = false, variant = '
               onClick={(e) => {
                 e.stopPropagation();
                 e.preventDefault();
-                console.log('👆 TaskCard - Custom Check clicked:', { id: task.id, val: !isSelected });
-                onSelect?.(task.id, !isSelected);
+                const newVal = !isSelected;
+                console.log('👆 [TaskCard] Toggle clicked:', { id: task.id, title: task.title, newVal });
+                if (onSelect) {
+                  onSelect(task.id, newVal);
+                } else {
+                  console.warn('⚠️ [TaskCard] onSelect prop is missing!');
+                }
               }}
               onKeyDown={(e) => {
                 if (e.key === ' ' || e.key === 'Enter') {

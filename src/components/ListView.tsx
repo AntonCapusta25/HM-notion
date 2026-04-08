@@ -89,17 +89,29 @@ const AssigneeManager = ({
               {assignedUsers.map(user => (
                 <CommandItem
                   key={user.id}
-                  className="flex items-center justify-between cursor-pointer"
-                  onSelect={() => handleUnassignUser(user.id)}
+                  className="p-0"
+                  onSelect={() => {
+                    console.log('👤 [AssigneeManager] onSelect triggered (unassign):', user.name);
+                    handleUnassignUser(user.id);
+                  }}
                 >
-                  <div className="flex items-center gap-2">
-                    <Avatar className="h-6 w-6">
-                      <AvatarFallback className="text-xs">{user.name.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <span className="text-sm">{user.name}</span>
-                    <Badge variant="outline" className="text-xs">{user.department}</Badge>
+                  <div 
+                    className="flex items-center justify-between w-full p-2 cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      console.log('👤 [AssigneeManager] onClick triggered (unassign):', user.name);
+                      handleUnassignUser(user.id);
+                    }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Avatar className="h-6 w-6">
+                        <AvatarFallback className="text-xs">{user.name.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm">{user.name}</span>
+                      <Badge variant="outline" className="text-xs">{user.department}</Badge>
+                    </div>
+                    <X className="h-3 w-3 text-red-500" />
                   </div>
-                  <X className="h-3 w-3 text-red-500" />
                 </CommandItem>
               ))}
             </CommandGroup>
@@ -110,17 +122,29 @@ const AssigneeManager = ({
               {unassignedUsers.map(user => (
                 <CommandItem
                   key={user.id}
-                  className="flex items-center justify-between cursor-pointer"
-                  onSelect={() => handleAssignUser(user.id)}
+                  className="p-0"
+                  onSelect={() => {
+                    console.log('👤 [AssigneeManager] onSelect triggered (assign):', user.name);
+                    handleAssignUser(user.id);
+                  }}
                 >
-                  <div className="flex items-center gap-2">
-                    <Avatar className="h-6 w-6">
-                      <AvatarFallback className="text-xs">{user.name.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <span className="text-sm">{user.name}</span>
-                    <Badge variant="outline" className="text-xs">{user.department}</Badge>
+                  <div 
+                    className="flex items-center justify-between w-full p-2 cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      console.log('👤 [AssigneeManager] onClick triggered (assign):', user.name);
+                      handleAssignUser(user.id);
+                    }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Avatar className="h-6 w-6">
+                        <AvatarFallback className="text-xs">{user.name.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm">{user.name}</span>
+                      <Badge variant="outline" className="text-xs">{user.department}</Badge>
+                    </div>
+                    <Plus className="h-3 w-3 text-green-500" />
                   </div>
-                  <Plus className="h-3 w-3 text-green-500" />
                 </CommandItem>
               ))}
             </CommandGroup>
@@ -436,8 +460,13 @@ export const ListView = ({
                         onClick={(e) => {
                           e.stopPropagation();
                           e.preventDefault();
-                          console.log('👆 ListView - Row custom check clicked:', { id: task.id, val: !isSelected });
-                          onSelect?.(task.id, !isSelected);
+                          const newVal = !isSelected;
+                          console.log('👆 [ListView] Row Toggle clicked:', { id: task.id, title: task.title, newVal });
+                          if (onSelect) {
+                            onSelect(task.id, newVal);
+                          } else {
+                            console.warn('⚠️ [ListView] onSelect prop is missing!');
+                          }
                         }}
                         onKeyDown={(e) => {
                           if (e.key === ' ' || e.key === 'Enter') {

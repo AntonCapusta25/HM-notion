@@ -1,6 +1,6 @@
 // Updated Dashboard component with error toast notifications
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Plus, Calendar, BarChart3, Grid3X3, List, RefreshCw, MessageCircle, X, Minimize2, AlertCircle } from 'lucide-react';
+import { Plus, Calendar, BarChart3, Grid3X3, List, RefreshCw, MessageCircle, X, Minimize2, AlertCircle, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -48,6 +48,7 @@ export const Dashboard = () => {
     createTask,
     updateTask,
     deleteTask,
+    deleteTasks,
     addComment,
     toggleSubtask,
     loading: tasksLoading,
@@ -71,13 +72,21 @@ export const Dashboard = () => {
     priority: [],
     assignee: [],
     tags: [],
-    sortBy: 'created_at',
+    sortBy: 'createdAt',
     sortOrder: 'desc'
   });
+
+  // Batch Selection State
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // Enhanced chatbot integration states
   const [showChatbot, setShowChatbot] = useState(false);
   const [isChatbotMinimized, setIsChatbotMinimized] = useState(false);
+
+  // Reset selection when filtering/view mode changes
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [filter, viewMode, taskFilters]);
 
   // Track task changes for logging
   useEffect(() => {
@@ -240,6 +249,46 @@ export const Dashboard = () => {
     }
   }, [toggleSubtask]);
 
+  const handleSelect = useCallback((taskId: string, selected: boolean) => {
+    console.log('🔄 [Dashboard] handleSelect called:', { taskId, selected });
+    setSelectedIds(prev => {
+      const next = selected
+        ? [...prev, taskId]
+        : prev.filter(id => id !== taskId);
+      console.log('🔄 [Dashboard] new selectedIds:', next);
+      return next;
+    });
+  }, []);
+
+  const handleSelectAll = useCallback((selected: boolean, visibleTasks: Task[]) => {
+    console.log('🔄 [Dashboard] handleSelectAll called:', { selected, count: visibleTasks.length });
+    if (selected) {
+      const next = visibleTasks.map(t => t.id);
+      setSelectedIds(next);
+      console.log('🔄 [Dashboard] selected all:', next.length);
+    } else {
+      setSelectedIds([]);
+      console.log('🔄 [Dashboard] cleared selection');
+    }
+  }, []);
+
+  const handleBatchDelete = useCallback(async () => {
+    if (selectedIds.length === 0) return;
+
+    const confirmed = window.confirm(`Are you sure you want to delete ${selectedIds.length} tasks?`);
+    if (!confirmed) return;
+
+    try {
+      console.log('🗑️ Dashboard - Deleting multiple tasks:', selectedIds);
+      await deleteTasks?.(selectedIds);
+      setSelectedIds([]);
+      if (refreshTasks) await refreshTasks();
+      await refreshDashboardStats();
+    } catch (err) {
+      console.error('❌ Dashboard - Failed to delete multiple tasks:', err);
+    }
+  }, [selectedIds, deleteTasks, refreshTasks, refreshDashboardStats]);
+
   // Enhanced filtering with better performance
   const filteredTasks = useMemo(() => {
     let result = [...tasks];
@@ -272,7 +321,7 @@ export const Dashboard = () => {
 
       try {
         switch (taskFilters.sortBy) {
-          case 'due_date':
+          case 'dueDate':
             const parseDate = (dateStr?: string | null) => {
               if (!dateStr) return new Date('9999-12-31').getTime();
               try {
@@ -298,7 +347,7 @@ export const Dashboard = () => {
             bValue = (b.title || '').toLowerCase();
             break;
 
-          default: // created_at
+          default: // createdAt
             const parseCreatedDate = (dateStr: string) => {
               try {
                 const date = new Date(dateStr);
@@ -536,6 +585,19 @@ export const Dashboard = () => {
             <MessageCircle className="h-4 w-4" />
             AI Assistant
           </Button>
+
+          {selectedIds.length > 0 && (
+            <Button
+              onClick={handleBatchDelete}
+              variant="destructive"
+              size="sm"
+              className="flex items-center gap-2 animate-in slide-in-from-right-2 duration-200"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete {selectedIds.length}
+            </Button>
+          )}
+
           <Button onClick={() => setShowCreateTask(true)} className="bg-homemade-orange hover:bg-homemade-orange-dark">
             <Plus className="h-4 w-4 mr-2" />
             New Task
@@ -684,6 +746,8 @@ export const Dashboard = () => {
                   key={task.id}
                   task={task}
                   onClick={() => setSelectedTask(task)}
+                  isSelected={selectedIds.includes(task.id)}
+                  onSelect={handleSelect}
                 />
               ))}
             </CardContent>
@@ -705,6 +769,8 @@ export const Dashboard = () => {
                   key={task.id}
                   task={task}
                   onClick={() => setSelectedTask(task)}
+                  isSelected={selectedIds.includes(task.id)}
+                  onSelect={handleSelect}
                 />
               ))}
             </CardContent>
@@ -726,6 +792,8 @@ export const Dashboard = () => {
                   key={task.id}
                   task={task}
                   onClick={() => setSelectedTask(task)}
+                  isSelected={selectedIds.includes(task.id)}
+                  onSelect={handleSelect}
                 />
               ))}
             </CardContent>
@@ -739,6 +807,9 @@ export const Dashboard = () => {
           onUpdateTask={handleUpdateTask}
           onDeleteTask={handleDeleteTask}
           onAssignTask={(taskId, userIds) => handleUpdateTask(taskId, { assignees: userIds })}
+          selectedIds={selectedIds}
+          onSelect={handleSelect}
+          onSelectAll={(selected) => handleSelectAll(selected, filteredTasks)}
         />
       )}
 

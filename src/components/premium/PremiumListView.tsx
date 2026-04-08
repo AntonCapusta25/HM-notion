@@ -19,6 +19,9 @@ interface ListViewProps {
     onDeleteTask: (taskId: string) => void;
     onAssignTask: (taskId: string, userIds: string[]) => void;
     onTaskClick?: (task: Task) => void;
+    selectedIds?: string[];
+    onSelect?: (taskId: string, selected: boolean) => void;
+    onSelectAll?: (selected: boolean) => void;
 }
 
 const safeFormatDate = (dateInput: string | null | undefined, formatStr: string = 'MMM d'): string => {
@@ -83,8 +86,18 @@ const AssigneeManager = ({
                         {assignedUsers.length > 0 && (
                             <CommandGroup heading={<span className="text-white/40 text-xs font-medium">Assigned</span>}>
                                 {assignedUsers.map(user => (
-                                    <CommandItem key={user.id} onSelect={() => handleUnassignUser(user.id)} className="aria-selected:bg-white/10 cursor-pointer text-white">
-                                        <div className="flex items-center justify-between w-full">
+                                    <CommandItem 
+                                        key={user.id} 
+                                        onSelect={() => handleUnassignUser(user.id)} 
+                                        className="p-0 aria-selected:bg-white/10 cursor-pointer text-white"
+                                    >
+                                        <div 
+                                            className="flex items-center justify-between w-full p-2"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleUnassignUser(user.id);
+                                            }}
+                                        >
                                             <div className="flex items-center gap-2">
                                                 <Avatar className="h-5 w-5 bg-white/10"><AvatarFallback className="text-[10px]">{user.name.charAt(0)}</AvatarFallback></Avatar>
                                                 <span className="text-sm">{user.name}</span>
@@ -98,8 +111,18 @@ const AssigneeManager = ({
                         {unassignedUsers.length > 0 && (
                             <CommandGroup heading={<span className="text-white/40 text-xs font-medium">Suggested</span>}>
                                 {unassignedUsers.map(user => (
-                                    <CommandItem key={user.id} onSelect={() => handleAssignUser(user.id)} className="aria-selected:bg-white/10 cursor-pointer text-white">
-                                        <div className="flex items-center justify-between w-full">
+                                    <CommandItem 
+                                        key={user.id} 
+                                        onSelect={() => handleAssignUser(user.id)} 
+                                        className="p-0 aria-selected:bg-white/10 cursor-pointer text-white"
+                                    >
+                                        <div 
+                                            className="flex items-center justify-between w-full p-2"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleAssignUser(user.id);
+                                            }}
+                                        >
                                             <div className="flex items-center gap-2">
                                                 <Avatar className="h-5 w-5 bg-white/10"><AvatarFallback className="text-[10px]">{user.name.charAt(0)}</AvatarFallback></Avatar>
                                                 <span className="text-sm">{user.name}</span>
@@ -152,7 +175,18 @@ const PremiumDateEditor = ({ taskId, currentDate, onUpdate }: { taskId: string, 
     )
 }
 
-export const PremiumListView = ({ tasks, users, onCreateTask, onUpdateTask, onDeleteTask, onAssignTask }: ListViewProps) => {
+export const PremiumListView = ({ 
+    tasks, 
+    users, 
+    onCreateTask, 
+    onUpdateTask, 
+    onDeleteTask, 
+    onAssignTask,
+    onTaskClick,
+    selectedIds = [],
+    onSelect,
+    onSelectAll
+}: ListViewProps) => {
     const [isAddingTask, setIsAddingTask] = useState(false);
     const [newTaskTitle, setNewTaskTitle] = useState('');
     const [optimisticTasks, setOptimisticTasks] = useState<Task[]>(tasks);
@@ -197,7 +231,28 @@ export const PremiumListView = ({ tasks, users, onCreateTask, onUpdateTask, onDe
     return (
         <div className="flex flex-col gap-2">
             {/* Header Row */}
-            <div className="grid grid-cols-[1fr,120px,120px,150px,150px,40px] gap-4 px-6 py-3 text-xs font-semibold text-white/40 uppercase tracking-wider">
+            <div className="grid grid-cols-[40px,1fr,120px,120px,150px,150px,40px] gap-4 px-6 py-3 text-xs font-semibold text-white/40 uppercase tracking-wider items-center">
+                <div className="flex justify-center">
+                    <div
+                        role="checkbox"
+                        aria-checked={tasks.length > 0 && selectedIds.length === tasks.length}
+                        tabIndex={0}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            const allSelected = tasks.length > 0 && selectedIds.length === tasks.length;
+                            onSelectAll?.(!allSelected);
+                        }}
+                        className={cn(
+                            "h-4 w-4 rounded border flex items-center justify-center transition-all cursor-pointer",
+                            tasks.length > 0 && selectedIds.length === tasks.length
+                                ? "bg-white border-white text-black" 
+                                : "bg-transparent border-white/20 hover:border-white/40"
+                        )}
+                    >
+                        {tasks.length > 0 && selectedIds.length === tasks.length && <Check className="h-3 w-3" />}
+                        {selectedIds.length > 0 && selectedIds.length < tasks.length && <div className="w-2 h-0.5 bg-white rounded-full" />}
+                    </div>
+                </div>
                 <div>Task Name</div>
                 <div>Status</div>
                 <div>Priority</div>
@@ -235,10 +290,38 @@ export const PremiumListView = ({ tasks, users, onCreateTask, onUpdateTask, onDe
 
             {/* Tasks Grid */}
             <div className="space-y-1">
-                {optimisticTasks.map(task => (
-                    <div key={task.id} className="group grid grid-cols-[1fr,120px,120px,150px,150px,40px] gap-4 items-center px-4 py-3 rounded-xl hover:bg-white/5 border border-transparent hover:border-white/5 transition-all duration-200">
-                        {/* Title & Icons */}
-                        <div className="flex items-center gap-3 min-w-0">
+                {optimisticTasks.map(task => {
+                    const isSelected = selectedIds.includes(task.id);
+                    return (
+                        <div key={task.id} className={cn(
+                            "group grid grid-cols-[40px,1fr,120px,120px,150px,150px,40px] gap-4 items-center px-4 py-3 rounded-xl border transition-all duration-200",
+                            isSelected 
+                                ? "bg-white/10 border-white/20" 
+                                : "bg-transparent border-transparent hover:bg-white/5 hover:border-white/5"
+                        )}>
+                            {/* Selection Checkbox */}
+                            <div className="flex justify-center">
+                                <div
+                                    role="checkbox"
+                                    aria-checked={isSelected}
+                                    tabIndex={0}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onSelect?.(task.id, !isSelected);
+                                    }}
+                                    className={cn(
+                                        "h-4 w-4 rounded border flex items-center justify-center transition-all cursor-pointer",
+                                        isSelected 
+                                            ? "bg-white border-white text-black" 
+                                            : "bg-transparent border-white/20 opacity-0 group-hover:opacity-100"
+                                    )}
+                                >
+                                    {isSelected && <Check className="h-3 w-3" />}
+                                </div>
+                            </div>
+
+                            {/* Title & Icons */}
+                            <div className="flex items-center gap-3 min-w-0" onClick={() => onTaskClick?.(task)}>
                             <div className={`h-2 w-2 rounded-full flex-shrink-0 ${task.status === 'done' ? 'bg-green-500' : task.priority === 'high' ? 'bg-red-500' : 'bg-white/20'}`} />
                             <span className={`text-sm font-medium truncate ${task.status === 'done' ? 'text-white/40 line-through' : 'text-white/90'}`}>{task.title}</span>
                         </div>
@@ -290,8 +373,9 @@ export const PremiumListView = ({ tasks, users, onCreateTask, onUpdateTask, onDe
                                 </PopoverContent>
                             </Popover>
                         </div>
-                    </div>
-                ))}
+                        </div>
+                    );
+                })}
                 {optimisticTasks.length === 0 && !isAddingTask && (
                     <div className="text-center py-12 text-white/20">No tasks in this view</div>
                 )}

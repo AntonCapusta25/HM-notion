@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Calendar, BarChart3, TrendingUp, Users, ArrowUpRight, CheckCircle2, List, LayoutGrid } from 'lucide-react';
+import { Plus, Calendar, BarChart3, TrendingUp, Users, ArrowUpRight, CheckCircle2, List, LayoutGrid, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -64,10 +64,11 @@ interface DashboardStats {
 export const PremiumDashboard = () => {
     const { user } = useAuth();
     const { profile } = useProfile();
-    const { tasks, users, createTask, updateTask, deleteTask, addComment, toggleSubtask, page, totalTasks, TASKS_PER_PAGE, setPage } = useTaskContext();
+    const { tasks, users, createTask, updateTask, deleteTask, deleteTasks, addComment, toggleSubtask, page, totalTasks, TASKS_PER_PAGE, setPage } = useTaskContext();
     const navigate = useNavigate();
     const [showCreateTask, setShowCreateTask] = useState(false);
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+    const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
     const [isExpanded, setIsExpanded] = useState(false);
 
@@ -147,6 +148,37 @@ export const PremiumDashboard = () => {
         };
     }, [tasks, dashboardStats, profile]);
 
+    const handleSelect = useCallback((taskId: string, selected: boolean) => {
+        setSelectedIds(prev =>
+            selected
+                ? [...prev, taskId]
+                : prev.filter(id => id !== taskId)
+        );
+    }, []);
+
+    const handleSelectAll = useCallback((selected: boolean, visibleTasks: Task[]) => {
+        if (selected) {
+            setSelectedIds(visibleTasks.map(t => t.id));
+        } else {
+            setSelectedIds([]);
+        }
+    }, []);
+
+    const handleBatchDelete = useCallback(async () => {
+        if (selectedIds.length === 0) return;
+
+        const confirmed = window.confirm(`Are you sure you want to delete ${selectedIds.length} tasks?`);
+        if (!confirmed) return;
+
+        try {
+            await deleteTasks?.(selectedIds);
+            setSelectedIds([]);
+            if (refreshDashboardStats) await refreshDashboardStats();
+        } catch (err) {
+            console.error('❌ Premium Dashboard - Failed to delete tasks:', err);
+        }
+    }, [selectedIds, deleteTasks, refreshDashboardStats]);
+
     return (
         <div className="space-y-8 p-4 pt-24 md:pl-8 no-scrollbar animate-in fade-in duration-500">
             {/* Welcome Section */}
@@ -159,12 +191,23 @@ export const PremiumDashboard = () => {
                         Welcome back, {profile?.name || user?.email?.split('@')[0]}. Here's your overview.
                     </p>
                 </div>
-                <Button
-                    onClick={() => setShowCreateTask(true)}
-                    className="bg-white text-black hover:bg-white/90 rounded-full px-6 h-12 font-medium shadow-lg shadow-white/10 transition-all hover:scale-105"
-                >
-                    <Plus className="h-5 w-5 mr-2" /> New Task
-                </Button>
+                <div className="flex items-center gap-3">
+                    {selectedIds.length > 0 && (
+                        <Button
+                            onClick={handleBatchDelete}
+                            variant="destructive"
+                            className="bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/20 rounded-full px-6 h-12 font-medium transition-all animate-in zoom-in-95"
+                        >
+                            <Trash2 className="h-5 w-5 mr-2" /> Delete {selectedIds.length}
+                        </Button>
+                    )}
+                    <Button
+                        onClick={() => setShowCreateTask(true)}
+                        className="bg-white text-black hover:bg-white/90 rounded-full px-6 h-12 font-medium shadow-lg shadow-white/10 transition-all hover:scale-105"
+                    >
+                        <Plus className="h-5 w-5 mr-2" /> New Task
+                    </Button>
+                </div>
             </div>
 
             {/* Premium Stats Grid */}
@@ -226,6 +269,9 @@ export const PremiumDashboard = () => {
                                 onDeleteTask={deleteTask}
                                 onAssignTask={(taskId, userIds) => updateTask(taskId, { assignees: userIds })}
                                 onTaskClick={(task) => setSelectedTask(task)}
+                                selectedIds={selectedIds}
+                                onSelect={handleSelect}
+                                onSelectAll={(selected) => handleSelectAll(selected, tasks)}
                             />
                         </div>
                     ) : (
@@ -240,8 +286,14 @@ export const PremiumDashboard = () => {
                                         </div>
                                         <div className="space-y-3 min-h-[200px]">
                                             {statusTasks.map(task => (
-                                                <div key={task.id} onClick={() => setSelectedTask(task)}>
-                                                    <TaskCard task={task} onClick={() => setSelectedTask(task)} variant="premium" />
+                                                <div key={task.id}>
+                                                    <TaskCard 
+                                                        task={task} 
+                                                        onClick={() => setSelectedTask(task)} 
+                                                        variant="premium" 
+                                                        isSelected={selectedIds.includes(task.id)}
+                                                        onSelect={handleSelect}
+                                                    />
                                                 </div>
                                             ))}
                                             {statusTasks.length === 0 && (
