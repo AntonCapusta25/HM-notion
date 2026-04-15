@@ -15,6 +15,7 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
   const [users, setUsers] = useState<User[]>([]);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Create stable reference for fetchTasks
@@ -39,19 +40,19 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
 
     if (!user) {
       setLoading(false);
+      setInitialLoading(false);
       return;
     }
 
     try {
+      // Only block the full UI on the very first load (no tasks yet)
+      // Background refreshes run silently without hiding existing data
       setLoading(true);
 
       // Calculate range for 0-indexed Supabase range
-      // Page 1: 0-99
-      // Page 2: 100-199
       const from = (pageNum - 1) * TASKS_PER_PAGE;
       const to = from + TASKS_PER_PAGE - 1;
 
-      // ENHANCED: Get count and data
       const { data, count, error } = await supabase
         .from('tasks')
         .select(`
@@ -70,14 +71,12 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
         return;
       }
 
-      // Format tasks with proper assignment data preserved
       const formattedTasks = (data || []).map(supabaseTask => {
         const formatted = formatTaskFromSupabase(supabaseTask);
         formatted.task_assignees = supabaseTask.task_assignees || [];
         return formatted;
       });
 
-      // ALWAYS REPLACE tasks for numbered pagination
       setTasks(formattedTasks);
       setTotalTasks(count || 0);
       setPage(pageNum);
@@ -89,6 +88,7 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
       setError(err.message);
     } finally {
       setLoading(false);
+      setInitialLoading(false);
     }
   }, [user?.id]);
 
@@ -173,8 +173,38 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
 
           // Handle different event types with optimistic state updates
           if (payload.eventType === 'INSERT') {
-            const newTask = formatTaskFromSupabase(payload.new);
-            setTasks(prev => [...prev, newTask]);
+            // ⚠️ payload.new ONLY has flat columns — no joined relations (assignees, tags, subtasks)
+            // We must do a separate fetch to get the full task with all relations.
+            // This also handles replacement of any optimistic temp task created in createTask.
+            const insertedId = payload.new.id;
+            supabase
+              .from('tasks')
+              .select(`
+                *,
+                comments(id, content, author, created_at),
+                subtasks(id, title, completed, created_at),
+                task_tags(tag),
+                task_assignees(user_id)
+              `)
+              .eq('id', insertedId)
+              .single()
+              .then(({ data: fullTask }) => {
+                if (!fullTask) return;
+                const formatted = formatTaskFromSupabase(fullTask);
+                formatted.task_assignees = fullTask.task_assignees || [];
+                setTasks(prev => {
+                  // Replace optimistic temp task if it exists (created by createTask)
+                  const tempIndex = prev.findIndex(t => t.id.startsWith('temp-'));
+                  if (tempIndex !== -1) {
+                    const updated = [...prev];
+                    updated[tempIndex] = formatted;
+                    return updated;
+                  }
+                  // Otherwise deduplicate and prepend
+                  return [formatted, ...prev.filter(t => t.id !== formatted.id)];
+                });
+                console.log('✅ Real-time INSERT: full task fetched and applied:', formatted.title);
+              });
           } else if (payload.eventType === 'UPDATE') {
             const updatedId = payload.new.id;
             // Skip echo from our own optimistic update — we already have fresh state
@@ -444,63 +474,92 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
 
   const createTask = useCallback(async (taskData: Partial<Task>) => {
     console.log('📝 createTask called');
-    console.log('  - taskData:', taskData);
-    console.log('  - user:', user?.id);
-    console.log('  - userProfile:', userProfile?.id);
 
     if (!user) throw new Error("User not authenticated");
 
     const userId = userProfile?.id || user.id;
-    console.log('  - Using userId:', userId);
-
     const { assignees, tags, subtasks, ...restOfTaskData } = taskData;
 
-    console.log('⏳ Inserting task to Supabase...');
-    console.log('  - workspace_id from taskData:', taskData.workspace_id);
+    // 🚀 STEP 1: INSTANT OPTIMISTIC UPDATE — task appears before any DB call
+    const tempId = `temp-${Date.now()}`;
+    const optimisticTask: Task = {
+      id: tempId,
+      title: restOfTaskData.title || '',
+      description: restOfTaskData.description || null,
+      status: restOfTaskData.status || 'todo',
+      priority: restOfTaskData.priority || 'medium',
+      due_date: restOfTaskData.due_date || null,
+      workspace_id: restOfTaskData.workspace_id || null,
+      created_by: userId,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      assignees: assignees || [],
+      tags: tags || [],
+      subtasks: subtasks || [],
+      comments: [],
+      task_assignees: (assignees || []).map(uid => ({ user_id: uid })),
+    };
+    setTasks(prev => [optimisticTask, ...prev]);
+    console.log('✨ Optimistically added task to UI:', optimisticTask.title);
 
-    const { data: newTask, error } = await supabase
-      .from('tasks')
-      .insert({
-        ...restOfTaskData,
-        created_by: userId,
-        workspace_id: taskData.workspace_id || null
-      })
-      .select()
-      .single();
+    try {
+      // 📡 STEP 2: Insert main task row
+      const { data: newTask, error } = await supabase
+        .from('tasks')
+        .insert({
+          ...restOfTaskData,
+          created_by: userId,
+          workspace_id: taskData.workspace_id || null
+        })
+        .select()
+        .single();
 
-    if (error) {
-      console.error('❌ Task creation error:', error);
-      throw error;
+      if (error) {
+        console.error('❌ Task creation error:', error);
+        // Roll back optimistic update
+        setTasks(prev => prev.filter(t => t.id !== tempId));
+        throw error;
+      }
+
+      console.log('✅ Task DB row created:', newTask.id);
+
+      // 📡 STEP 3: Insert relations IN PARALLEL (not sequentially)
+      const relationPromises: Promise<any>[] = [];
+
+      if (assignees && assignees.length > 0) {
+        const links = assignees.map(uid => ({ task_id: newTask.id, user_id: uid }));
+        relationPromises.push(
+          (async () => { const { error: e } = await supabase.from('task_assignees').insert(links); if (e) console.error('❌ Assignees error:', e); })()
+        );
+      }
+
+      if (tags && tags.length > 0) {
+        const links = tags.map(tag => ({ task_id: newTask.id, tag }));
+        relationPromises.push(
+          (async () => { const { error: e } = await supabase.from('task_tags').insert(links); if (e) console.error('❌ Tags error:', e); })()
+        );
+      }
+
+      if (subtasks && subtasks.length > 0) {
+        const links = subtasks.map(subtask => ({ ...subtask, id: undefined, task_id: newTask.id }));
+        relationPromises.push(
+          (async () => { const { error: e } = await supabase.from('subtasks').insert(links); if (e) console.error('❌ Subtasks error:', e); })()
+        );
+      }
+
+      // Fire all relation inserts at the same time
+      if (relationPromises.length > 0) {
+        await Promise.all(relationPromises);
+      }
+
+      console.log('✅ Task creation completed successfully — real-time will replace temp task');
+      // Note: the real-time INSERT handler will fetch the full task and replace the temp ID.
+
+    } catch (err) {
+      // Roll back optimistic task on any error
+      setTasks(prev => prev.filter(t => t.id !== tempId));
+      throw err;
     }
-
-    console.log('✅ Task created:', newTask);
-
-    // Handle many-to-many relationships
-    if (assignees && assignees.length > 0) {
-      console.log('Adding assignees:', assignees);
-      const links = assignees.map(userId => ({ task_id: newTask.id, user_id: userId }));
-      const { error: assigneesError } = await supabase.from('task_assignees').insert(links);
-      if (assigneesError) console.error('❌ Assignees error:', assigneesError);
-    }
-
-    if (tags && tags.length > 0) {
-      console.log('Adding tags:', tags);
-      const links = tags.map(tag => ({ task_id: newTask.id, tag: tag }));
-      const { error: tagsError } = await supabase.from('task_tags').insert(links);
-      if (tagsError) console.error('❌ Tags error:', tagsError);
-    }
-
-    if (subtasks && subtasks.length > 0) {
-      console.log('Adding subtasks:', subtasks);
-      const links = subtasks.map(subtask => ({ ...subtask, id: undefined, task_id: newTask.id }));
-      const { error: subtasksError } = await supabase.from('subtasks').insert(links);
-      if (subtasksError) console.error('❌ Subtasks error:', subtasksError);
-    }
-
-    console.log('✅ Task creation completed successfully');
-
-    // ✅ No manual refresh needed - real-time subscription will update the UI
-
   }, [user?.id, userProfile?.id]);
 
   const updateAssignees = useCallback(async (taskId: string, assigneeIds: string[]) => {
@@ -889,6 +948,7 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
     users,
     workspaces,
     loading,
+    initialLoading,
     error,
     createTask,
     updateTask,
@@ -904,7 +964,7 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
     TASKS_PER_PAGE,
     setPage: fetchTasks // Expose fetchTasks as setPage for direct page jumps
   }), [
-    tasks, users, workspaces, loading, error,
+    tasks, users, workspaces, loading, initialLoading, error,
     createTask, updateTask, deleteTask, deleteTasks, addComment, updateAssignees, updateTags, toggleSubtask, refreshTasks,
     page, totalTasks, fetchTasks
   ]);
