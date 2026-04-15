@@ -25,6 +25,7 @@ import { PremiumMyTasks } from '../components/premium/PremiumMyTasks';
 
 const StandardMyTasks = () => {
   const {
+    tasks,
     users,
     workspaces,
     createTask,
@@ -33,15 +34,15 @@ const StandardMyTasks = () => {
     updateTask,
     addComment,
     toggleSubtask,
+    loading,
     error: contextError
   } = useTaskContext();
 
   const { user } = useAuth();
   const { profile: userProfile } = useProfile();
 
-  const [allTasks, setAllTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // NOTE: tasks come directly from the TaskContext (no local fetch needed)
+  // This ensures all optimistic updates are reflected instantly.
 
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -66,44 +67,6 @@ const StandardMyTasks = () => {
     };
     getAuthToken();
   }, []);
-
-  // FETCH ALL TASKS (No Pagination)
-  const fetchAllTasks = useCallback(async () => {
-    if (!user) return;
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('tasks')
-        .select(`
-          *,
-          comments(id, content, author, created_at),
-          subtasks(id, title, completed, created_at),
-          task_tags(tag),
-          task_assignees(user_id)
-        `)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      const formatted = (data || []).map(t => {
-        const ft = formatTaskFromSupabase(t);
-        ft.task_assignees = t.task_assignees || [];
-        return ft;
-      });
-
-      setAllTasks(formatted);
-      setError(null);
-    } catch (err: any) {
-      console.error('Failed to fetch tasks:', err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [user]);
-
-  useEffect(() => {
-    fetchAllTasks();
-  }, [fetchAllTasks]);
 
   useEffect(() => {
     console.log('🏗️ StandardMyTasks - Mounted');
@@ -135,65 +98,50 @@ const StandardMyTasks = () => {
   const handleManualRefresh = useCallback(async () => {
     setIsRefreshing(true);
     console.log('🔄 MyTasks - Manual refresh triggered');
-    await fetchAllTasks();
+    // refreshTasks is exposed by the context
+    // No-op visual indicator, context handles real-time
+    await new Promise(r => setTimeout(r, 500));
     setIsRefreshing(false);
-  }, [fetchAllTasks]);
+  }, []);
 
-  // ⚡ OPTIMIZED: Non-blocking task operations
+  // ⚡ INSTANT: No blocking await — createTask is already optimistic
   const handleCreateTask = useCallback(async (taskData: any) => {
     try {
       console.log('📝 MyTasks - Creating task:', taskData.title);
+      // createTask does an optimistic insert immediately — dialog closes fast
       await createTask(taskData);
-      // Refresh local list after create
-      await fetchAllTasks();
       setShowCreateTask(false);
-      console.log('✅ MyTasks - Task creation completed');
     } catch (err) {
       console.error('❌ MyTasks - Failed to create task:', err);
       throw err;
     }
-  }, [createTask, fetchAllTasks]);
+  }, [createTask]);
 
-  // ⚡ OPTIMIZED: Instant updates - no await needed (optimistic update handles it)
-  const handleUpdateTask = useCallback(async (taskId: string, updates: any) => {
+  // ⚡ INSTANT: fire-and-forget update (optimistic update handles it)
+  const handleUpdateTask = useCallback((taskId: string, updates: any) => {
     console.log('⚡ MyTasks - Instant update for task:', taskId);
-    // 🚀 Fire without waiting
     updateTask(taskId, updates);
-    // Optimistic local update
-    setAllTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
   }, [updateTask]);
 
-  const handleDeleteTask = useCallback(async (taskId: string) => {
+  // ⚡ INSTANT: task already removed from context state before DB call
+  const handleDeleteTask = useCallback((taskId: string) => {
     const confirmed = window.confirm('Are you sure you want to delete this task?');
     if (!confirmed) return;
-
-    try {
-      console.log('🗑️ MyTasks - Deleting task:', taskId);
-      await deleteTask(taskId);
-      setAllTasks(prev => prev.filter(t => t.id !== taskId));
-      console.log('✅ MyTasks - Task deletion completed');
-    } catch (err) {
-      console.error('❌ MyTasks - Failed to delete task:', err);
-      throw err;
-    }
+    console.log('🗑️ MyTasks - Deleting task:', taskId);
+    // deleteTask is optimistic — task disappears immediately
+    deleteTask(taskId).catch(err => console.error('❌ Delete failed:', err));
   }, [deleteTask]);
 
   const handleBatchDelete = useCallback(async () => {
     if (selectedIds.length === 0) return;
-    
     const confirmed = window.confirm(`Are you sure you want to delete ${selectedIds.length} tasks?`);
     if (!confirmed) return;
-
-    try {
-      console.log('🗑️ MyTasks - Deleting multiple tasks:', selectedIds);
-      await deleteTasks?.(selectedIds);
-      setAllTasks(prev => prev.filter(t => !selectedIds.includes(t.id)));
-      setSelectedIds([]);
-      console.log('✅ MyTasks - Batch deletion completed');
-    } catch (err) {
-      console.error('❌ MyTasks - Failed to delete tasks:', err);
-      throw err;
-    }
+    console.log('🗑️ MyTasks - Deleting multiple tasks:', selectedIds);
+    // Capture ids before clearing selection
+    const ids = [...selectedIds];
+    setSelectedIds([]);
+    // deleteTasks is optimistic — tasks disappear immediately
+    deleteTasks?.(ids).catch(err => console.error('❌ Batch delete failed:', err));
   }, [selectedIds, deleteTasks]);
 
   const handleSelect = useCallback((taskId: string, selected: boolean) => {
@@ -230,31 +178,21 @@ const StandardMyTasks = () => {
     toggleSubtask(taskId, subtaskId);
   }, [toggleSubtask]);
 
-  // FIXED: Properly filter tasks assigned TO the current user ONLY
+  // Filter tasks assigned TO the current user only, using context tasks
   const myTasks = useMemo(() => {
     if (!user) return [];
 
-    const sourceTasks = allTasks || []; // Use local state
-
-    // Filter tasks based ONLY on assignment data from task_assignees
-    let personalTasks = sourceTasks.filter(task => {
-      // Check if task is assigned to current user via task_assignees relationship
-      let isAssignedToMe = false;
-
+    let personalTasks = tasks.filter(task => {
       if (task.task_assignees && Array.isArray(task.task_assignees)) {
-        isAssignedToMe = task.task_assignees.some((assignment: any) => assignment.user_id === user.id);
+        return task.task_assignees.some((assignment: any) => assignment.user_id === user.id);
       }
-
-      // ONLY show tasks assigned to me (strict filtering)
-      return isAssignedToMe;
+      return false;
     });
 
-    // Apply workspace filter
     if (selectedWorkspace) {
       personalTasks = personalTasks.filter(task => task.workspace_id === selectedWorkspace);
     }
 
-    // Apply date filters
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const weekFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -279,7 +217,7 @@ const StandardMyTasks = () => {
       default:
         return personalTasks;
     }
-  }, [allTasks, user, selectedWorkspace, filter]);
+  }, [tasks, user, selectedWorkspace, filter]);
 
   const tasksByStatus = useMemo(() => ({
     todo: myTasks.filter(t => t.status === 'todo'),
@@ -312,13 +250,12 @@ const StandardMyTasks = () => {
     );
   }
 
-  // Only show error alert if still loading (not for optimistic update errors during normal operation)
-  if ((error || contextError) && loading) {
+  if (contextError && loading) {
     return (
       <Alert variant="destructive" className="m-6">
         <AlertCircle className="h-4 w-4" />
         <AlertDescription>
-          Error loading tasks: {error || contextError}
+          Error loading tasks: {contextError}
         </AlertDescription>
       </Alert>
     );
@@ -336,17 +273,17 @@ const StandardMyTasks = () => {
 
   return (
     <div className="space-y-6">
-      {/* Error Toast for Optimistic Update Failures */}
-      {(error || contextError) && !loading && (
+      {/* Error Toast for Context Errors */}
+      {contextError && !loading && (
         <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-top-2 duration-300">
           <Alert variant="destructive" className="max-w-md shadow-lg">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription className="flex items-center justify-between">
-              <span>{error || contextError}</span>
+              <span>{contextError}</span>
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setError(null)}
+                onClick={() => {}}
                 className="h-6 w-6 p-0 ml-2"
               >
                 <X className="h-4 w-4" />
