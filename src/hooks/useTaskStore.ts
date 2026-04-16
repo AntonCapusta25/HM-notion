@@ -559,16 +559,23 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
           const assignedByName = assigner?.name || user?.email || 'Someone';
 
           console.log('📧 Sending assignment notifications on creation...', { taskId: newTask.id, assignees });
-          supabase.functions.invoke('notify-task-assigned', {
-            body: {
-              taskId: newTask.id,
-              taskTitle: newTask.title,
-              taskPriority: newTask.priority || 'Not set',
-              dueDate: newTask.due_date || 'Not set',
-              assignedByName,
-              newAssigneeIds: assignees
+          void (async () => {
+            const { data, error } = await supabase.functions.invoke('notify-task-assigned', {
+              body: {
+                taskId: newTask.id,
+                taskTitle: newTask.title,
+                taskPriority: newTask.priority || 'Not set',
+                dueDate: newTask.due_date || 'Not set',
+                assignedByName,
+                newAssigneeIds: assignees
+              }
+            });
+            if (error) {
+              console.error('❌ Assignment notification invoke failed on createTask:', error);
+            } else {
+              console.log('✅ Assignment notification invoke succeeded on createTask:', data);
             }
-          }).catch(err => console.error('Failed to send assignment notification:', err));
+          })().catch(err => console.error('Failed to send assignment notification:', err));
         } catch (notifErr) {
           console.error('Error preparing assignment notification:', notifErr);
         }
@@ -681,16 +688,23 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
           // --- EDGE FUNCTION: Email Notifications ---
           const assignedByName = currentUserData?.name || user?.email || 'Someone';
           console.log('📧 Sending assignment notifications...', { taskId, toAdd });
-          supabase.functions.invoke('notify-task-assigned', {
-            body: {
-              taskId,
-              taskTitle: task.title,
-              taskPriority: task.priority || 'Not set',
-              dueDate: task.due_date || 'Not set',
-              assignedByName,
-              newAssigneeIds: toAdd
+          void (async () => {
+            const { data, error } = await supabase.functions.invoke('notify-task-assigned', {
+              body: {
+                taskId,
+                taskTitle: task.title,
+                taskPriority: task.priority || 'Not set',
+                dueDate: task.due_date || 'Not set',
+                assignedByName,
+                newAssigneeIds: toAdd
+              }
+            });
+            if (error) {
+              console.error('❌ Assignment notification invoke failed on updateAssignees:', error);
+            } else {
+              console.log('✅ Assignment notification invoke succeeded on updateAssignees:', data);
             }
-          }).catch(err => console.error('Failed to send assignment notification:', err));
+          })().catch(err => console.error('Failed to send assignment notification:', err));
 
           // --- IN-APP NOTIFICATIONS ---
           const notificationsToCreate = toAdd

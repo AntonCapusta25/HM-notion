@@ -1,0 +1,10 @@
+project_id = "wqpmhnsxqcsplfdyxrih"
+
+[functions.escalate-overdue-tasks]
+verify_jwt = false
+
+[functions.nudge-overdue-assignees]
+verify_jwt = false
+
+[functions.send-daily-stats]
+verify_jwt = false
