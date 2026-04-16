@@ -552,6 +552,28 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
         await Promise.all(relationPromises);
       }
 
+      // FIRE NOTIFICATION FOR NEW ASSIGNEES ON CREATION
+      if (assignees && assignees.length > 0) {
+        try {
+          const assigner = users.find(u => u.id === user?.id);
+          const assignedByName = assigner?.name || user?.email || 'Someone';
+
+          console.log('📧 Sending assignment notifications on creation...', { taskId: newTask.id, assignees });
+          supabase.functions.invoke('notify-task-assigned', {
+            body: {
+              taskId: newTask.id,
+              taskTitle: newTask.title,
+              taskPriority: newTask.priority || 'Not set',
+              dueDate: newTask.due_date || 'Not set',
+              assignedByName,
+              newAssigneeIds: assignees
+            }
+          }).catch(err => console.error('Failed to send assignment notification:', err));
+        } catch (notifErr) {
+          console.error('Error preparing assignment notification:', notifErr);
+        }
+      }
+
       console.log('✅ Task creation completed successfully — real-time will replace temp task');
       // Note: the real-time INSERT handler will fetch the full task and replace the temp ID.
 
