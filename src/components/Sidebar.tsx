@@ -57,13 +57,6 @@ const navigation = [
   { name: 'My Tasks', href: '/my-tasks', icon: CheckSquare },
   { name: 'Team', href: '/team', icon: Users },
   { name: 'Calendar', href: '/calendar', icon: Calendar },
-  { name: 'Launch Posts', href: '/launch-posts', icon: Rocket },
-  { name: 'Trend Radar', href: '/content-hub', icon: Sparkles },
-  { name: 'Email Intel', href: '/email-intel', icon: Inbox },
-  { name: 'Video Pipeline', href: '/video', icon: Film },
-  { name: 'Lead Search', href: '/lead-search', icon: MapPin },
-  { name: 'Intelligence', href: '/intelligence', icon: Target },
-  { name: 'Search', href: '/search', icon: Search },
 ];
 
 

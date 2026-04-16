@@ -49,7 +49,6 @@ const navigation = [
     { name: 'My Tasks', href: '/my-tasks', icon: CheckSquare },
     { name: 'Team', href: '/team', icon: Users },
     { name: 'Calendar', href: '/calendar', icon: Calendar },
-    { name: 'Search', href: '/search', icon: Search },
 ];
 
 export const PremiumSidebar = ({ collapsed, onToggle }: SidebarProps) => {
