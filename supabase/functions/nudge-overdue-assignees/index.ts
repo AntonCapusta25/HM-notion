@@ -42,6 +42,9 @@ serve(async (req) => {
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       throw new Error('Supabase configuration missing')
     }
+    if (!SENDGRID_API_KEY) {
+      throw new Error('SENDGRID_API_KEY not configured')
+    }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
@@ -84,12 +87,16 @@ serve(async (req) => {
       })
     }
 
-    const senderEmail = Deno.env.get('DEFAULT_SENDER_EMAIL') || 'info@homemademeals.net'
+    const senderEmail =
+      Deno.env.get('SENDGRID_FROM_EMAIL') ||
+      Deno.env.get('DEFAULT_SENDER_EMAIL') ||
+      'info@homemademeals.net'
     const results = []
 
     for (const task of tasksToNudge) {
       const assignees = task.task_assignees || []
 
+      let successfulSends = 0
       for (const assignment of assignees) {
         const assigneeName = assignment.users?.name || 'Team member'
         const assigneeEmail = assignment.users?.email
@@ -124,6 +131,7 @@ If it remains unfinished for 3 days past the deadline, it will be escalated to m
         try {
           await sendEmail(senderEmail, assigneeEmail, subject, body)
           console.log(`✅ Nudge sent to ${assigneeEmail} for task: ${task.title}`)
+          successfulSends++
           results.push({ task_id: task.id, assignee: assigneeEmail, status: 'sent' })
         } catch (err: any) {
           console.error(`❌ Failed to nudge ${assigneeEmail}:`, err.message)
@@ -131,11 +139,14 @@ If it remains unfinished for 3 days past the deadline, it will be escalated to m
         }
       }
 
-      // Update nudge_sent_at regardless of individual assignee send success
-      await supabase
-        .from('tasks')
-        .update({ nudge_sent_at: now.toISOString() })
-        .eq('id', task.id)
+      // Only mark as nudged if at least one email actually went out.
+      // This allows automatic retries when delivery fails for all assignees.
+      if (successfulSends > 0) {
+        await supabase
+          .from('tasks')
+          .update({ nudge_sent_at: now.toISOString() })
+          .eq('id', task.id)
+      }
     }
 
     return new Response(JSON.stringify({ success: true, nudged: tasksToNudge.length, results }), {

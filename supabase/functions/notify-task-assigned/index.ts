@@ -31,6 +31,7 @@ serve(async (req) => {
 
   try {
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) throw new Error('Supabase config missing')
+    if (!SENDGRID_API_KEY) throw new Error('SENDGRID_API_KEY not configured')
 
     // Expected body: { taskId, taskTitle, taskPriority, dueDate, assignedByName, newAssigneeIds }
     const { taskId, taskTitle, taskPriority, dueDate, assignedByName, newAssigneeIds } = await req.json()
@@ -56,7 +57,10 @@ serve(async (req) => {
       })
     }
 
-    const senderEmail = Deno.env.get('DEFAULT_SENDER_EMAIL') || 'info@homemademeals.net'
+    const senderEmail =
+      Deno.env.get('SENDGRID_FROM_EMAIL') ||
+      Deno.env.get('DEFAULT_SENDER_EMAIL') ||
+      'info@homemademeals.net'
     const results = []
 
     for (const user of assignees) {

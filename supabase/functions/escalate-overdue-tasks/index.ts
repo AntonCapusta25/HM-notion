@@ -20,6 +20,9 @@ serve(async (req) => {
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       throw new Error('Supabase configuration missing')
     }
+    if (!SENDGRID_API_KEY) {
+      throw new Error('SENDGRID_API_KEY not configured')
+    }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
@@ -47,7 +50,10 @@ serve(async (req) => {
     }
 
     // 2. Prepare Sender
-    const senderEmail = Deno.env.get('DEFAULT_SENDER_EMAIL') || 'info@homemademeals.net'
+    const senderEmail =
+      Deno.env.get('SENDGRID_FROM_EMAIL') ||
+      Deno.env.get('DEFAULT_SENDER_EMAIL') ||
+      'info@homemademeals.net'
 
     const results = []
 
@@ -68,6 +74,7 @@ Priority: ${task.priority}
 Please check why this task remains unfinished.`
 
         // 3. Send email to each recipient
+        let successfulSends = 0
         for (const recipient of ESCALATION_RECIPIENTS) {
             const emailRes = await fetch('https://api.sendgrid.com/v3/mail/send', {
                 method: 'POST',
@@ -87,14 +94,21 @@ Please check why this task remains unfinished.`
               const errorText = await emailRes.text()
               console.error(`Failed to send email to ${recipient}:`, errorText)
               // We continue to next recipient even if one fails
+            } else {
+              successfulSends++
             }
         }
 
-        // 4. Mark task as escalated
-        await supabase
-          .from('tasks')
-          .update({ escalated_at: new Date().toISOString() })
-          .eq('id', task.id)
+        // 4. Mark task as escalated only after at least one successful email send.
+        // If all sends fail, keep it eligible for retry on next scheduled run.
+        if (successfulSends > 0) {
+          await supabase
+            .from('tasks')
+            .update({ escalated_at: new Date().toISOString() })
+            .eq('id', task.id)
+        } else {
+          throw new Error('Escalation emails failed for all recipients')
+        }
 
         results.push({ task_id: task.id, status: 'escalated' })
       } catch (err: any) {

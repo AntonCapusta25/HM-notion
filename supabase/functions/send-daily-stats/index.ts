@@ -45,6 +45,9 @@ serve(async (req) => {
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       throw new Error('Supabase configuration missing')
     }
+    if (!SENDGRID_API_KEY) {
+      throw new Error('SENDGRID_API_KEY not configured')
+    }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
     const now = new Date()
@@ -191,7 +194,10 @@ ${emp.taskLines.join('\n')}
 Generated at ${now.toISOString()} by HomeMade Task System`
 
     // 5. Send to each management recipient
-    const senderEmail = Deno.env.get('DEFAULT_SENDER_EMAIL') || 'info@homemademeals.net'
+    const senderEmail =
+      Deno.env.get('SENDGRID_FROM_EMAIL') ||
+      Deno.env.get('DEFAULT_SENDER_EMAIL') ||
+      'info@homemademeals.net'
     const subject = `📊 Daily Team Task Stats — ${todayIso}`
 
     const sendResults = []
