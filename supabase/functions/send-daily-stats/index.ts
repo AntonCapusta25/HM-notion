@@ -218,7 +218,7 @@ serve(async (req) => {
 
     emailHtml += `
         <div style="text-align: center; margin-top: 30px; margin-bottom: 10px;">
-          <a href="https://homemademeals.net/" style="background-color: #EE6A3E; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Open HomeMade Platform</a>
+          <a href="https://hmbase.netlify.app/my-tasks" style="background-color: #EE6A3E; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Open HomeMade Platform</a>
         </div>
       </div>
       <div style="background-color: #eeeeee; padding: 15px; text-align: center; color: #888; font-size: 12px; border-radius: 0 0 8px 8px;">

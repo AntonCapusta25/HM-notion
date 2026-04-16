@@ -87,7 +87,7 @@ serve(async (req) => {
             </p>
             
             <div style="text-align: center; margin-top: 35px; margin-bottom: 20px;">
-              <a href="https://homemademeals.net/" style="background-color: #1976D2; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-size: 16px;">View Task in Platform</a>
+              <a href="https://hmbase.netlify.app/my-tasks" style="background-color: #1976D2; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-size: 16px;">View Task in Platform</a>
             </div>
           </div>
           <div style="background-color: #f9f9f9; padding: 15px; text-align: center; color: #888; font-size: 12px; border-top: 1px solid #eee;">
