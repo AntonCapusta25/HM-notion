@@ -33,7 +33,7 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
   // Pagination state
   const [page, setPage] = useState(1); // 1-indexed for UI convenience
   const [totalTasks, setTotalTasks] = useState(0);
-  const TASKS_PER_PAGE = 100;
+  const TASKS_PER_PAGE = 1000;
 
   const fetchTasks = useCallback(async (pageNum = 1) => {
     console.log(`🔄 fetchTasks called for page ${pageNum}`);
