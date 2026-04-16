@@ -63,15 +63,38 @@ serve(async (req) => {
         const assigneeNames = assignees.map((ta: any) => ta.users?.name || ta.users?.email || 'Unknown').join(', ')
         
         const subject = `ALARM: Overdue Task - ${task.title}`
-        const content = `ALARM: The following task has not been finished 3 days after the deadline.
-
-Task: ${task.title}
-Deadline: ${task.due_date}
-Assignees: ${assigneeNames}
-Status: ${task.status}
-Priority: ${task.priority}
-
-Please check why this task remains unfinished.`
+        const htmlBody = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+          <div style="background-color: #d32f2f; padding: 20px; text-align: center;">
+            <h2 style="color: white; margin: 0; font-size: 24px;">🚨 ALARM: Task Escalation</h2>
+          </div>
+          <div style="padding: 30px; background-color: #ffffff;">
+            <p style="font-size: 16px; color: #333; margin-top: 0; font-weight: bold;">Management Alert:</p>
+            <p style="font-size: 16px; color: #333; line-height: 1.5;">
+              The following task has not been finished <strong>3 days after its deadline</strong>.
+            </p>
+            
+            <div style="background-color: #ffebee; border-left: 4px solid #d32f2f; padding: 15px; margin: 25px 0; border-radius: 0 4px 4px 0;">
+              <h3 style="margin: 0 0 10px 0; color: #333; font-size: 18px;">${task.title}</h3>
+              <p style="margin: 5px 0; color: #555; font-size: 14px;"><strong>Assignees:</strong> ${assigneeNames}</p>
+              <p style="margin: 5px 0; color: #555; font-size: 14px;"><strong>Deadline:</strong> ${task.due_date}</p>
+              <p style="margin: 5px 0; color: #555; font-size: 14px;"><strong>Priority:</strong> <span style="text-transform: capitalize;">${task.priority}</span></p>
+              <p style="margin: 5px 0; color: #555; font-size: 14px;"><strong>Status:</strong> <span style="text-transform: capitalize;">${task.status.replace('_', ' ')}</span></p>
+            </div>
+            
+            <p style="font-size: 14px; color: #555; line-height: 1.5; background-color: #f5f5f5; padding: 12px; border-radius: 4px;">
+              Please check with the assignees to understand why this task remains unfinished.
+            </p>
+            
+            <div style="text-align: center; margin-top: 35px; margin-bottom: 20px;">
+              <a href="https://homemademeals.net/" style="background-color: #1976D2; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-size: 16px;">View Task in Platform</a>
+            </div>
+          </div>
+          <div style="background-color: #f9f9f9; padding: 15px; text-align: center; color: #888; font-size: 12px; border-top: 1px solid #eee;">
+            &copy; ${new Date().getFullYear()} HomeMade Meals. All rights reserved.
+          </div>
+        </div>
+        `;
 
         // 3. Send email to each recipient
         let successfulSends = 0
@@ -84,9 +107,9 @@ Please check why this task remains unfinished.`
                 },
                 body: JSON.stringify({
                     personalizations: [{ to: [{ email: recipient }] }],
-                    from: { email: senderEmail },
+                    from: { email: senderEmail, name: 'HomeMade Escalations' },
                     subject: subject,
-                    content: [{ type: 'text/plain', value: content }],
+                    content: [{ type: 'text/html', value: htmlBody }],
                 }),
             })
 

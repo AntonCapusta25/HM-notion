@@ -555,8 +555,18 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
       // FIRE NOTIFICATION FOR NEW ASSIGNEES ON CREATION
       if (assignees && assignees.length > 0) {
         try {
-          const assigner = users.find(u => u.id === user?.id);
-          const assignedByName = assigner?.name || user?.email || 'Someone';
+          let assignedByName = user?.email || 'Someone';
+          
+          if (user?.id) {
+            const { data: currentUserData } = await supabase
+              .from('users')
+              .select('name')
+              .eq('id', user.id)
+              .single();
+            if (currentUserData?.name) {
+              assignedByName = currentUserData.name;
+            }
+          }
 
           console.log('📧 Sending assignment notifications on creation...', { taskId: newTask.id, assignees });
           void (async () => {

@@ -15,7 +15,7 @@ const corsHeaders = {
 // ─────────────────────────────────────────────
 // Send email via SendGrid API
 // ─────────────────────────────────────────────
-async function sendEmail(from: string, to: string, subject: string, body: string): Promise<void> {
+async function sendEmail(from: string, to: string, subject: string, htmlBody: string): Promise<void> {
   const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
     method: 'POST',
     headers: {
@@ -24,9 +24,9 @@ async function sendEmail(from: string, to: string, subject: string, body: string
     },
     body: JSON.stringify({
       personalizations: [{ to: [{ email: to }] }],
-      from: { email: from },
+      from: { email: from, name: 'HomeMade Reports' },
       subject: subject,
-      content: [{ type: 'text/plain', value: body }],
+      content: [{ type: 'text/html', value: htmlBody }],
     }),
   })
 
@@ -154,44 +154,78 @@ serve(async (req) => {
       })
     }
 
-    // 4. Build the full email body
+    // Build the full HTML email body
     const dateStr = now.toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
     const totalOverdue = employeeList.reduce((sum, e) => sum + e.overdue, 0)
     const totalEscalated = employeeList.reduce((sum, e) => sum + e.escalated, 0)
 
-    let emailBody = `DAILY TASK STATISTICS — ${dateStr}
-${'='.repeat(60)}
+    let emailHtml = `
+    <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; color: #333;">
+      <div style="background-color: #EE6A3E; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+        <h1 style="color: white; margin: 0; font-size: 24px;">Daily Task Statistics</h1>
+        <p style="color: rgba(255,255,255,0.9); margin: 5px 0 0 0;">${dateStr}</p>
+      </div>
+      
+      <div style="padding: 25px; background-color: #f8f9fa; border: 1px solid #e0e0e0; border-top: none;">
+        <div style="display: flex; justify-content: space-around; background-color: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 25px;">
+          <div style="text-align: center;">
+            <p style="margin: 0; font-size: 12px; color: #666; text-transform: uppercase;">Team Members</p>
+            <p style="margin: 5px 0 0 0; font-size: 24px; font-weight: bold; color: #1976d2;">${employeeList.length}</p>
+          </div>
+          <div style="text-align: center;">
+            <p style="margin: 0; font-size: 12px; color: #666; text-transform: uppercase;">Total Overdue</p>
+            <p style="margin: 5px 0 0 0; font-size: 24px; font-weight: bold; color: #d32f2f;">${totalOverdue}</p>
+          </div>
+          <div style="text-align: center;">
+            <p style="margin: 0; font-size: 12px; color: #666; text-transform: uppercase;">Escalated</p>
+            <p style="margin: 5px 0 0 0; font-size: 24px; font-weight: bold; color: #f57c00;">${totalEscalated}</p>
+          </div>
+        </div>
 
-OVERVIEW
---------
-Total employees with tasks: ${employeeList.length}
-Total overdue tasks across team: ${totalOverdue}
-Total escalated tasks: ${totalEscalated}
-
-${'='.repeat(60)}
-EMPLOYEE BREAKDOWN
-${'='.repeat(60)}
-`
+        <h2 style="color: #333; font-size: 18px; border-bottom: 2px solid #EE6A3E; padding-bottom: 5px; margin-top: 0;">Employee Breakdown</h2>
+    `;
 
     for (const emp of employeeList.sort((a, b) => b.overdue - a.overdue)) {
-      const overdueFlag = emp.overdue > 0 ? ` ⚠️ ${emp.overdue} OVERDUE` : ''
-      const escalatedFlag = emp.escalated > 0 ? ` 🚨 ${emp.escalated} ESCALATED` : ''
-      emailBody += `
-${emp.name}${overdueFlag}${escalatedFlag}
-${'-'.repeat(40)}
-Email:       ${emp.email}
-Total Tasks: ${emp.total}  |  ✅ Done: ${emp.done}  |  🔵 In Progress: ${emp.inProgress}  |  ⚪ To Do: ${emp.todo}
-Due in 7d:   ${emp.dueSoon}
-Overdue:     ${emp.overdue}
+      const isCritical = emp.overdue > 0 || emp.escalated > 0;
+      
+      emailHtml += `
+        <div style="background-color: white; border-radius: 8px; padding: 15px; margin-bottom: 20px; border-left: 5px solid ${isCritical ? '#d32f2f' : '#4caf50'}; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 10px;">
+            <h3 style="margin: 0; font-size: 16px; color: #333;">${emp.name}</h3>
+            <div>
+              ${emp.overdue > 0 ? `<span style="background-color: #ffebee; color: #d32f2f; padding: 3px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; margin-left: 5px;">⚠️ ${emp.overdue} Overdue</span>` : ''}
+              ${emp.escalated > 0 ? `<span style="background-color: #fff3e0; color: #e65100; padding: 3px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; margin-left: 5px;">🚨 ${emp.escalated} Escalated</span>` : ''}
+            </div>
+          </div>
+          
+          <div style="font-size: 13px; color: #555; margin-bottom: 15px; display: flex; flex-wrap: wrap; gap: 10px;">
+            <span style="background-color: #f5f5f5; padding: 4px 8px; border-radius: 4px;"><strong>Total:</strong> ${emp.total}</span>
+            <span style="background-color: #e8f5e9; padding: 4px 8px; border-radius: 4px;">✅ <strong>Done:</strong> ${emp.done}</span>
+            <span style="background-color: #e3f2fd; padding: 4px 8px; border-radius: 4px;">🔵 <strong>In Prog:</strong> ${emp.inProgress}</span>
+            <span style="background-color: #f5f5f5; padding: 4px 8px; border-radius: 4px;">⚪ <strong>To Do:</strong> ${emp.todo}</span>
+            <span style="background-color: #fff8e1; padding: 4px 8px; border-radius: 4px;">📅 <strong>Due in 7d:</strong> ${emp.dueSoon}</span>
+          </div>
 
-Tasks:
-${emp.taskLines.join('\n')}
-
-`
+          <h4 style="margin: 0 0 10px 0; font-size: 14px; color: #666;">Task List:</h4>
+          <ul style="margin: 0; padding-left: 20px; font-size: 13px; color: #444; line-height: 1.6;">
+            ${emp.taskLines.length > 0 
+              ? emp.taskLines.map(line => `<li style="margin-bottom: 4px;">${line.replace(/\[ESCALATED\]/g, '<strong style="color:#d32f2f;">[ESCALATED]</strong>')}</li>`).join('') 
+              : '<li><em>No active tasks.</em></li>'}
+          </ul>
+        </div>
+      `;
     }
 
-    emailBody += `${'='.repeat(60)}
-Generated at ${now.toISOString()} by HomeMade Task System`
+    emailHtml += `
+        <div style="text-align: center; margin-top: 30px; margin-bottom: 10px;">
+          <a href="https://homemademeals.net/" style="background-color: #EE6A3E; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Open HomeMade Platform</a>
+        </div>
+      </div>
+      <div style="background-color: #eeeeee; padding: 15px; text-align: center; color: #888; font-size: 12px; border-radius: 0 0 8px 8px;">
+        Generated automatically by HomeMade Task System &bull; ${new Date().toISOString()}
+      </div>
+    </div>
+    `;
 
     // 5. Send to each management recipient
     const senderEmail =
@@ -203,7 +237,7 @@ Generated at ${now.toISOString()} by HomeMade Task System`
     const sendResults = []
     for (const recipient of MANAGEMENT_RECIPIENTS) {
       try {
-        await sendEmail(senderEmail, recipient, subject, emailBody)
+        await sendEmail(senderEmail, recipient, subject, emailHtml)
         console.log(`✅ Daily stats sent to ${recipient}`)
         sendResults.push({ recipient, status: 'sent' })
       } catch (err: any) {

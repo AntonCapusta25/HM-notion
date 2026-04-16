@@ -12,7 +12,7 @@ const corsHeaders = {
 // ─────────────────────────────────────────────
 // Send email via SendGrid API
 // ─────────────────────────────────────────────
-async function sendEmail(from: string, to: string, subject: string, body: string): Promise<void> {
+async function sendEmail(from: string, to: string, subject: string, htmlBody: string): Promise<void> {
   const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
     method: 'POST',
     headers: {
@@ -21,9 +21,9 @@ async function sendEmail(from: string, to: string, subject: string, body: string
     },
     body: JSON.stringify({
       personalizations: [{ to: [{ email: to }] }],
-      from: { email: from },
+      from: { email: from, name: 'HomeMade Tasks' },
       subject: subject,
-      content: [{ type: 'text/plain', value: body }],
+      content: [{ type: 'text/html', value: htmlBody }],
     }),
   })
 
@@ -113,23 +113,43 @@ serve(async (req) => {
           ? `⏰ Overdue Task Reminder: ${task.title}`
           : `⏰ Task Due Today: ${task.title}`
 
-        const body = `Hi ${assigneeName},
-
-${isOverdue
-  ? `Your task "${task.title}" was due on ${task.due_date} (${daysOverdue} day${daysOverdue > 1 ? 's' : ''} ago) and is still outstanding.`
-  : `Your task "${task.title}" is due TODAY (${task.due_date}) and is still outstanding.`
-}
-
-Priority: ${task.priority}
-Status: ${task.status}
-
-Please complete this task as soon as possible.
-If it remains unfinished for 3 days past the deadline, it will be escalated to management.
-
-— HomeMade Team`
+        const htmlBody = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+          <div style="background-color: ${isOverdue ? '#d32f2f' : '#EE6A3E'}; padding: 20px; text-align: center;">
+            <h2 style="color: white; margin: 0; font-size: 24px;">${isOverdue ? 'Action Required: Task Overdue' : 'Task Due Today'}</h2>
+          </div>
+          <div style="padding: 30px; background-color: #ffffff;">
+            <p style="font-size: 16px; color: #333; margin-top: 0;">Hi ${assigneeName},</p>
+            <p style="font-size: 16px; color: #333; line-height: 1.5;">
+              ${isOverdue
+                ? `Your task "<strong>${task.title}</strong>" was due on ${task.due_date} (${daysOverdue} day${daysOverdue > 1 ? 's' : ''} ago) and is still outstanding.`
+                : `Your task "<strong>${task.title}</strong>" is due <strong>TODAY</strong> (${task.due_date}) and is still outstanding.`
+              }
+            </p>
+            
+            <div style="background-color: #fdf5f2; border-left: 4px solid ${isOverdue ? '#d32f2f' : '#EE6A3E'}; padding: 15px; margin: 25px 0; border-radius: 0 4px 4px 0;">
+              <h3 style="margin: 0 0 10px 0; color: #333; font-size: 18px;">${task.title}</h3>
+              <p style="margin: 5px 0; color: #555; font-size: 14px;"><strong>Priority:</strong> <span style="text-transform: capitalize;">${task.priority}</span></p>
+              <p style="margin: 5px 0; color: #555; font-size: 14px;"><strong>Status:</strong> <span style="text-transform: capitalize;">${task.status.replace('_', ' ')}</span></p>
+            </div>
+            
+            <p style="font-size: 14px; color: #555; line-height: 1.5; background-color: #f5f5f5; padding: 12px; border-radius: 4px;">
+              Please complete this task as soon as possible.<br/>
+              If it remains incomplete for 3 days past the deadline, it will be automatically <strong>escalated to management</strong>.
+            </p>
+            
+            <div style="text-align: center; margin-top: 35px; margin-bottom: 20px;">
+              <a href="https://homemademeals.net/" style="background-color: #EE6A3E; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-size: 16px;">View Task in Platform</a>
+            </div>
+          </div>
+          <div style="background-color: #f9f9f9; padding: 15px; text-align: center; color: #888; font-size: 12px; border-top: 1px solid #eee;">
+            &copy; ${now.getFullYear()} HomeMade Meals. All rights reserved.
+          </div>
+        </div>
+        `;
 
         try {
-          await sendEmail(senderEmail, assigneeEmail, subject, body)
+          await sendEmail(senderEmail, assigneeEmail, subject, htmlBody)
           console.log(`✅ Nudge sent to ${assigneeEmail} for task: ${task.title}`)
           successfulSends++
           results.push({ task_id: task.id, assignee: assigneeEmail, status: 'sent' })
