@@ -1,0 +1,21 @@
+{
+    "google_maps": [
+        {"name": "ChefMaison Private Chefs", "rating": 4.9, "reviews": 120, "snippet": "Star chefs and hobby chefs for private dinner parties in Amsterdam."},
+        {"name": "Take a Chef Amsterdam", "rating": 4.65, "reviews": 9853, "snippet": "Platform for booking private chefs with high ratings for food quality and presentation."},
+        {"name": "Where Is My Kitchen Now (Laurens Liezenberg)", "rating": 5.0, "reviews": 15, "snippet": "Bespoke private dining and catering in Amsterdam."},
+        {"name": "Vanderveen Chefs", "rating": 4.8, "reviews": 45, "snippet": "Young upcoming chefs recommended for private events."}
+    ],
+    "thefork_restaurants": [
+        {"name": "Restaurant Black and Blue", "cuisine": "European", "price": 46, "rating": 9.1},
+        {"name": "Restaurant Johannes", "cuisine": "European", "price": 55, "rating": 9.4, "notes": "Highly rated reviews in 2024/2025."},
+        {"name": "SHAM West", "cuisine": "Syrian", "price": 40, "rating": 8.9},
+        {"name": "Restaurant Bougainville", "cuisine": "Fine Dining", "price": 120, "rating": 9.7}
+    ],
+    "social_insights": [
+        {"platform": "Reddit", "community": "r/Amsterdam", "topic": "Private Chef Recommendations", "insight": "Users recommend platforms like ChefMaison and individual chefs from Instagram."},
+        {"platform": "Reddit", "community": "r/Netherlands", "topic": "Direct Booking", "insight": "Trends toward direct booking to save on platform fees."}
+    ],
+    "experience_platforms": [
+        {"name": "Withlocals Amsterdam Home Dinner", "rating": 5.0, "insight": "Consistently 5-star reviews for authentic local dining experiences."}
+    ]
+}

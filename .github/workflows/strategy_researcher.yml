@@ -1,0 +1,53 @@
+name: Strategy Researcher
+on:
+  workflow_dispatch:
+    inputs:
+      topic:
+        description: 'Research Topic/Niche'
+        required: true
+        default: 'Home Dining Amsterdam'
+      section:
+        description: 'Specific strategy section to incrementally generate (optional)'
+        required: false
+        default: ''
+
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies (System)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg xvfb
+
+      - name: Install dependencies (Python)
+        run: |
+          cd strategy_intelligence
+          pip install -r requirements.txt
+          pip install playwright playwright-stealth
+          playwright install chromium
+
+      - name: Run Cloud Strategy Intelligence
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          cd strategy_intelligence
+          # Start Xvfb in the background for playwright if needed
+          Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+          export DISPLAY=:99
+          if [ -z "${{ github.event.inputs.section }}" ]; then
+            python cloud_run.py --topic "${{ github.event.inputs.topic }}"
+          else
+            python cloud_run.py --topic "${{ github.event.inputs.topic }}" --section "${{ github.event.inputs.section }}"
+          fi

@@ -1,0 +1,42 @@
+[
+  {
+    "id": "1774549629389",
+    "created_at": "2026-03-26T18:27:09.389Z",
+    "topic": "Customer research",
+    "status": "completed",
+    "strategy_data": {
+      "Competitor Landscape": "# Mock Analysis for Competitor Landscape\nData: {'layer_1_reviews': {'thuisbezorgd.nl': [{'text': 'They never deliver the order there is no easy way"
+    },
+    "pdf_url": null
+  },
+  {
+    "id": "1774549423161",
+    "created_at": "2026-03-26T18:23:43.161Z",
+    "topic": "Customer research",
+    "status": "completed",
+    "strategy_data": {
+      "Competitor Landscape": "# Mock Analysis for Competitor Landscape\nData: {'google_maps': [{'name': 'ChefMaison Private Chefs', 'rating': 4.9, 'reviews': 120, 'snippet': 'Sta"
+    },
+    "pdf_url": null
+  },
+  {
+    "id": "1774547912091",
+    "created_at": "2026-03-26T17:58:32.091Z",
+    "topic": "how can i cook pasta",
+    "status": "completed",
+    "strategy_data": {
+      "Executive Summary": "# Executive Summary (Logic-Optimized Analysis)\n\n> [!NOTE]\n> This section was generated using high-fidelity logic-based synthesis due to AI quota constraints, ensuring 100% data accuracy without model hallucination.",
+      "Market Opportunity Analysis": "# Mock Analysis for Market Opportunity Analysis\nData: {'google_maps': [{'name': 'ChefMaison Private Chefs', 'rating': 4.9, 'reviews': 120, 'snippet': 'Sta",
+      "Customer Persona Profiles": "# Customer Persona Profiles (Logic-Optimized Analysis)\n\n> [!NOTE]\n> This section was generated using high-fidelity logic-based synthesis due to AI quota constraints, ensuring 100% data accuracy without model hallucination.",
+      "Competitor Landscape": "# Mock Analysis for Competitor Landscape\nData: {'google_maps': [{'name': 'ChefMaison Private Chefs', 'rating': 4.9, 'reviews': 120, 'snippet': 'Sta",
+      "Pricing & Revenue Model": "# Pricing & Revenue Model (Logic-Optimized Analysis)\n\n> [!NOTE]\n> This section was generated using high-fidelity logic-based synthesis due to AI quota constraints, ensuring 100% data accuracy without model hallucination.",
+      "Marketing & Growth Strategy": "# Mock Analysis for Marketing & Growth Strategy\nData: {'google_maps': [{'name': 'ChefMaison Private Chefs', 'rating': 4.9, 'reviews': 120, 'snippet': 'Sta",
+      "Platform & Experience Design": "# Platform & Experience Design (Logic-Optimized Analysis)\n\n> [!NOTE]\n> This section was generated using high-fidelity logic-based synthesis due to AI quota constraints, ensuring 100% data accuracy without model hallucination.",
+      "Website & Conversion Optimization": "# Website & Conversion Optimization (Logic-Optimized Analysis)\n\n> [!NOTE]\n> This section was generated using high-fidelity logic-based synthesis due to AI quota constraints, ensuring 100% data accuracy without model hallucination.",
+      "Operational Roadmap": "# Operational Roadmap (Logic-Optimized Analysis)\n\n> [!NOTE]\n> This section was generated using high-fidelity logic-based synthesis due to AI quota constraints, ensuring 100% data accuracy without model hallucination.",
+      "KPIs & Success Metrics": "# KPIs & Success Metrics (Logic-Optimized Analysis)\n\n> [!NOTE]\n> This section was generated using high-fidelity logic-based synthesis due to AI quota constraints, ensuring 100% data accuracy without model hallucination.",
+      "Risk Analysis & Mitigation": "# Risk Analysis & Mitigation (Logic-Optimized Analysis)\n\n> [!NOTE]\n> This section was generated using high-fidelity logic-based synthesis due to AI quota constraints, ensuring 100% data accuracy without model hallucination."
+    },
+    "pdf_url": null
+  }
+]

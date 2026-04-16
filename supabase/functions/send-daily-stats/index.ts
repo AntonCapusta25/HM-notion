@@ -1,10 +1,8 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { encode as base64url } from 'https://deno.land/std@0.168.0/encoding/base64url.ts'
-
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-const GMAIL_API = 'https://gmail.googleapis.com/gmail/v1'
+const SENDGRID_API_KEY = Deno.env.get('SENDGRID_API_KEY')
 
 // Management recipients for the daily digest
 const MANAGEMENT_RECIPIENTS = ['mahmoudelwakil22@gmail.com', 'bangalexf@gmail.com']
@@ -15,87 +13,26 @@ const corsHeaders = {
 }
 
 // ─────────────────────────────────────────────
-// Service Account JWT Auth
+// Send email via SendGrid API
 // ─────────────────────────────────────────────
-async function getServiceAccountToken(impersonateEmail: string): Promise<string> {
-  const googleServiceAccount = Deno.env.get('GOOGLE_SERVICE_ACCOUNT')
-  if (!googleServiceAccount) throw new Error('Missing GOOGLE_SERVICE_ACCOUNT secret')
-
-  const sa = JSON.parse(googleServiceAccount)
-  const now = Math.floor(Date.now() / 1000)
-  const header = { alg: 'RS256', typ: 'JWT' }
-  const payload = {
-    iss: sa.client_email,
-    sub: impersonateEmail,
-    scope: 'https://www.googleapis.com/auth/gmail.send',
-    aud: 'https://oauth2.googleapis.com/token',
-    iat: now,
-    exp: now + 3600,
-  }
-
-  const encode = (obj: object) =>
-    base64url(new TextEncoder().encode(JSON.stringify(obj)))
-  const signingInput = `${encode(header)}.${encode(payload)}`
-
-  const pemBody = sa.private_key
-    .replace(/-----BEGIN PRIVATE KEY-----/, '')
-    .replace(/-----END PRIVATE KEY-----/, '')
-    .replace(/\n/g, '')
-  const keyData = Uint8Array.from(atob(pemBody), c => c.charCodeAt(0))
-  const cryptoKey = await crypto.subtle.importKey(
-    'pkcs8', keyData,
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-    false, ['sign']
-  )
-
-  const signature = await crypto.subtle.sign(
-    'RSASSA-PKCS1-v1_5', cryptoKey, new TextEncoder().encode(signingInput)
-  )
-
-  const jwt = `${signingInput}.${base64url(new Uint8Array(signature))}`
-
-  const res = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-      assertion: jwt,
-    }),
-  })
-
-  const data = await res.json()
-  if (!data.access_token) throw new Error(`Token error: ${JSON.stringify(data)}`)
-  return data.access_token
-}
-
-// ─────────────────────────────────────────────
-// Send email via Gmail API
-// ─────────────────────────────────────────────
-async function sendEmail(token: string, from: string, to: string, subject: string, body: string): Promise<void> {
-  const utf8Subject = `=?utf-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`
-  const messageParts = [
-    `From: ${from}`,
-    `To: ${to}`,
-    `Subject: ${utf8Subject}`,
-    `Content-Type: text/plain; charset=utf-8`,
-    `MIME-Version: 1.0`,
-    ``,
-    body,
-  ]
-  const rawMessage = base64url(new TextEncoder().encode(messageParts.join('\n')))
-
-  const res = await fetch(`${GMAIL_API}/users/me/messages/send`, {
+async function sendEmail(from: string, to: string, subject: string, body: string): Promise<void> {
+  const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${token}`,
+      'Authorization': `Bearer ${SENDGRID_API_KEY}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ raw: rawMessage }),
+    body: JSON.stringify({
+      personalizations: [{ to: [{ email: to }] }],
+      from: { email: from },
+      subject: subject,
+      content: [{ type: 'text/plain', value: body }],
+    }),
   })
 
   if (!res.ok) {
     const errText = await res.text()
-    throw new Error(`Gmail API error for ${to}: ${res.status} - ${errText}`)
+    throw new Error(`SendGrid API error for ${to}: ${res.status} - ${errText}`)
   }
 }
 
@@ -255,13 +192,12 @@ Generated at ${now.toISOString()} by HomeMade Task System`
 
     // 5. Send to each management recipient
     const senderEmail = Deno.env.get('DEFAULT_SENDER_EMAIL') || 'info@homemademeals.net'
-    const token = await getServiceAccountToken(senderEmail)
     const subject = `📊 Daily Team Task Stats — ${todayIso}`
 
     const sendResults = []
     for (const recipient of MANAGEMENT_RECIPIENTS) {
       try {
-        await sendEmail(token, senderEmail, recipient, subject, emailBody)
+        await sendEmail(senderEmail, recipient, subject, emailBody)
         console.log(`✅ Daily stats sent to ${recipient}`)
         sendResults.push({ recipient, status: 'sent' })
       } catch (err: any) {

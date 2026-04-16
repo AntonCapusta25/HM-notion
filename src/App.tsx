@@ -25,6 +25,8 @@ import LaunchPosts from "./pages/LaunchPosts";
 import ContentHub from "./pages/ContentHub";
 import EmailIntelligencePage from "./pages/EmailIntelligencePage";
 import VideoPage from "./pages/VideoPage";
+import LeadSearchPage from "./pages/LeadSearchPage";
+import IntelligenceDashboard from "./pages/IntelligenceDashboard";
 
 
 // CRITICAL FIX: Move QueryClient creation outside component
@@ -92,6 +94,16 @@ const App = () => (
               <Route path="/video" element={
                 <ProtectedRoute>
                   <VideoPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/lead-search" element={
+                <ProtectedRoute>
+                  <LeadSearchPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/intelligence" element={
+                <ProtectedRoute>
+                  <IntelligenceDashboard />
                 </ProtectedRoute>
               } />
 

@@ -20,7 +20,7 @@ CREATE EXTENSION IF NOT EXISTS pg_net;
 -- ============================================================
 -- 1. ESCALATION: daily at 00:00 UTC
 -- ============================================================
-SELECT cron.unschedule('escalate-overdue-tasks-daily');
+DO $$ BEGIN PERFORM cron.unschedule('escalate-overdue-tasks-daily'); EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 SELECT cron.schedule(
   'escalate-overdue-tasks-daily',
@@ -37,7 +37,7 @@ SELECT cron.schedule(
 -- ============================================================
 -- 2. NUDGE EMAILS: daily at 15:30 UTC (5:30 PM Amsterdam / EET)
 -- ============================================================
-SELECT cron.unschedule('nudge-overdue-assignees-daily');
+DO $$ BEGIN PERFORM cron.unschedule('nudge-overdue-assignees-daily'); EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 SELECT cron.schedule(
   'nudge-overdue-assignees-daily',
@@ -54,7 +54,7 @@ SELECT cron.schedule(
 -- ============================================================
 -- 3. DAILY STATS: daily at 15:30 UTC (same time, or adjust as needed)
 -- ============================================================
-SELECT cron.unschedule('send-daily-stats-email');
+DO $$ BEGIN PERFORM cron.unschedule('send-daily-stats-email'); EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 SELECT cron.schedule(
   'send-daily-stats-email',

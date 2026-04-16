@@ -21,11 +21,13 @@ import {
   Sparkles,
   MessageSquare,
   Bot,
-  Image,
+  Image as ImageIcon,
   Wrench,
   Rocket,
   Inbox,
-  Film
+  Film,
+  MapPin,
+  Target
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -59,6 +61,8 @@ const navigation = [
   { name: 'Trend Radar', href: '/content-hub', icon: Sparkles },
   { name: 'Email Intel', href: '/email-intel', icon: Inbox },
   { name: 'Video Pipeline', href: '/video', icon: Film },
+  { name: 'Lead Search', href: '/lead-search', icon: MapPin },
+  { name: 'Intelligence', href: '/intelligence', icon: Target },
   { name: 'Search', href: '/search', icon: Search },
 ];
 
@@ -490,7 +494,7 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
                         {hasChildren && isAiTools && aiToolsExpanded && (
                           <div className="ml-6 mt-1 space-y-1 border-l-2 border-gray-200 pl-2">
                             {item.children!.map((child) => {
-                              const ChildIcon = child.icon === 'MessageSquare' ? MessageSquare : child.icon === 'Bot' ? Bot : child.icon === 'Wrench' ? Wrench : Image;
+                              const ChildIcon = child.icon === 'MessageSquare' ? MessageSquare : child.icon === 'Bot' ? Bot : child.icon === 'Wrench' ? Wrench : ImageIcon;
                               const isChildActive = location.pathname === child.route;
 
                               return (

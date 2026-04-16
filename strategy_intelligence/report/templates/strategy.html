@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ topic }} - Strategy Report</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap');
+
+        :root {
+            --primary: #1e1b4b;
+            --accent: #4f46e5;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --bg-soft: #f8fafc;
+            --border: #e2e8f0;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            line-height: 1.7;
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            background: white;
+        }
+
+        /* Cover Page */
+        .cover-page {
+            height: 297mm; /* Full A4 */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            background: #0f172a;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cover-page::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: radial-gradient(circle at 70% 30%, rgba(79, 70, 229, 0.15) 0%, transparent 70%);
+        }
+
+        .logo-placeholder {
+            font-weight: 800;
+            font-size: 24px;
+            letter-spacing: -0.02em;
+            margin-bottom: 100px;
+            text-transform: uppercase;
+            color: var(--accent);
+        }
+
+        .cover-page h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: 56px;
+            margin-bottom: 20px;
+            max-width: 80%;
+            line-height: 1.1;
+        }
+
+        .cover-page .subtitle {
+            font-size: 22px;
+            font-weight: 500;
+            color: var(--text-muted);
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        .footer-branding {
+            position: absolute;
+            bottom: 60px;
+            width: 100%;
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        /* Content Container */
+        .container {
+            width: 180mm; /* Slightly wider for better table fit */
+            margin: 0 auto;
+            padding: 20px 0;
+        }
+
+        /* Section Styling */
+        section {
+            padding: 40px 0;
+            border-top: 1px solid var(--border);
+            page-break-inside: auto;
+        }
+
+        section:first-of-type {
+            border-top: none;
+        }
+
+        h2 {
+            font-family: 'Playfair Display', serif;
+            font-size: 32px;
+            color: var(--primary);
+            border-bottom: 4px solid var(--accent);
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+            page-break-after: avoid;
+        }
+
+        h3 {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-top: 25px;
+            page-break-after: avoid;
+        }
+
+        /* Data Tables - Consulting Style */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 25px 0;
+            font-size: 11px; /* Smaller for density */
+            table-layout: fixed; /* Enforce column widths */
+            page-break-inside: avoid;
+        }
+
+        th {
+            background-color: var(--primary);
+            color: white;
+            text-align: left;
+            padding: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        td {
+            padding: 10px;
+            border-bottom: 1px solid var(--border);
+            overflow-wrap: break-word;
+            word-wrap: break-word;
+            word-break: break-word;
+            vertical-align: top;
+        }
+
+        /* Responsive Column Ratios for Partners */
+        th:nth-child(1), td:nth-child(1) { width: 25%; } /* Partner */
+        th:nth-child(2), td:nth-child(2) { width: 20%; } /* Category */
+        th:nth-child(3), td:nth-child(3) { width: 35%; } /* Website - wide for URLs */
+        th:nth-child(4), td:nth-child(4) { width: 20%; } /* Hidden columns if any */
+
+        tr:nth-child(even) {
+            background-color: var(--bg-soft);
+        }
+
+        /* Insights Card */
+        .executive-insight {
+            background: #eef2ff;
+            border-left: 6px solid var(--accent);
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 0 12px 12px 0;
+            page-break-inside: avoid;
+        }
+
+        .executive-insight strong {
+            display: block;
+            font-size: 14px;
+            color: var(--accent);
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        /* Campaign Cards */
+        .campaign-card {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 25px;
+            margin: 25px 0;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+
+        .campaign-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px dashed var(--border);
+        }
+
+        .campaign-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .campaign-badge {
+            background: var(--accent);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .campaign-assets {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .asset-block {
+            background: var(--bg-soft);
+            padding: 15px;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .asset-label {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .prompt-block {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 12px;
+            border-radius: 8px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 10px;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            word-break: break-all;
+            margin: 0;
+            border: 1px solid #334155;
+        }
+
+        /* Print Settings */
+        @media print {
+            body { background: white; }
+            .cover-page { height: 100vh; }
+            @page {
+                size: A4;
+                margin: 15mm;
+            }
+            .container { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="cover-page">
+        <div class="logo-placeholder">Homemade B.V.</div>
+        <h1>{{ topic }}</h1>
+        <div class="subtitle">360-Degree Market Intelligence Report</div>
+        
+        <div class="footer-branding">
+            Strategic Department &bull; Confidential &bull; {{ date }}
+        </div>
+    </div>
+
+    <div class="container">
+        {% for section in sections %}
+        <section id="section-{{ loop.index }}">
+            <h2>{{ section.title }}</h2>
+            <div class="section-content">
+                {{ section.content|safe }}
+            </div>
+        </section>
+        {% endfor %}
+
+        {% if campaigns %}
+        <section id="marketing-campaigns">
+            <h2>Omnichannel Marketing Assets</h2>
+            <p>Ready-to-deploy campaigns synchronized across email, social, and short-form video channels.</p>
+            
+            {% for campaign in campaigns %}
+            <div class="campaign-card">
+                <div class="campaign-header">
+                    <div class="campaign-title">{{ campaign.title }}</div>
+                    <div class="campaign-badge">Omnichannel Suite</div>
+                </div>
+                
+                <div class="campaign-assets">
+                    <!-- 1. Technical Prompt Layer -->
+                    <div class="asset-block" style="grid-column: span 2;">
+                        <span class="asset-label">Visual Concept / Prompt Architect (JSON)</span>
+                        <pre class="prompt-block">{{ campaign.social_concept|safe }}</pre>
+                    </div>
+
+                    <!-- 2. Email Channel -->
+                    <div class="asset-block">
+                        <span class="asset-label">📧 Marketing Email</span>
+                        <div class="asset-content">
+                            <strong>Subject:</strong> {{ campaign.email_subject }}<br><br>
+                            {{ campaign.email_body|replace('\n', '<br>')|safe }}
+                        </div>
+                    </div>
+
+                    <!-- 3. Social & Video -->
+                    <div class="asset-block">
+                        <span class="asset-label">📱 Instagram & TikTok</span>
+                        <div class="asset-content">
+                            <strong>Reel/TikTok Script:</strong><br>
+                            {{ campaign.reel_script|replace('\n', '<br>')|safe }}
+                            <br><br>
+                            <strong>Instagram Post Copy:</strong><br>
+                            {{ campaign.instagram_post|replace('\n', '<br>')|safe }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </section>
+        {% endif %}
+
+        {% if partnerships %}
+        <section id="strategic-partnerships">
+            <h2>Strategic Partnerships & Distribution</h2>
+            <p>Verified local businesses identified for high-impact distribution and lead generation in Amsterdam West.</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 20%;">Partner Name</th>
+                        <th style="width: 15%;">Category</th>
+                        <th style="width: 25%;">Website</th>
+                        <th style="width: 20%;">Email</th>
+                        <th style="width: 20%;">Phone</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in partnerships %}
+                    <tr>
+                        <td>{{ p.name }}</td>
+                        <td>{{ p.category }}</td>
+                        <td style="font-size: 9px;">{{ p.website or 'N/A' }}</td>
+                        <td style="font-size: 9px;">{{ p.email or 'N/A' }}</td>
+                        <td>{{ p.phone or 'N/A' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+        {% endif %}
+    </div>
+
+</body>
+</html>

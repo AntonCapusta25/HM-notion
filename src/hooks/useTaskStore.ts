@@ -635,6 +635,35 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
       if (promises.length > 0) {
         await Promise.all(promises);
         console.log('✅ Delta updates committed successfully');
+
+        // FIRE NOTIFICATION FOR NEW ASSIGNEES
+        if (toAdd.length > 0) {
+          try {
+            // Find the current user profile (who assigned it)
+            const assigner = users.find(u => u.id === user?.id);
+            const assignedByName = assigner?.name || user?.email || 'Someone';
+
+            // Find the task info
+            const taskLevelTask = tasks.find(t => t.id === taskId);
+            
+            if (taskLevelTask) {
+              console.log('📧 Sending assignment notifications...', { taskId, toAdd });
+              // Call the new Edge Function async (fire-and-forget so UI doesn't block)
+              supabase.functions.invoke('notify-task-assigned', {
+                body: {
+                  taskId,
+                  taskTitle: taskLevelTask.title,
+                  taskPriority: taskLevelTask.priority || 'Not set',
+                  dueDate: taskLevelTask.due_date || 'Not set',
+                  assignedByName,
+                  newAssigneeIds: toAdd
+                }
+              }).catch(err => console.error('Failed to send assignment notification:', err));
+            }
+          } catch (notifErr) {
+            console.error('Error preparing assignment notification:', notifErr);
+          }
+        }
       } else {
         console.log('✨ No changes needed for assignees');
       }
