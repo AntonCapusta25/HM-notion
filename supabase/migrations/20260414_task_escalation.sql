@@ -1,33 +1,69 @@
--- Add escalated_at column to tasks table to track when an escalation email was sent
-ALTER TABLE tasks ADD COLUMN IF NOT EXISTS escalated_at TIMESTAMP WITH TIME ZONE;
+-- ============================================================
+-- Notification columns
+-- ============================================================
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS escalated_at  TIMESTAMP WITH TIME ZONE;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS nudge_sent_at TIMESTAMP WITH TIME ZONE;
 
--- Enable pg_cron if not already enabled
+-- ============================================================
+-- pg_cron + pg_net extensions
+-- ============================================================
 CREATE EXTENSION IF NOT EXISTS pg_cron;
+CREATE EXTENSION IF NOT EXISTS pg_net;
 
--- Schedule the escalation function to run daily at 00:00 UTC
--- Note: Replace the URL with your project's Edge Function URL if needed, 
--- but using the internal service role key is usually preferred for cron jobs.
--- This requires the supabase_functions extension or similar.
--- For now, we set up the cron to call the edge function via HTTP.
+-- ============================================================
+-- Helper: get project ref from the Supabase built-in variable
+-- ============================================================
+-- NOTE: Replace <YOUR_PROJECT_REF> with your actual Supabase project ref
+-- and <YOUR_SERVICE_ROLE_KEY> with your service_role key.
+-- You can find both in Supabase Dashboard → Settings → API
+
+-- ============================================================
+-- 1. ESCALATION: daily at 00:00 UTC
+-- ============================================================
+SELECT cron.unschedule('escalate-overdue-tasks-daily');
 
 SELECT cron.schedule(
-    'escalate-overdue-tasks-daily',
-    '0 0 * * *',
-    $$
-    SELECT
-      net.http_post(
-        url := (SELECT value FROM settings WHERE key = 'supabase_url') || '/functions/v1/escalate-overdue-tasks',
-        headers := jsonb_build_object(
-          'Content-Type', 'application/json',
-          'Authorization', 'Bearer ' || (SELECT value FROM settings WHERE key = 'service_role_key')
-        ),
-        body := '{}'
-      )
-    $$
+  'escalate-overdue-tasks-daily',
+  '0 0 * * *',
+  $$
+  SELECT net.http_post(
+    url     := 'https://<YOUR_PROJECT_REF>.supabase.co/functions/v1/escalate-overdue-tasks',
+    headers := '{"Content-Type":"application/json","Authorization":"Bearer <YOUR_SERVICE_ROLE_KEY>"}'::jsonb,
+    body    := '{}'::jsonb
+  )
+  $$
 );
 
--- Note: The above SQL assumes a 'settings' table or similar for URL/Key.
--- If not available, we might need a more direct way or manual setup in Supabase UI.
--- However, standard Supabase projects often use secrets that are not directly available in SQL.
--- A better approach for cron in Supabase is often to use the dashboard, 
--- but we can provide the SQL as a template.
+-- ============================================================
+-- 2. NUDGE EMAILS: daily at 15:30 UTC (5:30 PM Amsterdam / EET)
+-- ============================================================
+SELECT cron.unschedule('nudge-overdue-assignees-daily');
+
+SELECT cron.schedule(
+  'nudge-overdue-assignees-daily',
+  '30 15 * * *',
+  $$
+  SELECT net.http_post(
+    url     := 'https://<YOUR_PROJECT_REF>.supabase.co/functions/v1/nudge-overdue-assignees',
+    headers := '{"Content-Type":"application/json","Authorization":"Bearer <YOUR_SERVICE_ROLE_KEY>"}'::jsonb,
+    body    := '{}'::jsonb
+  )
+  $$
+);
+
+-- ============================================================
+-- 3. DAILY STATS: daily at 15:30 UTC (same time, or adjust as needed)
+-- ============================================================
+SELECT cron.unschedule('send-daily-stats-email');
+
+SELECT cron.schedule(
+  'send-daily-stats-email',
+  '30 15 * * *',
+  $$
+  SELECT net.http_post(
+    url     := 'https://<YOUR_PROJECT_REF>.supabase.co/functions/v1/send-daily-stats',
+    headers := '{"Content-Type":"application/json","Authorization":"Bearer <YOUR_SERVICE_ROLE_KEY>"}'::jsonb,
+    body    := '{}'::jsonb
+  )
+  $$
+);
