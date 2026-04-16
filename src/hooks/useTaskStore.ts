@@ -656,50 +656,43 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
       // Wait for both operations
       if (promises.length > 0) {
         await Promise.all(promises);
-        console.log('✅ Delta updates committed successfully');
-
-        // FIRE NOTIFICATION FOR NEW ASSIGNEES
-        if (toAdd.length > 0) {
-          try {
-            // Find the current user profile (who assigned it)
-            const assigner = users.find(u => u.id === user?.id);
-            const assignedByName = assigner?.name || user?.email || 'Someone';
-
-            // Find the task info
-            const taskLevelTask = tasks.find(t => t.id === taskId);
-            
-            if (taskLevelTask) {
-              console.log('📧 Sending assignment notifications...', { taskId, toAdd });
-              // Call the new Edge Function async (fire-and-forget so UI doesn't block)
-              supabase.functions.invoke('notify-task-assigned', {
-                body: {
-                  taskId,
-                  taskTitle: taskLevelTask.title,
-                  taskPriority: taskLevelTask.priority || 'Not set',
-                  dueDate: taskLevelTask.due_date || 'Not set',
-                  assignedByName,
-                  newAssigneeIds: toAdd
-                }
-              }).catch(err => console.error('Failed to send assignment notification:', err));
-            }
-          } catch (notifErr) {
-            console.error('Error preparing assignment notification:', notifErr);
-          }
-        }
+        console.log('✅ Delta updates committed successfully for assignees');
       } else {
         console.log('✨ No changes needed for assignees');
       }
 
       // 4. Notifications (Only for NEW assignees)
       if (toAdd.length > 0) {
-        // Get task details for notification
-        const { data: task } = await supabase
-          .from('tasks')
-          .select('title, created_by')
-          .eq('id', taskId)
-          .single();
+        // Fetch fresh task details and the current user's name directly to avoid stale closures
+        const [{ data: task }, { data: currentUserData }] = await Promise.all([
+          supabase
+            .from('tasks')
+            .select('title, priority, due_date, created_by')
+            .eq('id', taskId)
+            .single(),
+          user?.id ? supabase
+            .from('users')
+            .select('name')
+            .eq('id', user.id)
+            .single() : Promise.resolve({ data: null })
+        ]);
 
         if (task) {
+          // --- EDGE FUNCTION: Email Notifications ---
+          const assignedByName = currentUserData?.name || user?.email || 'Someone';
+          console.log('📧 Sending assignment notifications...', { taskId, toAdd });
+          supabase.functions.invoke('notify-task-assigned', {
+            body: {
+              taskId,
+              taskTitle: task.title,
+              taskPriority: task.priority || 'Not set',
+              dueDate: task.due_date || 'Not set',
+              assignedByName,
+              newAssigneeIds: toAdd
+            }
+          }).catch(err => console.error('Failed to send assignment notification:', err));
+
+          // --- IN-APP NOTIFICATIONS ---
           const notificationsToCreate = toAdd
             .filter(userId => userId !== task.created_by) // Don't notify task creator
             .map(userId => ({
@@ -731,9 +724,9 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
                 .insert(uniqueNotifications);
 
               if (notifError) {
-                console.error('❌ Error creating notifications:', notifError);
+                console.error('❌ Error creating in-app notifications:', notifError);
               } else {
-                console.log(`✅ Created ${uniqueNotifications.length} task assignment notifications`);
+                console.log(`✅ Created ${uniqueNotifications.length} task assignment in-app notifications`);
               }
             }
           }
