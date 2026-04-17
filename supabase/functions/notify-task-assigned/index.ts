@@ -33,8 +33,8 @@ serve(async (req) => {
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) throw new Error('Supabase config missing')
     if (!SENDGRID_API_KEY) throw new Error('SENDGRID_API_KEY not configured')
 
-    // Expected body: { taskId, taskTitle, taskPriority, dueDate, assignedByName, newAssigneeIds }
-    const { taskId, taskTitle, taskPriority, dueDate, assignedByName, newAssigneeIds } = await req.json()
+    // Expected body: { taskId, taskTitle, taskDescription, taskPriority, dueDate, assignedByName, newAssigneeIds }
+    const { taskId, taskTitle, taskDescription, taskPriority, dueDate, assignedByName, newAssigneeIds } = await req.json()
 
     if (!taskId || !taskTitle || !newAssigneeIds?.length) {
       return new Response(JSON.stringify({ error: 'Missing required fields' }), {
@@ -63,6 +63,8 @@ serve(async (req) => {
       'info@homemademeals.net'
     const results = []
 
+    const allAssigneeNames = assignees.map(a => a.name || a.email || 'Team member').join(', ')
+
     for (const user of assignees) {
       if (!user.email) { console.warn(`No email for user ${user.id}`); continue }
 
@@ -79,6 +81,8 @@ serve(async (req) => {
           
           <div style="background-color: #fdf5f2; border-left: 4px solid #EE6A3E; padding: 15px; margin: 25px 0; border-radius: 0 4px 4px 0;">
             <h3 style="margin: 0 0 10px 0; color: #333; font-size: 18px;">${taskTitle}</h3>
+            ${taskDescription ? `<p style="margin: 10px 0; color: #444; font-size: 14px; background-color: white; padding: 10px; border-radius: 4px; border: 1px solid #eee;">${taskDescription}</p>` : ''}
+            <p style="margin: 5px 0; color: #555; font-size: 14px;"><strong>Assignees:</strong> ${allAssigneeNames}</p>
             <p style="margin: 5px 0; color: #555; font-size: 14px;"><strong>Priority:</strong> ${taskPriority || 'Not set'}</p>
             <p style="margin: 5px 0; color: #555; font-size: 14px;"><strong>Due Date:</strong> ${dueDate || 'Not set'}</p>
           </div>

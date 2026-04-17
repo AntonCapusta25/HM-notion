@@ -574,6 +574,7 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
               body: {
                 taskId: newTask.id,
                 taskTitle: newTask.title,
+                taskDescription: newTask.description || 'No description provided',
                 taskPriority: newTask.priority || 'Not set',
                 dueDate: newTask.due_date || 'Not set',
                 assignedByName,
@@ -684,7 +685,7 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
         const [{ data: task }, { data: currentUserData }] = await Promise.all([
           supabase
             .from('tasks')
-            .select('title, priority, due_date, created_by')
+            .select('title, description, priority, due_date, created_by')
             .eq('id', taskId)
             .single(),
           user?.id ? supabase
@@ -703,6 +704,7 @@ export const useTaskStore = (options: UseTaskStoreOptions = {}) => {
               body: {
                 taskId,
                 taskTitle: task.title,
+                taskDescription: task.description || 'No description provided',
                 taskPriority: task.priority || 'Not set',
                 dueDate: task.due_date || 'Not set',
                 assignedByName,
