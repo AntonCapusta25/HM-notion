@@ -56,7 +56,7 @@ BEGIN
 
   PERFORM cron.schedule(
     'escalate-overdue-tasks-daily',
-    '0 0 * * *',
+    '0 17 * * *',
     format(
       $cmd$SELECT net.http_post(url := %L, headers := %L::jsonb, body := '{}'::jsonb)$cmd$,
       v_base_url || '/escalate-overdue-tasks',
@@ -66,7 +66,7 @@ BEGIN
 
   PERFORM cron.schedule(
     'nudge-overdue-assignees-daily',
-    '30 15 * * *',
+    '0 17 * * *',
     format(
       $cmd$SELECT net.http_post(url := %L, headers := %L::jsonb, body := '{}'::jsonb)$cmd$,
       v_base_url || '/nudge-overdue-assignees',
@@ -76,7 +76,7 @@ BEGIN
 
   PERFORM cron.schedule(
     'send-daily-stats-email',
-    '30 15 * * *',
+    '0 17 * * *',
     format(
       $cmd$SELECT net.http_post(url := %L, headers := %L::jsonb, body := '{}'::jsonb)$cmd$,
       v_base_url || '/send-daily-stats',
