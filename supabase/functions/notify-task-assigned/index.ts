@@ -36,78 +36,12 @@ serve(async (req) => {
     // Expected body: { taskId, taskTitle, taskDescription, taskPriority, dueDate, assignedByName, newAssigneeIds }
     const { taskId, taskTitle, taskDescription, taskPriority, dueDate, assignedByName, newAssigneeIds } = await req.json()
 
-    if (!taskId || !taskTitle || !newAssigneeIds?.length) {
-      return new Response(JSON.stringify({ error: 'Missing required fields' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
-
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-
-    // Fetch assignee emails
-    const { data: assignees, error } = await supabase
-      .from('users')
-      .select('id, name, email')
-      .in('id', newAssigneeIds)
-
-    if (error) throw new Error(`Failed to fetch assignees: ${error.message}`)
-    if (!assignees?.length) {
-      return new Response(JSON.stringify({ message: 'No valid assignees found' }), {
-        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
-
-    const senderEmail =
-      Deno.env.get('SENDGRID_FROM_EMAIL') ||
-      Deno.env.get('DEFAULT_SENDER_EMAIL') ||
-      'info@homemademeals.net'
-    const results = []
-
-    const allAssigneeNames = assignees.map(a => a.name || a.email || 'Team member').join(', ')
-
-    for (const user of assignees) {
-      if (!user.email) { console.warn(`No email for user ${user.id}`); continue }
-
-      const subject = `📋 You've been assigned a task: ${taskTitle}`
-      
-      const htmlBody = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-        <div style="background-color: #EE6A3E; padding: 20px; text-align: center;">
-          <h2 style="color: white; margin: 0; font-size: 24px;">New Task Assigned</h2>
-        </div>
-        <div style="padding: 30px; background-color: #ffffff;">
-          <p style="font-size: 16px; color: #333; margin-top: 0;">Hi ${user.name || 'there'},</p>
-          <p style="font-size: 16px; color: #333; line-height: 1.5;">You have been assigned a new task${assignedByName ? ` by <strong>${assignedByName}</strong>` : ''}.</p>
-          
-          <div style="background-color: #fdf5f2; border-left: 4px solid #EE6A3E; padding: 15px; margin: 25px 0; border-radius: 0 4px 4px 0;">
-            <h3 style="margin: 0 0 10px 0; color: #333; font-size: 18px;">${taskTitle}</h3>
-            ${taskDescription ? `<p style="margin: 10px 0; color: #444; font-size: 14px; background-color: white; padding: 10px; border-radius: 4px; border: 1px solid #eee;">${taskDescription}</p>` : ''}
-            <p style="margin: 5px 0; color: #555; font-size: 14px;"><strong>Assignees:</strong> ${allAssigneeNames}</p>
-            <p style="margin: 5px 0; color: #555; font-size: 14px;"><strong>Priority:</strong> ${taskPriority || 'Not set'}</p>
-            <p style="margin: 5px 0; color: #555; font-size: 14px;"><strong>Due Date:</strong> ${dueDate || 'Not set'}</p>
-          </div>
-          
-          <div style="text-align: center; margin-top: 35px; margin-bottom: 20px;">
-            <a href="https://hmbase.netlify.app/my-tasks" style="background-color: #EE6A3E; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-size: 16px;">View Task in Platform</a>
-          </div>
-        </div>
-        <div style="background-color: #f9f9f9; padding: 15px; text-align: center; color: #888; font-size: 12px; border-top: 1px solid #eee;">
-          &copy; ${new Date().getFullYear()} HomeMade Meals. All rights reserved.
-        </div>
-      </div>
-      `;
-
-      try {
-        await sendEmail(senderEmail, user.email, subject, htmlBody)
-        console.log(`✅ Assignment notification sent to ${user.email}`)
-        results.push({ userId: user.id, email: user.email, status: 'sent' })
-      } catch (err: any) {
-        console.error(`❌ Failed to notify ${user.email}:`, err.message)
-        results.push({ userId: user.id, email: user.email, status: 'failed', error: err.message })
-      }
-    }
-
-    return new Response(JSON.stringify({ success: true, results }), {
+    // Immediate task assignment notifications are now disabled in favor of the daily digest.
+    // We return success so the client/caller doesn't throw an error.
+    return new Response(JSON.stringify({ 
+      success: true, 
+      message: 'Individual task notifications are disabled in favor of daily digest' 
+    }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
 
